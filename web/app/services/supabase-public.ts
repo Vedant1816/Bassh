@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-const supabaseURL = process.env.SUPABASE_URL;
-const anon_key = process.env.ANON_KEY;
+const supabaseURL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anon_key = process.env.NEXT_PUBLIC_ANON_KEY;
 if(!supabaseURL || !anon_key){
     throw new Error("Missing Supabase Credentials");
 }
