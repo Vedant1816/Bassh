@@ -14,7 +14,7 @@ export default function SignupPage(){
         setMessage("");
 
         const { data, error } = await supabasePublic.auth.signUp({
-            email,
+            email, 
             password,
         });
 
