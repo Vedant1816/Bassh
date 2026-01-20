@@ -30,6 +30,15 @@ export const POST = withAuth(async (req, user) => {
     if(error){
       return Response.json({error: error.message}, {status: 500});
     }
+    const { error : locationError } = await supabaseAdmin.rpc("insert_location", {
+      p_name: clubName,
+      p_category: "club",
+      p_lat: location.latitude,
+      p_lng: location.longitude,
+    })
+    if(locationError){
+      return Response.json({error: locationError.message}, {status: 500});
+    }
   }
 
   return Response.json({ ok: true });
