@@ -1,22 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import supabasePublic from "@/app/services/supabase-public";
 import { withAuthHeaders } from "@/app/services/auth-fetch";
 import ClubLocationPicker from "../components/ClubLocationPicker";
+import { useRouter } from "next/navigation";
 
-export default function SignupPage() {
-  type LocationData = {
+type LocationData = {
   address: string;
   latitude: number;
   longitude: number;
 };
+
+export default function SignupPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [location, setLocation] = useState<LocationData | null>(null);
   const [clubName, setClubName] = useState("");
+  const [location, setLocation] = useState<LocationData | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [message, setMessage] = useState("");
+
+  //  AUTH PRE-CHECK
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabasePublic.auth.getSession();
+
+      if (session) {
+        router.replace("/");
+      } else {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   const handleSignUp = async () => {
     if (!email || !password) {
@@ -27,53 +50,69 @@ export default function SignupPage() {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabasePublic.auth.signUp({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabasePublic.auth.signUp({
+        email,
+        password,
+      });
 
-    if (error) {
-      setMessage(error.message);
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      // Create user profile
+      const res = await fetch(
+        "/api/users",
+        await withAuthHeaders({
+          method: "POST",
+          body: JSON.stringify({
+            name: email.split("@")[0],
+            email,
+            role: "club",
+            location,
+            clubName,
+          }),
+        })
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        setMessage(err.error || "Failed to create profile");
+        return;
+      }
+
+      //  Success → go to login but first log out
+      await supabasePublic.auth.signOut();
+      router.replace("/login");
+    } catch (err) {
+      console.error(err);
+      setMessage("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // create user profile
-    const res = await fetch(
-      "/api/users",
-      await withAuthHeaders({
-        method: "POST",
-        body: JSON.stringify({
-          name: email.split("@")[0],
-          email,
-          role: "club",
-          location,
-          clubName
-        }),
-      })
-    );
-
-    if (!res.ok) {
-      const err = await res.json();
-      setMessage(err.error || "Failed to create profile");
-    } else {
-      setMessage("Account created successfully.");
-    }
-
-    setLoading(false);
   };
+
+  // 🔄 AUTH CHECK LOADING SCREEN
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#0b0b0b] p-8 text-center">
+          <p className="text-sm text-gray-400">
+            Checking authentication…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#0b0b0b] p-8">
 
-        {/* Title */}
         <h1 className="text-xl font-semibold text-white mb-1">
           Sign Up
         </h1>
-        {/* <p className="text-sm text-gray-400 mb-6">
-          Sign up to create your club management dashboard
-        </p> */}
 
         {/* Email */}
         <div className="mb-4">
@@ -103,6 +142,7 @@ export default function SignupPage() {
           />
         </div>
 
+        {/* Club Name */}
         <div className="mb-4">
           <label className="block text-sm text-gray-400 mb-1">
             Club Name
@@ -110,18 +150,19 @@ export default function SignupPage() {
           <input
             value={clubName}
             onChange={(e) => setClubName(e.target.value)}
-            className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-pink-500"
+            className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
           />
         </div>
 
-        <ClubLocationPicker
-          onSelect={(data) => {
-          setLocation(data);
-          }}
-        />
+        <ClubLocationPicker onSelect={setLocation} />
 
+        <p className="mt-4 text-center text-sm text-gray-400">
+          Already Registered?{" "}
+          <a href="/login" className="text-pink-500 hover:underline">
+            Log In
+          </a>
+        </p>
 
-        {/* Button */}
         <button
           onClick={handleSignUp}
           disabled={loading}
@@ -130,18 +171,12 @@ export default function SignupPage() {
           {loading ? "Signing up..." : "Sign up"}
         </button>
 
-        {/* Message */}
         {message && (
           <p className="mt-4 text-center text-sm text-gray-400">
             {message}
           </p>
         )}
       </div>
-
-      {/* Footer */}
-      {/* <p className="absolute bottom-6 text-xs text-gray-500">
-        © 2025 Club Dashboard. All rights reserved.
-      </p> */}
     </div>
   );
 }
