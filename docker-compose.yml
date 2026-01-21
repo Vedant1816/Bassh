@@ -1,16 +1,19 @@
-
 services:
   expo:
     container_name: baash-expo
     build:
-      context: ./app
+      context: ./myApp
+      dockerfile: Dockerfile
     volumes:
-      - ./app:/app
+      - ./myApp:/app
       - /app/node_modules
     ports:
       - "8081:8081"
     environment:
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - NODE_ENV=development
+    env_file:
+      - ./myApp/.env
     stdin_open: true
     tty: true
 
@@ -18,8 +21,13 @@ services:
     container_name: baash-web
     build:
       context: ./web
+      dockerfile: Dockerfile
     volumes:
       - ./web:/app
       - /app/node_modules
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - ./web/.env

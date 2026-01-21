@@ -289,8 +289,17 @@ export default function HomeScreen() {
               animationMode="flyTo"
               animationDuration={1000}
             />
+          ) : location ? (
+            // Zoom to user's current location when available
+            <Mapbox.Camera
+              ref={cameraRef}
+              centerCoordinate={[location.lng, location.lat]}
+              zoomLevel={13}
+              animationMode="flyTo"
+              animationDuration={1500}
+            />
           ) : geojson.features.length > 0 ? (
-            // Fit all clubs in view initially
+            // Fit all clubs in view if no user location available
             <Mapbox.Camera
               ref={cameraRef}
               bounds={{
@@ -307,7 +316,7 @@ export default function HomeScreen() {
               animationDuration={1500}
             />
           ) : (
-            // Default view centered on user location
+            // Default view centered on user location (fallback)
             <Mapbox.Camera
               ref={cameraRef}
               followUserLocation
