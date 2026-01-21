@@ -67,6 +67,9 @@ export default function LoginScreen() {
         return;
       }
 
+      // Log the access token
+      const token = sessionData.session.access_token;
+      console.log("🔑 Access Token:", token);
       console.log("Login successful, redirecting based on role...");
       await redirectToRoleHome(router);
     } catch (err: any) {

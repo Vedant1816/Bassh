@@ -62,6 +62,12 @@ export default function SignupScreen() {
       return;
     }
 
+    // Get session and log the access token
+    const { data: sessionData } = await supabasePublic.auth.getSession();
+    if (sessionData?.session?.access_token) {
+      console.log("🔑 Signup Access Token:", sessionData.session.access_token);
+    }
+
     // Using helper to attach Authorization automatically
     // Only call API if URL is configured (required for physical devices)
     if (!API_BASE_URL || (!isApiUrlConfiguredForDevice() && Platform.OS !== "web")) {

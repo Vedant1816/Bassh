@@ -67,6 +67,9 @@ export default function StaffLoginScreen() {
         return;
       }
 
+      // Log the access token
+      const token = sessionData.session.access_token;
+      console.log("🔑 Staff Access Token:", token);
       console.log("Staff login successful, redirecting based on role...");
       await redirectToRoleHome(router);
     } catch (err: any) {

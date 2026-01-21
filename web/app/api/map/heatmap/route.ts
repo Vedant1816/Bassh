@@ -1,7 +1,7 @@
 import supabaseAdmin from "@/app/services/supabase-admin";
 import { withAuth } from "@/app/services/protected";
 
-export const POST = withAuth(async (req) => {
+export const POST = withAuth(async (req: Request, _params: any, _user: any) => {
   const { categories = ["club"], minIntensity = 1 } = await req.json();
 
   const { data, error } = await supabaseAdmin.rpc(
