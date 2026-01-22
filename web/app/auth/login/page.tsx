@@ -19,7 +19,7 @@ export default function LoginPage() {
       } = await supabasePublic.auth.getSession();
 
       if (session) {
-        router.replace("/");
+        router.replace("/dashboard");
       } else {
         setCheckingAuth(false);
       }
@@ -44,7 +44,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (err) {
       console.error("UNEXPECTED ERROR:", err);
       setMessage("Something went wrong. Please try again.");
@@ -101,7 +101,7 @@ export default function LoginPage() {
         <p className="mt-4 text-center text-sm text-gray-400">
           New to Bassh?{" "}
           <a
-            href="/signUp"
+            href="/auth/signUp"
             className="text-pink-500 hover:underline"
           >
             Create Account
