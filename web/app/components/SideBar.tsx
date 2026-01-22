@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { useRouter } from "next/navigation";
 import supabasePublic from "@/app/services/supabase-public";
@@ -23,10 +25,10 @@ export default function Sidebar() {
 
       {/* NAV (NOT SCROLLABLE) */}
       <nav className="px-4 space-y-1 text-sm">
-        <NavItem label="Overview" active />
+        <NavItem label="Overview" href="/dashboard"/>
         <NavItem label="Menu Management" />
         <NavItem label="Discounts & Offers" />
-        <NavItem label="Event Management" />
+        <NavItem label="Event Management" href="/dashboard/events/manage" />
         <NavItem label="Guest List" />
         <NavItem label="Billing & Receipts" />
         <NavItem label="Settings" />
@@ -47,20 +49,26 @@ export default function Sidebar() {
 
 function NavItem({
   label,
-  active,
+  href,
 }: {
-  label: string;
-  active?: boolean;
+  label: string,
+  href?: string,
 }) {
-  return (
-    <div
-      className={`px-3 py-2 rounded-md cursor-pointer ${
-        active
-          ? "bg-pink-500/10 text-pink-400"
-          : "text-gray-400 hover:text-white hover:bg-white/5"
-      }`}
-    >
-      {label}
-    </div>
-  );
+  const pathName = usePathname();
+  const isActive = href? pathName === href : false;
+
+  const className = `block px-3 py-2 rounded-md ${
+    isActive
+      ? "bg-pink-600 text-white"
+      : "text-gray-400 hover:text-white hover:bg-white/5"
+  }`;
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {label}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{label}</div>;
 }

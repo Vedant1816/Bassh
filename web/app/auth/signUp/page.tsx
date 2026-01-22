@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import supabasePublic from "@/app/services/supabase-public";
 import { withAuthHeaders } from "@/app/services/auth-fetch";
-import ClubLocationPicker from "../components/ClubLocationPicker";
+import ClubLocationPicker from "@/app/components/ClubLocationPicker";
 import { useRouter } from "next/navigation";
 
 type LocationData = {
@@ -32,7 +32,7 @@ export default function SignupPage() {
       } = await supabasePublic.auth.getSession();
 
       if (session) {
-        router.replace("/");
+        router.replace("/dashboard");
       } else {
         setCheckingAuth(false);
       }
@@ -84,7 +84,7 @@ export default function SignupPage() {
 
       //  Success → go to login but first log out
       await supabasePublic.auth.signOut();
-      router.replace("/login");
+      router.replace("/auth/login");
     } catch (err) {
       console.error(err);
       setMessage("Something went wrong. Please try again.");
@@ -158,7 +158,7 @@ export default function SignupPage() {
 
         <p className="mt-4 text-center text-sm text-gray-400">
           Already Registered?{" "}
-          <a href="/login" className="text-pink-500 hover:underline">
+          <a href="/auth/login" className="text-pink-500 hover:underline">
             Log In
           </a>
         </p>
