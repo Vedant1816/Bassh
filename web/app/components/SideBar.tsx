@@ -10,7 +10,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await supabasePublic.auth.signOut();
-    router.replace("/login");
+    router.replace("/auth/login");
   };
 
   return (

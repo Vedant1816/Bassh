@@ -1,7 +1,7 @@
 import { withAuth } from "@/app/services/protected";
 import supabaseAdmin from "@/app/services/supabase-admin";
 
-export const POST = withAuth(async (req, user) => {
+export const POST = withAuth(async (req:Request, user:any) => {
   try {
     const body = await req.json();
 
@@ -91,4 +91,19 @@ export const POST = withAuth(async (req, user) => {
       { status: 500 }
     );
   }
+});
+export const runtime = "nodejs";
+
+export const GET = withAuth(async (_req: Request, _params: any, _user: any) => {
+  const { data, error } = await supabaseAdmin
+    .from("events")
+    .select("*")
+    .order("event_date", { ascending: true })
+    .order("event_time", { ascending: true });
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  return Response.json(data);
 });

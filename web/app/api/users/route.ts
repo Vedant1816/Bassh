@@ -1,7 +1,7 @@
 import { withAuth } from "@/app/services/protected";
 import supabaseAdmin from "@/app/services/supabase-admin";
 
-export const POST = withAuth(async (req, user) => {
+export const POST = withAuth(async (req:Request, user:any) => {
   //Generic logic for all users(Club + Customers)
   const { name, email, role, clubName, location } = await req.json();
   
