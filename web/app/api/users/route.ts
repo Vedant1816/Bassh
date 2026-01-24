@@ -1,6 +1,7 @@
 import { withAuth } from "@/app/services/protected";
 import supabaseAdmin from "@/app/services/supabase-admin";
 
+<<<<<<< HEAD
 export const runtime = "nodejs";
 
 export const POST = withAuth(async (req: Request, user: any) => {
@@ -10,6 +11,18 @@ export const POST = withAuth(async (req: Request, user: any) => {
     const email = body.email || user.email;
     const role = body.role || "user";
     const name = body.name || email.split("@")[0];
+=======
+export const POST = withAuth(async (req:Request, user:any) => {
+  //Generic logic for all users(Club + Customers)
+  const { name, email, role, clubName, location } = await req.json();
+  
+  const { error } = await supabaseAdmin.from("users").insert({
+    id: user.id,
+    name,
+    email,
+    role,
+  });
+>>>>>>> d7a7b2fa2c3310d5a60807f5d97d0051e733ade8
 
     console.log("📝 Creating / updating user:", {
       id: user.id,
@@ -145,4 +158,35 @@ export const POST = withAuth(async (req: Request, user: any) => {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 });
+=======
+
+  //Club Only logic
+  if(role === "club"){
+    const { error } = await supabaseAdmin.from("clubs").insert({
+      id: user.id,
+      club_name: clubName,
+      club_email: email,
+      address_text: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+
+    if(error){
+      return Response.json({error: error.message}, {status: 500});
+    }
+    const { error : locationError } = await supabaseAdmin.rpc("insert_location", {
+      p_name: clubName,
+      p_category: "club",
+      p_lat: location.latitude,
+      p_lng: location.longitude,
+    })
+    if(locationError){
+      return Response.json({error: locationError.message}, {status: 500});
+    }
+  }
+
+  return Response.json({ ok: true });
+});
+>>>>>>> d7a7b2fa2c3310d5a60807f5d97d0051e733ade8
