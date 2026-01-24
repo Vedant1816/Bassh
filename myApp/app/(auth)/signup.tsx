@@ -68,6 +68,7 @@ export default function SignupScreen() {
       console.log("🔑 Signup Access Token:", sessionData.session.access_token);
     }
 
+
     // Using helper to attach Authorization automatically
     // Only call API if URL is configured (required for physical devices)
     if (!API_BASE_URL || (!isApiUrlConfiguredForDevice() && Platform.OS !== "web")) {
@@ -81,6 +82,7 @@ export default function SignupScreen() {
     }
 
     try {
+      console.log("📝 Creating user profile in database...");
       const res = await fetch(
         `${API_BASE_URL}/api/users`,
         await withAuthHeaders({
@@ -90,35 +92,39 @@ export default function SignupScreen() {
           },
           body: JSON.stringify({
             name: trimmedEmail.split("@")[0],
+            email: trimmedEmail,
             role: "user",
           }),
         })
       );
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        console.error("❌ Profile creation failed:", err);
         setMessage(`Account created but profile setup failed: ${err.error || "Unknown error"}. Redirecting...`);
-        // Still redirect even if profile setup failed - account exists
+        // Still redirect to about-you even if profile setup failed - account exists
         setTimeout(async () => {
-          await redirectToRoleHome(router, "user");
+          await router.replace("/onboarding/about-you");
         }, 1500);
       } else {
-        setMessage("Account created successfully! Redirecting...");
-        // Wait a moment then redirect with known role
+        const result = await res.json().catch(() => ({}));
+        console.log("✅ User profile created:", result);
+        setMessage("Account created! Redirecting to onboarding...");
+        // Redirect to about-you to start onboarding flow
         setTimeout(async () => {
-          await redirectToRoleHome(router, "user");
-        }, 1000);
+          await router.replace("/onboarding/about-you");
+        }, 1500);
       }
     } catch (fetchError: any) {
       // Handle network errors gracefully - account is still created in Supabase
-      console.error("API Error:", fetchError);
+      console.error("❌ API Error:", fetchError);
       const errorMsg = fetchError.message?.includes("Network request failed")
         ? "Account created! API server unreachable. Redirecting anyway..."
         : "Account created! Profile setup failed. Redirecting anyway...";
       setMessage(errorMsg);
       // Still redirect even if API failed - Supabase account exists
       setTimeout(async () => {
-        await redirectToRoleHome(router, "user");
+        await router.replace("/onboarding/about-you");
       }, 1500);
     }
 
