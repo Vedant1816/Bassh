@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import supabasePublic from "@/_services/supabase-public";
-import { getUserRole } from "@/_services/user-role";
+import { withAuthHeaders } from "@/_services/auth-fetch";
+import { API_BASE_URL } from "@/_services/api-config";
 
 export default function StaffHomeScreen() {
   const router = useRouter();
@@ -10,17 +11,34 @@ export default function StaffHomeScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadUserData();
+    checkStaffStatus();
   }, []);
 
-  const loadUserData = async () => {
+  const checkStaffStatus = async () => {
     try {
+      // Check staff status
+      const res = await fetch(
+        `${API_BASE_URL}/api/staff/me`,
+        await withAuthHeaders({ method: "GET" })
+      );
+
+      if (res.ok) {
+        const staff = await res.json();
+        
+        // If status is pending and no club_id, redirect to join-club
+        if (staff.status === "pending" && !staff.club_id) {
+          router.replace("/staff/join-club");
+          return;
+        }
+      }
+
+      // Load user data for dashboard
       const { data: { user } } = await supabasePublic.auth.getUser();
       if (user) {
         setUserEmail(user.email || "");
       }
     } catch (error) {
-      console.error("Error loading user data:", error);
+      console.error("Error loading staff data:", error);
     } finally {
       setLoading(false);
     }

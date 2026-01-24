@@ -10,10 +10,20 @@ export default function AboutYouScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
+  const [gender, setGender] = useState("");
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Gender options - database likely expects lowercase values
+  const genderOptions = [
+    { label: "Male", value: "male" },
+    { label: "Female", value: "female" },
+    { label: "Other", value: "other" },
+    { label: "Prefer not to say", value: "prefer_not_to_say" }
+  ];
+
   const save = async () => {
-    if (!firstName.trim() || !lastName.trim() || !username.trim()) {
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !gender) {
       return;
     }
 
@@ -35,6 +45,7 @@ export default function AboutYouScreen() {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             username: username.trim(),
+            gender: gender,
           }),
         })
       );
@@ -116,6 +127,51 @@ export default function AboutYouScreen() {
               />
             </View>
 
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <Pressable
+                style={styles.pickerButton}
+                onPress={() => setShowGenderPicker(!showGenderPicker)}
+              >
+                <Text style={[styles.pickerText, !gender && styles.placeholderText]}>
+                  {gender ? genderOptions.find(opt => opt.value === gender)?.label || gender : "Select gender"}
+                </Text>
+                <Ionicons 
+                  name={showGenderPicker ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#EC4899" 
+                />
+              </Pressable>
+              
+              {showGenderPicker && (
+                <View style={styles.pickerOptions}>
+                  {genderOptions.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.pickerOption,
+                        gender === option.value && styles.pickerOptionSelected
+                      ]}
+                      onPress={() => {
+                        setGender(option.value);
+                        setShowGenderPicker(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.pickerOptionText,
+                        gender === option.value && styles.pickerOptionTextSelected
+                      ]}>
+                        {option.label}
+                      </Text>
+                      {gender === option.value && (
+                        <Ionicons name="checkmark" size={20} color="#EC4899" />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
             <View style={styles.buttonRow}>
               <Pressable
                 onPress={() => router.back()}
@@ -125,10 +181,10 @@ export default function AboutYouScreen() {
               </Pressable>
               <Pressable
                 onPress={save}
-                disabled={loading || !firstName.trim() || !lastName.trim() || !username.trim()}
+                disabled={loading || !firstName.trim() || !lastName.trim() || !username.trim() || !gender}
                 style={[
                   styles.continueButton,
-                  (loading || !firstName.trim() || !lastName.trim() || !username.trim()) && styles.buttonDisabled
+                  (loading || !firstName.trim() || !lastName.trim() || !username.trim() || !gender) && styles.buttonDisabled
                 ]}
               >
                 <Text style={styles.continueButtonText}>
@@ -259,6 +315,53 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  pickerButton: {
+    width: "100%",
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(236, 72, 153, 0.3)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pickerText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+  placeholderText: {
+    color: "#6B7280",
+  },
+  pickerOptions: {
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(236, 72, 153, 0.3)",
+    overflow: "hidden",
+  },
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  pickerOptionSelected: {
+    backgroundColor: "rgba(236, 72, 153, 0.1)",
+  },
+  pickerOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+  pickerOptionTextSelected: {
+    color: "#EC4899",
     fontWeight: "600",
   },
 });

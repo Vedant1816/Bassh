@@ -11,14 +11,26 @@ export function withAuth(
     const authHeader = req.headers.get("authorization");
 
     if (!authHeader) {
+      console.warn("⚠️ No Authorization header in request");
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const token = authHeader.replace("Bearer ", "");
 
+    if (!token) {
+      console.warn("⚠️ Empty token in Authorization header");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
-    if (error || !data?.user) {
+    if (error) {
+      console.error("❌ Token validation error:", error.message);
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!data?.user) {
+      console.warn("⚠️ No user found from token");
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -1,84 +1,72 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   ActivityIndicator,
   StyleSheet,
   Text,
   Pressable,
+  ScrollView,
+  Dimensions,
 } from "react-native";
 import * as Location from "expo-location";
 import Mapbox from "@rnmapbox/maps";
-import { useRouter } from "expo-router";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { API_BASE_URL } from "@/_services/api-config";
-import LocationPickerSheet from "../components/LocationPickerSheet";
 
-/* -------------------------------- TYPES -------------------------------- */
+/* ---------------- TYPES ---------------- */
 
-type GeoJSONFeatureCollection = {
+type ClubCard = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  intensity: number;
+  guest_count: number;
+  distance_km: number;
+  score: number;
+};
+
+type GeoJSON = {
   type: "FeatureCollection";
   features: any[];
 };
 
-type EventData = {
-  id: string;
-  event_name: string;
-  club_name: string;
-  latitude?: number;
-  longitude?: number;
-};
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
-const EMPTY_GEOJSON: GeoJSONFeatureCollection = {
+const EMPTY_GEOJSON: GeoJSON = {
   type: "FeatureCollection",
   features: [],
 };
 
-/* -------------------------------- SCREEN -------------------------------- */
+/* ---------------- SCREEN ---------------- */
 
 export default function HomeScreen() {
   const router = useRouter();
-
   const cameraRef = useRef<Mapbox.Camera>(null);
-  const eventSheetRef = useRef<BottomSheet>(null);
-  const locationSheetRef = useRef<BottomSheet>(null);
-
-  const snapPoints = useMemo(() => ["30%", "60%"], []);
 
   const [authChecked, setAuthChecked] = useState(false);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const [location, setLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  const [clubs, setClubs] = useState<ClubCard[]>([]);
+  const [geojson, setGeojson] = useState<GeoJSON>(EMPTY_GEOJSON);
 
-  const [currentCity, setCurrentCity] = useState("Locating…");
-  const [currentAddress, setCurrentAddress] = useState("");
+  const [loadingCards, setLoadingCards] = useState(true);
 
-  const [geojson, setGeojson] =
-    useState<GeoJSONFeatureCollection>(EMPTY_GEOJSON);
-
-  const [events, setEvents] = useState<EventData[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
-
-  /* ------------------------------ AUTH ------------------------------ */
+  /* ---------------- AUTH ---------------- */
   useEffect(() => {
     (async () => {
       const { data } = await supabasePublic.auth.getSession();
-      if (!data.session) {
-        router.replace("/(auth)");
-      } else {
-        setAuthChecked(true);
-      }
+      if (!data.session) router.replace("/(auth)");
+      else setAuthChecked(true);
     })();
   }, []);
 
-  /* --------------------------- LOCATION --------------------------- */
+  /* ---------------- LOCATION ---------------- */
   useEffect(() => {
     if (!authChecked) return;
 
@@ -90,42 +78,45 @@ export default function HomeScreen() {
         accuracy: Location.Accuracy.High,
       });
 
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      setLocation({ lat, lng });
-
-      const geo = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
+      setLocation({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
       });
-
-      if (geo[0]) {
-        setCurrentCity(geo[0].city || "Nearby");
-        setCurrentAddress(
-          [geo[0].name, geo[0].street, geo[0].district]
-            .filter(Boolean)
-            .join(", ")
-        );
-      }
     })();
   }, [authChecked]);
 
-  /* ----------------------- HEATMAP (ASYNC) ----------------------- */
+  /* ---------------- CLUB CARDS ---------------- */
   useEffect(() => {
-    if (!location || !authChecked) return;
+    if (!location) return;
+
+    (async () => {
+      setLoadingCards(true);
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/clubs/nearby?lat=${location.lat}&lng=${location.lng}`,
+        await withAuthHeaders({ method: "GET" })
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("❌ Clubs fetch failed:", err);
+        setLoadingCards(false);
+        return;
+      }
+
+      setClubs(await res.json());
+      setLoadingCards(false);
+    })();
+  }, [location]);
+
+  /* ---------------- HEATMAP (ASYNC) ---------------- */
+  useEffect(() => {
+    if (!location) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        // Ensure we have a session before making the request
-        const { data: sessionData } = await supabasePublic.auth.getSession();
-        if (!sessionData?.session?.access_token) {
-          console.warn("⚠️ No session available for heatmap request");
-          return;
-        }
-
         const res = await fetch(
           `${API_BASE_URL}/api/map/heatmap`,
           await withAuthHeaders({
@@ -142,8 +133,8 @@ export default function HomeScreen() {
         if (!cancelled && res.ok) {
           setGeojson(await res.json());
         }
-      } catch (error) {
-        console.error("❌ Heatmap fetch error:", error);
+      } catch (err) {
+        console.error("❌ Heatmap error:", err);
         if (!cancelled) setGeojson(EMPTY_GEOJSON);
       }
     })();
@@ -151,38 +142,9 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [location, authChecked]);
+  }, [location]);
 
-  /* ---------------------------- EVENTS ---------------------------- */
-  useEffect(() => {
-    if (!authChecked) return;
-
-    (async () => {
-      try {
-        // Ensure we have a session before making the request
-        const { data: sessionData } = await supabasePublic.auth.getSession();
-        if (!sessionData?.session?.access_token) {
-          console.warn("⚠️ No session available for events request");
-          return;
-        }
-
-        const res = await fetch(
-          `${API_BASE_URL}/api/events`,
-          await withAuthHeaders({ method: "GET" })
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          setEvents(data || []);
-          setSelectedEvent(data?.[0] ?? null);
-        }
-      } catch (error) {
-        console.error("❌ Events fetch error:", error);
-      }
-    })();
-  }, [authChecked]);
-
-  /* ---------------------------- LOADING ---------------------------- */
+  /* ---------------- LOADING ---------------- */
   if (!authChecked || !location) {
     return (
       <View style={styles.loading}>
@@ -191,39 +153,26 @@ export default function HomeScreen() {
     );
   }
 
-  /* ------------------------------ UI ------------------------------ */
-
+  /* ---------------- UI ---------------- */
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
-
-      {/* HEADER */}
-      <Pressable
-        style={styles.header}
-        onPress={() => locationSheetRef.current?.expand()}
-      >
-        <Ionicons name="location" size={20} color="#EF4444" />
-        <View style={{ marginLeft: 8 }}>
-          <Text style={styles.city}>{currentCity}</Text>
-          <Text style={styles.address}>{currentAddress}</Text>
-        </View>
-      </Pressable>
 
       {/* MAP */}
       <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Dark}>
         <Mapbox.Camera
           ref={cameraRef}
-          defaultSettings={{
-            centerCoordinate: [location.lng, location.lat],
-            zoomLevel: 13,
-          }}
+          centerCoordinate={[location.lng, location.lat]}
+          zoomLevel={13}
         />
 
-        <Mapbox.UserLocation visible />
+        {/* 🔵 USER LOCATION */}
+        <Mapbox.UserLocation visible animated />
 
-        <Mapbox.ShapeSource id="heat" shape={geojson as any}>
+        {/* 🔥 HEATMAP */}
+        <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
           <Mapbox.HeatmapLayer
-            id="heat-layer"
+            id="heatmap-layer"
             style={{
               heatmapIntensity: 1.8,
               heatmapRadius: 45,
@@ -233,98 +182,65 @@ export default function HomeScreen() {
                 ["linear"],
                 ["heatmap-density"],
                 0, "rgba(0,0,0,0)",
-                0.2, "rgba(34,197,94,0.5)",   // green-500
-                0.4, "rgba(132,204,22,0.7)",  // lime-400
-                0.6, "rgba(253,224,71,0.85)", // yellow-300
-                0.8, "rgba(251,146,60,0.9)",  // orange-400
-                1, "rgba(239,68,68,1)",       // red-500
+                0.2, "rgba(34,197,94,0.4)",   // green
+                0.4, "rgba(132,204,22,0.6)",  // lime
+                0.6, "rgba(253,224,71,0.8)",  // yellow
+                0.8, "rgba(251,146,60,0.9)",  // orange
+                1, "rgba(239,68,68,1)",       // red
               ],
             }}
           />
         </Mapbox.ShapeSource>
 
-        {events.map(
-          (e) =>
-            e.latitude &&
-            e.longitude && (
-              <Mapbox.PointAnnotation
-                key={e.id}
-                id={e.id}
-                coordinate={[e.longitude, e.latitude]}
-                onSelected={() => {
-                  setSelectedEvent(e);
-                  eventSheetRef.current?.expand();
-                }}
-              >
-                <View style={styles.pin} />
-              </Mapbox.PointAnnotation>
-            )
-        )}
+        {/* CLUB PINS */}
+        {clubs.map((club) => (
+          <Mapbox.PointAnnotation
+            key={club.id}
+            id={club.id}
+            coordinate={[club.longitude, club.latitude]}
+          >
+            <View style={styles.pin} />
+          </Mapbox.PointAnnotation>
+        ))}
       </Mapbox.MapView>
 
-      {/* EVENT CARD */}
-      {selectedEvent && (
-        <Pressable
-          style={styles.eventCard}
-          onPress={() => eventSheetRef.current?.expand()}
-        >
-          <Text style={styles.eventTitle}>{selectedEvent.event_name}</Text>
-          <Text style={styles.eventSub}>{selectedEvent.club_name}</Text>
-        </Pressable>
-      )}
+      {/* 🔥 POPULAR NEAR YOU */}
+      <View style={styles.cardsContainer}>
+        <Text style={styles.sectionTitle}>🔥 Popular near you</Text>
 
-      {/* EVENT SHEET */}
-      <BottomSheet
-        ref={eventSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        backgroundStyle={styles.sheetBg}
-      >
-        <View style={{ padding: 20 }}>
-          {selectedEvent && (
-            <Pressable
-              style={styles.detailsBtn}
-              onPress={() => router.push(`/event/${selectedEvent.id}`)}
-            >
-              <Text style={{ color: "#fff" }}>View Details</Text>
-            </Pressable>
-          )}
-        </View>
-      </BottomSheet>
-
-      {/* LOCATION PICKER */}
-      <LocationPickerSheet
-        sheetRef={locationSheetRef}
-        onSelect={({ city, address, lat, lng }) => {
-          setCurrentCity(city);
-          setCurrentAddress(address);
-          setLocation({ lat, lng });
-
-          cameraRef.current?.flyTo([lng, lat], 1200);
-          cameraRef.current?.zoomTo(13, 1200);
-        }}
-      />
+        {loadingCards ? (
+          <ActivityIndicator color="#EC4899" />
+        ) : (
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+            {clubs.map((club) => (
+              <View key={club.id} style={styles.cardWrapper}>
+                <Pressable style={styles.card}>
+                  <Text style={styles.cardTitle}>{club.name}</Text>
+                  <Text style={styles.cardMeta}>
+                    {club.distance_km} km · 🔥 {club.intensity.toFixed(1)}
+                  </Text>
+                  <Text style={styles.cardMeta}>
+                    👥 {club.guest_count}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
     </GestureHandlerRootView>
   );
 }
 
-/* -------------------------------- STYLES -------------------------------- */
+/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  header: {
-    position: "absolute",
-    top: 50,
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    flexDirection: "row",
+  loading: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000",
   },
-
-  city: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  address: { color: "#9CA3AF", fontSize: 12 },
 
   pin: {
     width: 14,
@@ -335,29 +251,43 @@ const styles = StyleSheet.create({
     borderColor: "#000",
   },
 
-  eventCard: {
+  cardsContainer: {
     position: "absolute",
-    bottom: 80,
-    left: 16,
-    right: 16,
+    bottom: 20,
+    left: 0,
+    right: 0,
+  },
+
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    marginLeft: 16,
+    marginBottom: 8,
+  },
+
+  cardWrapper: {
+    width: SCREEN_WIDTH,
+    paddingHorizontal: 16,
+  },
+
+  card: {
     backgroundColor: "#1F1F1F",
-    padding: 16,
     borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#333",
   },
 
-  eventTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  eventSub: { color: "#9CA3AF", marginTop: 4 },
-
-  sheetBg: {
-    backgroundColor: "#1F1F1F",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  cardTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 
-  detailsBtn: {
-    backgroundColor: "#EC4899",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
+  cardMeta: {
+    color: "#EC4899",
+    marginTop: 6,
+    fontSize: 13,
   },
 });

@@ -1,7 +1,6 @@
 import { withAuth } from "@/app/services/protected";
 import supabaseAdmin from "@/app/services/supabase-admin";
 
-<<<<<<< HEAD
 export const runtime = "nodejs";
 
 export const POST = withAuth(async (req: Request, user: any) => {
@@ -11,37 +10,19 @@ export const POST = withAuth(async (req: Request, user: any) => {
     const email = body.email || user.email;
     const role = body.role || "user";
     const name = body.name || email.split("@")[0];
-=======
-export const POST = withAuth(async (req:Request, user:any) => {
-  //Generic logic for all users(Club + Customers)
-  const { name, email, role, clubName, location } = await req.json();
-  
-  const { error } = await supabaseAdmin.from("users").insert({
-    id: user.id,
-    name,
-    email,
-    role,
-  });
->>>>>>> d7a7b2fa2c3310d5a60807f5d97d0051e733ade8
 
-    console.log("📝 Creating / updating user:", {
-      id: user.id,
-      email,
-      role,
-      name,
-    });
+    /* ---------------- VALIDATION ---------------- */
 
-    /* -------------------- VALIDATION -------------------- */
-
-    if (!["user", "club"].includes(role)) {
-      return Response.json(
-        { error: "Invalid role" },
-        { status: 400 }
-      );
+    if (!email) {
+      return Response.json({ error: "Email missing" }, { status: 400 });
     }
 
-    /* -------------------- USERS TABLE -------------------- */
-    // identity table (auth-linked)
+    if (!["user", "club", "staff"].includes(role)) {
+      return Response.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    /* ---------------- USERS TABLE ---------------- */
+    // Identity table (auth-linked)
 
     const { error: userError } = await supabaseAdmin
       .from("users")
@@ -56,55 +37,68 @@ export const POST = withAuth(async (req:Request, user:any) => {
       );
 
     if (userError) {
-      console.error("❌ users upsert failed:", userError);
-      return Response.json(
-        { error: userError.message },
-        { status: 500 }
-      );
+      return Response.json({ error: userError.message }, { status: 500 });
     }
 
-    /* -------------------- ROLE: USER -------------------- */
-    // profile table (onboarding lives here)
+    /* ---------------- CUSTOMERS TABLE ---------------- */
+    // Always create customer profile for users
 
     if (role === "user") {
-      const { error } = await supabaseAdmin
+      const { error: customerError } = await supabaseAdmin
         .from("customers")
         .upsert(
           {
-            id: user.id,                 // FK = users.id (PRIMARY KEY)
-            email: email,
-            onboarding_completed: false, // updated later after onboarding
+            id: user.id,              // FK → users.id
+            email,
+            onboarding_completed: false,
           },
           { onConflict: "id" }
         );
 
-      if (error) {
-        console.error("❌ customers upsert failed:", error);
+      if (customerError) {
         return Response.json(
-          { error: error.message },
+          { error: customerError.message },
           { status: 500 }
         );
       }
     }
 
-    /* -------------------- ROLE: CLUB -------------------- */
-    // business entity + heatmap
+    /* ---------------- STAFF TABLE ---------------- */
+
+    if (role === "staff") {
+      const { error: staffError } = await supabaseAdmin
+        .from("staff")
+        .upsert(
+          {
+            id: user.id,
+            email,
+            status: "pending",
+            club_id: null,
+            club_name: null,
+          },
+          { onConflict: "id" }
+        );
+
+      if (staffError) {
+        return Response.json(
+          { error: staffError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    /* ---------------- CLUBS TABLE ---------------- */
 
     if (role === "club") {
-      const { clubName, location } = body;
+      const { clubName, location, isNewClub } = body;
 
-      if (
-        !clubName ||
-        !location?.latitude ||
-        !location?.longitude
-      ) {
+      if (!clubName || !location?.latitude || !location?.longitude) {
         return Response.json(
           { error: "Missing club details" },
           { status: 400 }
         );
       }
 
-      // clubs table
       const { error: clubError } = await supabaseAdmin
         .from("clubs")
         .upsert(
@@ -119,74 +113,38 @@ export const POST = withAuth(async (req:Request, user:any) => {
         );
 
       if (clubError) {
-        console.error("❌ clubs upsert failed:", clubError);
         return Response.json(
           { error: clubError.message },
           { status: 500 }
         );
       }
 
-      // heatmap / locations table
-      const { error: locationError } = await supabaseAdmin.rpc(
-        "insert_location",
-        {
-          p_name: clubName,
-          p_category: "club",
-          p_lat: location.latitude,
-          p_lng: location.longitude,
-        }
-      );
-
-      if (locationError) {
-        console.error("❌ insert_location failed:", locationError);
-        return Response.json(
-          { error: locationError.message },
-          { status: 500 }
+      // Insert heatmap point only once
+      if (isNewClub === true) {
+        const { error: locationError } = await supabaseAdmin.rpc(
+          "insert_location",
+          {
+            p_name: clubName,
+            p_category: "club",
+            p_lat: location.latitude,
+            p_lng: location.longitude,
+          }
         );
+
+        if (locationError) {
+          return Response.json(
+            { error: locationError.message },
+            { status: 500 }
+          );
+        }
       }
     }
 
-    /* -------------------- SUCCESS -------------------- */
-
-    console.log("✅ User flow completed successfully");
     return Response.json({ ok: true });
-
   } catch (err: any) {
-    console.error("❌ Unexpected error in /api/users:", err);
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }
     );
   }
-<<<<<<< HEAD
 });
-=======
-
-  //Club Only logic
-  if(role === "club"){
-    const { error } = await supabaseAdmin.from("clubs").insert({
-      id: user.id,
-      club_name: clubName,
-      club_email: email,
-      address_text: location.address,
-      latitude: location.latitude,
-      longitude: location.longitude,
-    });
-
-    if(error){
-      return Response.json({error: error.message}, {status: 500});
-    }
-    const { error : locationError } = await supabaseAdmin.rpc("insert_location", {
-      p_name: clubName,
-      p_category: "club",
-      p_lat: location.latitude,
-      p_lng: location.longitude,
-    })
-    if(locationError){
-      return Response.json({error: locationError.message}, {status: 500});
-    }
-  }
-
-  return Response.json({ ok: true });
-});
->>>>>>> d7a7b2fa2c3310d5a60807f5d97d0051e733ade8
