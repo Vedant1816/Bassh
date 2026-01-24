@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { withAuthHeaders } from "@/app/services/auth-fetch";
+import Link from "next/link";
+import {
+  Pencil,
+  Share2,
+  Trash2,
+  ChevronDown,
+} from "lucide-react";
+
 
 /* ---------------- TYPES ---------------- */
 
@@ -22,6 +30,8 @@ type EventForm = {
 /* ---------------- IMAGE UPLOAD (SERVER) ---------------- */
 
 const uploadImage = async (file: File, path: string): Promise<string> => {
+
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("path", path);
@@ -43,6 +53,11 @@ const uploadImage = async (file: File, path: string): Promise<string> => {
 /* ---------------- PAGE ---------------- */
 
 export default function ManageEventPage() {
+   const DEFAULT_BANNER_IMAGE =
+  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
+
+const DEFAULT_DJ_IMAGE =
+  "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4";
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -84,6 +99,25 @@ export default function ManageEventPage() {
     setPricing((p) => p.filter((_, i) => i !== index));
   };
 
+  /* Get current Events*/
+   const [postedEvents, setPostedEvents] = useState<any[]>([]);
+
+   const [eventLoading, setEventLoading] = useState(false);
+   const fetchEvents = async() => {
+    setEventLoading(true);
+    const res = await fetch("/api/events/club?limit=3", await withAuthHeaders({
+      method:"GET"
+    }
+    ));
+    const data = await res.json();
+
+    setPostedEvents(data);
+    setEventLoading(false);
+   }
+   useEffect(()=> {
+    fetchEvents();
+   }, []);
+
   /* ---------------- SUBMIT ---------------- */
 
   const handleSaveEvent = async () => {
@@ -96,10 +130,31 @@ export default function ManageEventPage() {
         return;
       }
 
-      const eventId = crypto.randomUUID();
+      const cleanedPricing = pricing
+        .filter((p) => p.label && p.price)
+        .map((p) => ({
+          label: p.label,
+          price: Number(p.price),
+        }));
 
-      let bannerUrl: string | null = null;
-      let djImageUrl: string | null = null;
+      const res = await fetch("/api/events", await withAuthHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+         ...form,
+        max_attendees: Number(form.max_attendees),
+        pricing: cleanedPricing,
+      }),
+     }));
+     const data = await res.json();
+     if (!res.ok) {
+        setMessage(data.error || "Failed to create event");
+        return;
+      }
+      const eventId = data.event.id;
+
+      let bannerUrl = DEFAULT_BANNER_IMAGE;
+      let djImageUrl = DEFAULT_DJ_IMAGE;
 
       if (bannerImage) {
         bannerUrl = await uploadImage(
@@ -115,31 +170,22 @@ export default function ManageEventPage() {
         );
       }
 
-      const cleanedPricing = pricing
-        .filter((p) => p.label && p.price)
-        .map((p) => ({
-          label: p.label,
-          price: Number(p.price),
-        }));
-
-      const res = await fetch("/api/events", await withAuthHeaders({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          max_attendees: Number(form.max_attendees),
-          banner_image_url: bannerUrl,
-          dj_image_url: djImageUrl,
-          pricing: cleanedPricing,
-        }),
-      }));
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage(data.error || "Failed to create event");
-        return;
+      const res1 = await fetch(
+           `/api/events/patch?eventId=${eventId}`,
+               await withAuthHeaders({
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  banner_image_url: bannerUrl,
+                  dj_image_url: djImageUrl,
+                }),
+          })
+        );
+      const data1 = await res1.json();
+      if(!res1.ok){
+        setMessage(data1.error || "Failed to upload images");
       }
+
       if(res.ok){
         setForm({name: "",
               event_date: "",
@@ -157,8 +203,12 @@ export default function ManageEventPage() {
       setMessage("Something went wrong");
     } finally {
       setLoading(false);
+      await fetchEvents();
     }
+
   };
+  
+
 
   /* ---------------- UI ---------------- */
 
@@ -266,7 +316,7 @@ export default function ManageEventPage() {
               <div className="flex gap-3">
                 <Input
                   label="Price"
-                  placeholder="$ 0.00"
+                  placeholder="₹ 0.00"
                   value={tier.price}
                   onChange={(v) =>
                     updatePricing(index, "price", v)
@@ -316,6 +366,48 @@ export default function ManageEventPage() {
           </p>
         )}
       </div>
+      {/* ---------------- YOUR EVENTS ---------------- */}
+      <div className="mt-12 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold">Your Events</h2>
+            <p className="text-sm text-gray-400">
+              Manage your upcoming and past events
+            </p>
+          </div>
+
+          <div className="flex gap-3 items-center">
+            <Link
+              href="/dashboard/events/viewAll"
+              className="px-4 py-2 rounded-full bg-pink-600 text-sm font-medium hover:bg-pink-700"
+              >
+              View All Events
+            </Link>
+            <div className="relative">
+              <input
+                placeholder="Search events..."
+                className="pl-4 pr-10 py-2 rounded-full bg-[#1a1a1a] border border-white/10 text-sm text-white"
+              />
+              <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+            </div>
+          </div>
+        </div>
+
+        {eventLoading && (
+          <p className="text-sm text-gray-400">Loading events…</p>
+        )}
+
+        {!eventLoading && postedEvents.length === 0 && (
+          <p className="text-sm text-gray-400">No events yet</p>
+        )}
+
+        <div className="space-y-4">
+          {postedEvents.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+     </div>
+
     </div>
   );
 }
@@ -418,3 +510,108 @@ function BannerUpload({
     </label>
   );
 }
+function EventCard({ event }: { event: any }) {
+  const [open, setOpen] = useState(false);
+
+  const banner = event.banner_image_url
+  ? `${event.banner_image_url}?v=${event.updated_at}`
+  : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
+
+  const isUpcoming = new Date(event.event_date) >= new Date();
+
+  return (
+    <div className="rounded-xl bg-[#0b0b0b] border border-white/10 overflow-hidden">
+      <div className="flex gap-4 p-4">
+        <img
+          src={banner}
+          alt="event banner"
+          className="w-16 h-16 rounded-lg object-cover"
+        />
+
+        <div className="flex-1">
+          <h3 className="font-semibold">{event.name}</h3>
+
+          <p className="text-sm text-gray-400">
+            {new Date(event.event_date).toDateString()} at {event.start_time}
+          </p>
+
+          <p className="text-xs text-gray-400 mt-1">
+            DJ {event.dj_name || "—"} • {event.max_attendees || 0} attendees
+          </p>
+
+          {/* PRICING */}
+          {Array.isArray(event.event_ticket_pricing) &&
+            event.event_ticket_pricing.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {event.event_ticket_pricing.map((tier: any) => (
+                  <span
+                    key={tier.id}
+                    className="px-3 py-1 rounded-full bg-[#1a1a1a] border border-white/10 text-xs text-gray-300"
+                  >
+                    {tier.label}: ₹{tier.price}
+                  </span>
+                ))}
+              </div>
+            )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span
+            className={`px-3 py-1 rounded-full text-xs ${
+              isUpcoming
+                ? "bg-pink-600 text-white"
+                : "bg-gray-600 text-white"
+            }`}
+          >
+            {isUpcoming ? "Upcoming" : "Past"}
+          </span>
+
+          <div className="flex items-center gap-3">
+           <Link
+          href={`/dashboard/events/update/${event.id}`}
+          className="text-gray-400 hover:text-white transition"
+         >
+          <Pencil size={16} />
+         </Link>
+
+          <button className="text-gray-400 hover:text-white transition">
+            <Share2 size={16} />
+          </button>
+
+          <button className="text-gray-400 hover:text-red-400 transition">
+            <Trash2 size={16} />
+          </button>
+
+          <button
+            onClick={() => setOpen(!open)}
+            className={`text-gray-400 hover:text-white transition ${
+              open ? "rotate-180" : ""
+            }`}
+          >
+            <ChevronDown size={18} />
+          </button>
+        </div>
+        </div>
+      </div>
+
+      {/* DROPDOWN */}
+      {open && (
+        <div className="border-t border-white/10 p-4 space-y-4">
+          <div className="flex gap-3">
+            <button className="flex-1 py-2 rounded-md bg-[#1a1a1a] text-sm text-gray-300">
+              Guest List
+            </button>
+            <button className="flex-1 py-2 rounded-md bg-pink-600 text-sm font-medium">
+              Attendees List
+            </button>
+          </div>
+
+          <div className="rounded-lg bg-[#1a1a1a] border border-white/10 p-6 text-center text-sm text-gray-400">
+            No data yet — you’ll wire this later 👀
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

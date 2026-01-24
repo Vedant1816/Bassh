@@ -21,6 +21,7 @@ export const POST = withAuth(async (req : Request, user:any) => {
     .upload(path, buffer, {
       contentType: file.type,
       upsert: true,
+      cacheControl: "0",
     });
 
   if (error) {

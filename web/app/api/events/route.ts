@@ -12,8 +12,6 @@ export const POST = withAuth(async (req:Request, user:any) => {
       event_date,
       start_time,
       max_attendees,
-      banner_image_url,
-      dj_image_url,
       pricing, 
     } = body;
 
@@ -37,8 +35,6 @@ export const POST = withAuth(async (req:Request, user:any) => {
           event_date,
           start_time,
           max_attendees,
-          banner_image_url,
-          dj_image_url,
         })
         .select()
         .single();

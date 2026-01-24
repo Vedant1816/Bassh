@@ -28,7 +28,7 @@ export default function Sidebar() {
         <NavItem label="Overview" href="/dashboard"/>
         <NavItem label="Menu Management" />
         <NavItem label="Discounts & Offers" />
-        <NavItem label="Event Management" href="/dashboard/events/manage" />
+        <NavItem label="Event Management" href="/dashboard/events" />
         <NavItem label="Guest List" />
         <NavItem label="Billing & Receipts" />
         <NavItem label="Settings" />
@@ -55,7 +55,13 @@ function NavItem({
   href?: string,
 }) {
   const pathName = usePathname();
-  const isActive = href? pathName === href : false;
+  var isActive = false;
+  if(href && href === "/dashboard"){
+     isActive = href === pathName ? true : false;
+  }
+  else{
+     isActive = href ? pathName.startsWith(href) : false;
+  }  
 
   const className = `block px-3 py-2 rounded-md ${
     isActive
