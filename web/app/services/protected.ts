@@ -7,7 +7,7 @@ type HandlerSimple = (req: Request) => Promise<Response>;
 export function withAuth(
   handler: HandlerWithParams | HandlerWithUser | HandlerSimple
 ) {
-  return async (req: Request, ctx?: { params?: Promise<any> }) => {
+  return async (req: Request, ctx?: { params?: Promise<any> | any }) => {
     const authHeader = req.headers.get("authorization");
 
     if (!authHeader) {
@@ -44,7 +44,11 @@ export function withAuth(
       return (handler as HandlerWithUser)(req, data.user);
     } else {
       // Handler: (req, params, user) => Promise<Response>
-      const params = ctx?.params ? await ctx.params : {};
+      let params = {};
+      if (ctx?.params) {
+        // Handle both Promise and direct object
+        params = ctx.params instanceof Promise ? await ctx.params : ctx.params;
+      }
       return (handler as HandlerWithParams)(req, params, data.user);
     }
   };

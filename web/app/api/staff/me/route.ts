@@ -7,9 +7,10 @@ export const GET = withAuth(async (_req: Request, user: any) => {
       .from("staff")
       .select("*")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (error) {
+    // If no record found, return a default pending record
+    if (error && error.code !== "PGRST116") {
       console.error("❌ Failed to fetch staff:", error);
       return Response.json(
         { error: error.message },
@@ -17,11 +18,14 @@ export const GET = withAuth(async (_req: Request, user: any) => {
       );
     }
 
+    // If no staff record exists, return default pending status
     if (!data) {
-      return Response.json(
-        { error: "Staff record not found" },
-        { status: 404 }
-      );
+      return Response.json({
+        id: user.id,
+        status: "pending",
+        club_id: null,
+        club_name: null,
+      });
     }
 
     return Response.json(data);

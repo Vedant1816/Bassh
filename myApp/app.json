@@ -5,24 +5,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
+    
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "extra": {
-      "MAPBOX_TOKEN": "${EXPO_PUBLIC_MAPBOX_TOKEN}"
+      "MAPBOX_TOKEN": "${EXPO_PUBLIC_MAPBOX_TOKEN}",
+      "RAZORPAY_KEY_ID": "${EXPO_PUBLIC_RAZORPAY_KEY_ID}"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.harshsehra.myApp",
       "infoPlist": {
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true,
-          "NSExceptionDomains": {
-            "localhost": {
-              "NSExceptionAllowsInsecureHTTPLoads": true
-            }
-          }
-        },
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby events on the map.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show nearby events on the map."
       }
@@ -67,7 +61,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

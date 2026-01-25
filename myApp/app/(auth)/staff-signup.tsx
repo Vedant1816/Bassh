@@ -5,7 +5,7 @@ import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { API_BASE_URL } from "@/_services/api-config";
 
-export default function SignupScreen() {
+export default function StaffSignupScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -15,14 +15,14 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!email.trim() || !password.trim()) {
-      setMessage("Email and password required");
+      setMessage("Email and password are required");
       return;
     }
 
     setLoading(true);
     setMessage("");
 
-    /* -------- SUPABASE AUTH -------- */
+    /* ---------------- SUPABASE SIGNUP ---------------- */
 
     const { error } = await supabasePublic.auth.signUp({
       email: email.trim(),
@@ -35,7 +35,7 @@ export default function SignupScreen() {
       return;
     }
 
-    /* -------- CREATE USER PROFILE -------- */
+    /* ---------------- CREATE PROFILE (BACKEND) ---------------- */
 
     try {
       const res = await fetch(
@@ -52,13 +52,14 @@ export default function SignupScreen() {
 
       if (!res.ok) {
         const err = await res.json();
-        console.error("Profile creation failed:", err);
+        console.error("❌ Profile creation failed:", err);
+        setMessage("Account created, but profile setup failed.");
       }
-    } catch (e) {
-      console.warn("API unreachable, continuing anyway");
+    } catch (err) {
+      console.warn("⚠️ API unreachable, continuing anyway");
     }
 
-    /* -------- REDIRECT TO STAFF CHECK -------- */
+    /* ---------------- REDIRECT ---------------- */
 
     router.replace("/staff");
     setLoading(false);
@@ -67,10 +68,11 @@ export default function SignupScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Create account</Text>
+        <Text style={styles.title}>Staff Signup</Text>
 
         <TextInput
           placeholder="Email"
+          placeholderTextColor="#777"
           value={email}
           onChangeText={setEmail}
           style={styles.input}
@@ -79,6 +81,7 @@ export default function SignupScreen() {
 
         <TextInput
           placeholder="Password"
+          placeholderTextColor="#777"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -88,10 +91,10 @@ export default function SignupScreen() {
         <Pressable
           onPress={handleSignup}
           disabled={loading}
-          style={styles.button}
+          style={[styles.button, loading && styles.disabled]}
         >
           <Text style={styles.buttonText}>
-            {loading ? "Creating..." : "Sign up"}
+            {loading ? "Creating..." : "Create Account"}
           </Text>
         </Pressable>
 
@@ -101,14 +104,31 @@ export default function SignupScreen() {
   );
 }
 
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", backgroundColor: "#000" },
-  card: { padding: 24 },
-  title: { color: "#fff", fontSize: 24, marginBottom: 16 },
-  input: {
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {
     backgroundColor: "#111",
+    padding: 24,
+    borderRadius: 12,
+  },
+  title: {
+    color: "#EC4899",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  input: {
+    backgroundColor: "#1F1F1F",
     color: "#fff",
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     marginBottom: 12,
   },
@@ -117,7 +137,19 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
+    marginTop: 8,
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  error: { color: "red", marginTop: 8 },
+  disabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  error: {
+    color: "#F87171",
+    marginTop: 10,
+    textAlign: "center",
+  },
 });

@@ -20,17 +20,13 @@ export const GET = withAuth(async (req: Request) => {
       );
     }
 
-    /**
-     * We ONLY use clubs table
-     * No joins with locations
-     */
     const { data, error } = await supabaseAdmin.rpc("get_nearby_clubs", {
       user_lat: lat,
       user_lng: lng,
     });
 
     if (error) {
-      console.error("❌ Nearby clubs error:", error);
+      console.error("❌ get_nearby_clubs error:", error);
       return Response.json(
         { error: error.message },
         { status: 500 }

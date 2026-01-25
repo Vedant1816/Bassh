@@ -1,4 +1,5 @@
 import supabasePublic from "./supabase-public";
+import { fetchWithFallback } from "./api-config";
 
 export async function withAuthHeaders(
   init: RequestInit = {}
@@ -37,4 +38,15 @@ export async function withAuthHeaders(
     // Return original init even if auth fails
     return init;
   }
+}
+
+/**
+ * Fetch with authentication and automatic fallback to ngrok URL
+ */
+export async function authFetch(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const authInit = await withAuthHeaders(init);
+  return fetchWithFallback(path, authInit);
 }

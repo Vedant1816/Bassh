@@ -1,6 +1,12 @@
 import { Platform } from "react-native";
 
 /**
+ * Fallback API URL (ngrok tunnel)
+ * Used when primary API URL is unreachable
+ */
+export const FALLBACK_API_URL = "https://irrefutably-nondiscordant-ethan.ngrok-free.dev";
+
+/**
  * Get the API base URL for the current platform
  * - iOS Simulator: localhost works
  * - Android Emulator: Use 10.0.2.2 (special alias for host machine)
@@ -23,6 +29,55 @@ export function getApiBaseUrl(): string | null {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+/**
+ * Try to fetch from primary URL, fallback to ngrok URL if it fails
+ */
+export async function fetchWithFallback(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const primaryUrl = API_BASE_URL;
+  
+  if (!primaryUrl) {
+    // If no primary URL, use fallback directly
+    console.log(`🔄 No primary URL configured, using fallback: ${FALLBACK_API_URL}${path}`);
+    return fetch(`${FALLBACK_API_URL}${path}`, init);
+  }
+
+  try {
+    // Create timeout controller for React Native compatibility
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    // Try primary URL first
+    const response = await fetch(`${primaryUrl}${path}`, {
+      ...init,
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    // If successful, return response
+    if (response.ok || response.status < 500) {
+      return response;
+    }
+    
+    // If server error, try fallback
+    console.warn(`⚠️ Primary API returned ${response.status}, trying fallback...`);
+  } catch (error: any) {
+    // Network error or timeout - try fallback
+    if (error.name === 'AbortError') {
+      console.warn(`⚠️ Primary API timeout, trying fallback...`);
+    } else {
+      console.warn(`⚠️ Primary API unreachable (${error.message}), trying fallback...`);
+    }
+  }
+
+  // Try fallback URL
+  console.log(`🔄 Using fallback API: ${FALLBACK_API_URL}${path}`);
+  return fetch(`${FALLBACK_API_URL}${path}`, init);
+}
 
 /**
  * Check if API URL is configured for physical devices

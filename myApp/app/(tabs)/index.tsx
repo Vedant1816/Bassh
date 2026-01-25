@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   Dimensions,
+  TextInput,
 } from "react-native";
 import * as Location from "expo-location";
 import Mapbox from "@rnmapbox/maps";
@@ -22,13 +23,13 @@ import { API_BASE_URL } from "@/_services/api-config";
 
 type ClubCard = {
   id: string;
-  name: string;
+  club_name: string;
+  address_text?: string;
   latitude: number;
   longitude: number;
-  intensity: number;
-  guest_count: number;
+  rating?: number;
+  guest_count?: number;
   distance_km: number;
-  score: number;
 };
 
 type GeoJSON = {
@@ -51,11 +52,13 @@ export default function HomeScreen() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationAddress, setLocationAddress] = useState("");
 
   const [clubs, setClubs] = useState<ClubCard[]>([]);
   const [geojson, setGeojson] = useState<GeoJSON>(EMPTY_GEOJSON);
 
   const [loadingCards, setLoadingCards] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   /* ---------------- AUTH ---------------- */
   useEffect(() => {
@@ -82,6 +85,17 @@ export default function HomeScreen() {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
       });
+
+      const [addr] = await Location.reverseGeocodeAsync({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+
+      if (addr) {
+        setLocationAddress(
+          `${addr.district || addr.subregion || ""}, ${addr.city || ""}`
+        );
+      }
     })();
   }, [authChecked]);
 
@@ -98,18 +112,22 @@ export default function HomeScreen() {
       );
 
       if (!res.ok) {
-        const err = await res.json();
-        console.error("❌ Clubs fetch failed:", err);
+        console.error("❌ Clubs fetch failed");
         setLoadingCards(false);
         return;
       }
 
-      setClubs(await res.json());
+      const raw = await res.json();
+      const mapped: ClubCard[] = (raw || []).map((c: any) => ({
+        ...c,
+        club_name: c.club_name ?? c.name ?? "Club",
+      }));
+      setClubs(mapped);
       setLoadingCards(false);
     })();
   }, [location]);
 
-  /* ---------------- HEATMAP (ASYNC) ---------------- */
+  /* ---------------- HEATMAP ---------------- */
   useEffect(() => {
     if (!location) return;
 
@@ -133,8 +151,7 @@ export default function HomeScreen() {
         if (!cancelled && res.ok) {
           setGeojson(await res.json());
         }
-      } catch (err) {
-        console.error("❌ Heatmap error:", err);
+      } catch {
         if (!cancelled) setGeojson(EMPTY_GEOJSON);
       }
     })();
@@ -166,10 +183,9 @@ export default function HomeScreen() {
           zoomLevel={13}
         />
 
-        {/* 🔵 USER LOCATION */}
         <Mapbox.UserLocation visible animated />
 
-        {/* 🔥 HEATMAP */}
+        {/* HEATMAP */}
         <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
           <Mapbox.HeatmapLayer
             id="heatmap-layer"
@@ -177,17 +193,6 @@ export default function HomeScreen() {
               heatmapIntensity: 1.8,
               heatmapRadius: 45,
               heatmapOpacity: 0.85,
-              heatmapColor: [
-                "interpolate",
-                ["linear"],
-                ["heatmap-density"],
-                0, "rgba(0,0,0,0)",
-                0.2, "rgba(34,197,94,0.4)",   // green
-                0.4, "rgba(132,204,22,0.6)",  // lime
-                0.6, "rgba(253,224,71,0.8)",  // yellow
-                0.8, "rgba(251,146,60,0.9)",  // orange
-                1, "rgba(239,68,68,1)",       // red
-              ],
             }}
           />
         </Mapbox.ShapeSource>
@@ -204,24 +209,86 @@ export default function HomeScreen() {
         ))}
       </Mapbox.MapView>
 
-      {/* 🔥 POPULAR NEAR YOU */}
-      <View style={styles.cardsContainer}>
-        <Text style={styles.sectionTitle}>🔥 Popular near you</Text>
+      {/* HEADER */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.locationTitle}>Home</Text>
+        <Text style={styles.locationAddress}>{locationAddress}</Text>
 
+        <View style={styles.searchContainer}>
+          <TextInput
+            placeholder="Search location for event"
+            placeholderTextColor="#888"
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+      </View>
+
+      {/* 🔥 FIGMA CARDS */}
+      <View style={styles.cardsContainer}>
         {loadingCards ? (
           <ActivityIndicator color="#EC4899" />
         ) : (
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
             {clubs.map((club) => (
               <View key={club.id} style={styles.cardWrapper}>
-                <Pressable style={styles.card}>
-                  <Text style={styles.cardTitle}>{club.name}</Text>
-                  <Text style={styles.cardMeta}>
-                    {club.distance_km} km · 🔥 {club.intensity.toFixed(1)}
-                  </Text>
-                  <Text style={styles.cardMeta}>
-                    👥 {club.guest_count}
-                  </Text>
+                <Pressable
+                  style={styles.figmaCard}
+                  onPress={() => router.push(`/club/${club.id}`)}
+                >
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.cardImage}>
+                      <Text style={{ fontSize: 28 }}>🏙️</Text>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardDate}>
+                        ⭐ {(club.rating ?? 0).toFixed(1)}
+                      </Text>
+
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {club.club_name || "Club"}
+                      </Text>
+
+                      <View style={styles.priceRow}>
+                        <Text style={styles.price}>Rs.999</Text>
+                        <Text style={styles.priceLabel}>per entry</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.joiningContainer}>
+                      <View style={styles.avatarRow}>
+                        <View style={styles.avatar} />
+                        <View style={styles.avatar} />
+                        <View style={styles.avatarCount}>
+                          <Text style={styles.avatarCountText}>
+                            +{club.guest_count ?? 0}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.joiningText}>Joining</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardBottomRow}>
+                    <View style={styles.locationRow}>
+                      <Text style={styles.locationIcon}>📍</Text>
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {club.address_text ?? ""}
+                      </Text>
+                    </View>
+
+                    <View style={styles.distanceRow}>
+                      <Text style={styles.distanceText}>
+                        {(club.distance_km ?? 0).toFixed(1)} km
+                      </Text>
+                      <View style={styles.navigateBtn}>
+                        <Text style={{ color: "#fff" }}>📍</Text>
+                      </View>
+                    </View>
+                  </View>
+
                 </Pressable>
               </View>
             ))}
@@ -235,12 +302,14 @@ export default function HomeScreen() {
 /* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-  },
+  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+
+  headerContainer: { position: "absolute", top: 50, left: 16, right: 16 },
+  locationTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  locationAddress: { color: "#888", fontSize: 12, marginBottom: 8 },
+
+  searchContainer: { backgroundColor: "#2a2a2a", borderRadius: 16, padding: 12 },
+  searchInput: { color: "#fff" },
 
   pin: {
     width: 14,
@@ -251,43 +320,75 @@ const styles = StyleSheet.create({
     borderColor: "#000",
   },
 
-  cardsContainer: {
-    position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
-  },
+  cardsContainer: { position: "absolute", bottom: 10, left: 0, right: 0 },
+  cardWrapper: { width: SCREEN_WIDTH, paddingHorizontal: 16 },
 
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    marginLeft: 16,
-    marginBottom: 8,
-  },
-
-  cardWrapper: {
-    width: SCREEN_WIDTH,
-    paddingHorizontal: 16,
-  },
-
-  card: {
-    backgroundColor: "#1F1F1F",
-    borderRadius: 14,
+  figmaCard: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#3a3a3a",
   },
 
-  cardTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+  cardTopRow: { flexDirection: "row", gap: 12 },
+  cardImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: "#444",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  cardMeta: {
-    color: "#EC4899",
-    marginTop: 6,
-    fontSize: 13,
+  cardDate: { color: "#EC4899", fontSize: 11, marginBottom: 4 },
+  cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 4 },
+  price: { color: "#EC4899", fontSize: 18, fontWeight: "700" },
+  priceLabel: { color: "#9ca3af", fontSize: 11 },
+
+  joiningContainer: { alignItems: "center" },
+  avatarRow: { flexDirection: "row" },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#6b7280",
+    marginLeft: -6,
+  },
+  avatarCount: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#111",
+    marginLeft: -6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarCountText: { color: "#fff", fontSize: 9, fontWeight: "700" },
+  joiningText: { color: "#9ca3af", fontSize: 11, marginTop: 4 },
+
+  cardBottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
+  },
+
+  locationRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  locationIcon: { fontSize: 14 },
+  locationText: { color: "#9ca3af", fontSize: 13, flex: 1 },
+
+  distanceRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  distanceText: { color: "#9ca3af", fontSize: 13 },
+
+  navigateBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EC4899",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

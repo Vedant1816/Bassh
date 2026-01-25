@@ -30,10 +30,16 @@ export const POST = withAuth(async (req, user) => {
     .eq("id", data.id);
 
   // Save phone to customers
+  const { error: deleteError } = await supabaseAdmin
+  .from("phone_otps")
+  .delete()
+  .eq("id", data.id);
+
   await supabaseAdmin
     .from("customers")
     .update({ phone_number: phone })
     .eq("id", user.id);
+  
 
   return Response.json({ ok: true });
 });
