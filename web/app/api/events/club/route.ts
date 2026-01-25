@@ -5,6 +5,7 @@ export const GET = withAuth(async (req: Request, user: any) => {
   try {
     const { searchParams } = new URL(req.url);
     const limitParam = searchParams.get("limit");
+    const search = searchParams.get("search");
     const clubId = user.id;
 
     let query = supabaseAdmin
@@ -18,7 +19,12 @@ export const GET = withAuth(async (req: Request, user: any) => {
         )
       `)
       .eq("club_id", clubId)
-      .order("event_date", { ascending: false });
+      .order("event_date", { ascending: false })
+      .order("start_time", {ascending: false});
+
+    if (search && search.trim() !== "") {
+      query = query.ilike("name", `%${search.trim()}%`);
+    }
 
     if (limitParam) {
       query = query.limit(Number(limitParam));
@@ -40,3 +46,4 @@ export const GET = withAuth(async (req: Request, user: any) => {
     );
   }
 });
+

@@ -36,7 +36,7 @@ const uploadImage = async (file: File, path: string): Promise<string> => {
   formData.append("file", file);
   formData.append("path", path);
 
-  const res = await fetch("/api/upload-image", await withAuthHeaders({
+  const res = await fetch("/api/events/upload-image", await withAuthHeaders({
     method: "POST",
     body: formData,
   }));
@@ -60,6 +60,8 @@ const DEFAULT_DJ_IMAGE =
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4";
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+
 
   const [form, setForm] = useState<EventForm>({
     name: "",
@@ -103,20 +105,38 @@ const DEFAULT_DJ_IMAGE =
    const [postedEvents, setPostedEvents] = useState<any[]>([]);
 
    const [eventLoading, setEventLoading] = useState(false);
-   const fetchEvents = async() => {
-    setEventLoading(true);
-    const res = await fetch("/api/events/club?limit=3", await withAuthHeaders({
-      method:"GET"
-    }
-    ));
-    const data = await res.json();
+   const fetchEvents = async (searchText = "") => {
+  setEventLoading(true);
 
-    setPostedEvents(data);
-    setEventLoading(false);
-   }
+  const params = new URLSearchParams();
+  params.append("limit", "3");
+
+  if (searchText.trim() !== "") {
+    params.append("search", searchText.trim());
+  }
+
+  const res = await fetch(
+    `/api/events/club?${params.toString()}`,
+    await withAuthHeaders({ method: "GET" })
+  );
+
+  const data = await res.json();
+  setPostedEvents(data);
+  setEventLoading(false);
+};
+
    useEffect(()=> {
     fetchEvents();
    }, []);
+   
+   useEffect(() => {
+  const timer = setTimeout(() => {
+    fetchEvents(search);
+  }, 400); // debounce
+
+  return () => clearTimeout(timer);
+}, [search]);
+
 
   /* ---------------- SUBMIT ---------------- */
 
@@ -207,6 +227,81 @@ const DEFAULT_DJ_IMAGE =
     }
 
   };
+    const [deleteState, setDeleteState] = useState<{
+    open: boolean;
+    loading: boolean;
+    success: boolean;
+    error: string | null;
+  }>({
+    open: false,
+    loading: false, 
+    success: false,
+    error: null,
+  });
+  const [eventIdToDelete, setEventIdToDelete] = useState<string | null>(null);
+
+
+ const confirmDeleteEvent = async () => {
+  if (!eventIdToDelete) return;
+
+  setDeleteState({
+    open: true,
+    loading: true,
+    success: false,
+    error: null,
+  });
+
+  try {
+    // delete banner
+    let res = await fetch(
+      `/api/events/delete-image?eventId=${eventIdToDelete}&type=banner`,
+      await withAuthHeaders({ method: "POST" })
+    );
+    if (!res.ok) throw new Error("Failed to delete banner image");
+
+    // delete DJ
+    res = await fetch(
+      `/api/events/delete-image?eventId=${eventIdToDelete}&type=dj`,
+      await withAuthHeaders({ method: "POST" })
+    );
+    if (!res.ok) throw new Error("Failed to delete DJ image");
+
+    // delete event
+    res = await fetch(
+      `/api/events/delete?eventId=${eventIdToDelete}`,
+      await withAuthHeaders({ method: "DELETE" })
+    );
+    if (!res.ok) throw new Error("Failed to delete event");
+
+    setDeleteState({
+      open: true,
+      loading: false,
+      success: true,
+      error: null,
+    });
+
+    await fetchEvents();
+  } catch (err: any) {
+    setDeleteState({
+      open: true,
+      loading: false,
+      success: false,
+      error: err.message || "Could not delete event",
+    });
+  }
+};
+const openDeleteConfirmation = (eventId: string) => {
+  setEventIdToDelete(eventId);
+  setDeleteState({
+    open: true,
+    loading: false,
+    success: false,
+    error: null,
+  });
+};
+
+
+
   
 
 
@@ -386,6 +481,8 @@ const DEFAULT_DJ_IMAGE =
             <div className="relative">
               <input
                 placeholder="Search events..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-4 pr-10 py-2 rounded-full bg-[#1a1a1a] border border-white/10 text-sm text-white"
               />
               <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
@@ -403,9 +500,33 @@ const DEFAULT_DJ_IMAGE =
 
         <div className="space-y-4">
           {postedEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <EventCard
+              key={event.id}
+              event={event}
+              openDeleteConfirmation={openDeleteConfirmation}
+            />
           ))}
+
         </div>
+        {deleteState.open && (
+          <DeleteEventModal
+  loading={deleteState.loading}
+  success={deleteState.success}
+  error={deleteState.error}
+  onClose={() => {
+    setDeleteState({
+      open: false,
+      loading: false,
+      success: false,
+      error: null,
+    });
+    setEventIdToDelete(null);
+  }}
+  onConfirm={confirmDeleteEvent}
+/>
+
+)}
+
      </div>
 
     </div>
@@ -510,14 +631,18 @@ function BannerUpload({
     </label>
   );
 }
-function EventCard({ event }: { event: any }) {
+function EventCard({ event, openDeleteConfirmation }: { event: any, openDeleteConfirmation: (eventId : string) => void; }) {
   const [open, setOpen] = useState(false);
 
   const banner = event.banner_image_url
   ? `${event.banner_image_url}?v=${event.updated_at}`
   : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
 
-  const isUpcoming = new Date(event.event_date) >= new Date();
+  const eventDateTime = new Date(
+  `${event.event_date}T${event.start_time}`
+);
+
+const isUpcoming = eventDateTime >= new Date();
 
   return (
     <div className="rounded-xl bg-[#0b0b0b] border border-white/10 overflow-hidden">
@@ -578,7 +703,8 @@ function EventCard({ event }: { event: any }) {
             <Share2 size={16} />
           </button>
 
-          <button className="text-gray-400 hover:text-red-400 transition">
+          <button className="text-gray-400 hover:text-red-400 transition" onClick={() => openDeleteConfirmation(event.id)}
+          >
             <Trash2 size={16} />
           </button>
 
@@ -607,10 +733,105 @@ function EventCard({ event }: { event: any }) {
           </div>
 
           <div className="rounded-lg bg-[#1a1a1a] border border-white/10 p-6 text-center text-sm text-gray-400">
-            No data yet — you’ll wire this later 👀
+            No data yet 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DeleteEventModal({
+  loading,
+  success,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  loading: boolean;
+  success: boolean;
+  error: string | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-sm rounded-xl bg-[#0b0b0b] border border-white/10 p-6 text-center">
+
+        {/* CONFIRM STATE */}
+        {!loading && !success && !error && (
+          <>
+            <p className="text-lg font-semibold text-white">
+              Are you sure?
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              This will permanently delete the event and its images.
+            </p>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 rounded-md border border-white/10 text-sm"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={onConfirm}
+                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-sm font-medium"
+              >
+                Yes, delete
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* LOADING STATE */}
+        {loading && (
+          <>
+            <p className="text-lg font-semibold text-white">
+              Deleting event…
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              Please wait
+            </p>
+          </>
+        )}
+
+        {/* SUCCESS STATE */}
+        {!loading && success && (
+          <>
+            <p className="text-lg font-semibold text-green-400">
+              Event deleted successfully
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-6 px-4 py-2 rounded-md bg-pink-600 hover:bg-pink-700 text-sm"
+            >
+              Close
+            </button>
+          </>
+        )}
+
+        {/* ERROR STATE */}
+        {!loading && error && (
+          <>
+            <p className="text-lg font-semibold text-red-400">
+              Something went wrong
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              {error}
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-6 px-4 py-2 rounded-md border border-white/10 text-sm"
+            >
+              Close
+            </button>
+          </>
+        )}
+
+      </div>
     </div>
   );
 }
