@@ -24,6 +24,11 @@ type EventForm = {
 /* ---------------- PAGE ---------------- */
 
 export default function UpdateEventPage() {
+  const DEFAULT_BANNER_IMAGE =
+   "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
+
+   const DEFAULT_DJ_IMAGE =
+   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4";
   const { eventId } = useParams<{ eventId: string }>();
 
   const [loading, setLoading] = useState(true);
@@ -43,13 +48,12 @@ export default function UpdateEventPage() {
     formData.append("path", path);
 
     const res = await fetch(
-      "/api/upload-image",
+      "/api/events/upload-image",
       await withAuthHeaders({
         method: "POST",
         body: formData,
       })
     );
-
     const data = await res.json();
 
     if (!res.ok) {
@@ -58,6 +62,19 @@ export default function UpdateEventPage() {
 
     return data.url;
   };
+   const deleteImage = async (type: "banner" | "dj"): Promise<void> => {
+    const res = await fetch(
+    `/api/events/delete-image?eventId=${eventId}&type=${type}`,
+    await withAuthHeaders({
+      method: "POST",
+    })
+  );
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || "Failed to delete image");
+  }
+};
 
   const [form, setForm] = useState<EventForm>({
     name: "",
@@ -146,8 +163,15 @@ export default function UpdateEventPage() {
       }
 
       // checkbox logic
-      if (useDefaultBanner) body.banner_image_url = null;
-      if (useDefaultDJ) body.dj_image_url = null;
+      if (useDefaultBanner) {
+        await deleteImage("banner");
+        body.banner_image_url = "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
+      }
+
+      if (useDefaultDJ){ 
+        await deleteImage("dj");
+        body.dj_image_url = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4";
+      }
 
       const res = await fetch(
         `/api/events/patch?eventId=${eventId}`,
