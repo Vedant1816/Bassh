@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import supabaseAdmin from "@/app/services/supabase-admin";
+import { withAuth } from "@/app/services/protected";
 
 export const POST = withAuth(async (req:Request, user:any) => {
   try {
