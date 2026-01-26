@@ -39,10 +39,15 @@ export async function fetchWithFallback(
 ): Promise<Response> {
   const primaryUrl = API_BASE_URL;
   
+  console.log("🌐 [API] Request path:", path);
+  console.log("🌐 [API] Primary URL:", primaryUrl || "NOT SET");
+  console.log("🌐 [API] Fallback URL:", FALLBACK_API_URL);
+  
   if (!primaryUrl) {
     // If no primary URL, use fallback directly
-    console.log(`🔄 No primary URL configured, using fallback: ${FALLBACK_API_URL}${path}`);
-    return fetch(`${FALLBACK_API_URL}${path}`, init);
+    const fullUrl = `${FALLBACK_API_URL}${path}`;
+    console.log(`🔄 [API] No primary URL configured, using fallback: ${fullUrl}`);
+    return fetch(fullUrl, init);
   }
 
   try {
@@ -51,32 +56,39 @@ export async function fetchWithFallback(
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     // Try primary URL first
-    const response = await fetch(`${primaryUrl}${path}`, {
+    const fullUrl = `${primaryUrl}${path}`;
+    console.log(`🌐 [API] Attempting request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
       ...init,
       signal: controller.signal,
     });
     
     clearTimeout(timeoutId);
     
+    console.log(`✅ [API] Primary API response: ${response.status} ${response.statusText}`);
+    
     // If successful, return response
     if (response.ok || response.status < 500) {
+      console.log(`✅ [API] Using primary API response`);
       return response;
     }
     
     // If server error, try fallback
-    console.warn(`⚠️ Primary API returned ${response.status}, trying fallback...`);
+    console.warn(`⚠️ [API] Primary API returned ${response.status}, trying fallback...`);
   } catch (error: any) {
     // Network error or timeout - try fallback
     if (error.name === 'AbortError') {
-      console.warn(`⚠️ Primary API timeout, trying fallback...`);
+      console.warn(`⚠️ [API] Primary API timeout after 5s, trying fallback...`);
     } else {
-      console.warn(`⚠️ Primary API unreachable (${error.message}), trying fallback...`);
+      console.warn(`⚠️ [API] Primary API unreachable (${error.message}), trying fallback...`);
     }
   }
 
   // Try fallback URL
-  console.log(`🔄 Using fallback API: ${FALLBACK_API_URL}${path}`);
-  return fetch(`${FALLBACK_API_URL}${path}`, init);
+  const fallbackUrl = `${FALLBACK_API_URL}${path}`;
+  console.log(`🔄 [API] Using fallback API: ${fallbackUrl}`);
+  return fetch(fallbackUrl, init);
 }
 
 /**

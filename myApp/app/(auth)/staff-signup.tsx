@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function StaffSignupScreen() {
   const router = useRouter();
@@ -14,7 +14,12 @@ export default function StaffSignupScreen() {
   const [message, setMessage] = useState("");
 
   const handleSignup = async () => {
+    console.log("👤 [STAFF-SIGNUP] Signup initiated");
+    console.log("👤 [STAFF-SIGNUP] Email:", email.trim());
+    console.log("👤 [STAFF-SIGNUP] Password length:", password.length);
+
     if (!email.trim() || !password.trim()) {
+      console.warn("⚠️ [STAFF-SIGNUP] Validation failed: Email or password missing");
       setMessage("Email and password are required");
       return;
     }
@@ -23,44 +28,79 @@ export default function StaffSignupScreen() {
     setMessage("");
 
     /* ---------------- SUPABASE SIGNUP ---------------- */
+    console.log("🔐 [STAFF-SIGNUP] Creating Supabase auth account...");
 
-    const { error } = await supabasePublic.auth.signUp({
+    const { data: signupData, error } = await supabasePublic.auth.signUp({
       email: email.trim(),
       password: password.trim(),
     });
 
     if (error) {
+      console.error("❌ [STAFF-SIGNUP] Supabase signup error:", {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
       setMessage(error.message);
       setLoading(false);
       return;
     }
 
+    console.log("✅ [STAFF-SIGNUP] Supabase account created:", {
+      userId: signupData?.user?.id,
+      email: signupData?.user?.email,
+      session: !!signupData?.session
+    });
+
     /* ---------------- CREATE PROFILE (BACKEND) ---------------- */
+    console.log("📝 [STAFF-SIGNUP] Creating staff profile in backend...");
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/users`,
-        await withAuthHeaders({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: email.trim(),
-            role: "staff",
-          }),
-        })
+      const authHeaders = await withAuthHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          role: "staff",
+        }),
+      });
+
+      console.log("📤 [STAFF-SIGNUP] Sending request to /api/users");
+      console.log("📤 [STAFF-SIGNUP] Request body:", {
+        email: email.trim(),
+        role: "staff"
+      });
+      console.log("📤 [STAFF-SIGNUP] Auth headers present:", !!authHeaders.headers?.Authorization);
+
+      const res = await fetchWithFallback(
+        `/api/users`,
+        authHeaders
       );
+
+      console.log("📥 [STAFF-SIGNUP] Response status:", res.status);
+      console.log("📥 [STAFF-SIGNUP] Response ok:", res.ok);
 
       if (!res.ok) {
         const err = await res.json();
-        console.error("❌ Profile creation failed:", err);
+        console.error("❌ [STAFF-SIGNUP] Profile creation failed:", {
+          status: res.status,
+          error: err
+        });
         setMessage("Account created, but profile setup failed.");
+      } else {
+        const responseData = await res.json();
+        console.log("✅ [STAFF-SIGNUP] Profile created successfully:", responseData);
       }
-    } catch (err) {
-      console.warn("⚠️ API unreachable, continuing anyway");
+    } catch (err: any) {
+      console.error("❌ [STAFF-SIGNUP] API request error:", {
+        message: err.message,
+        stack: err.stack
+      });
+      console.warn("⚠️ [STAFF-SIGNUP] API unreachable, continuing anyway");
     }
 
     /* ---------------- REDIRECT ---------------- */
-
+    console.log("🔄 [STAFF-SIGNUP] Redirecting to /staff");
     router.replace("/staff");
     setLoading(false);
   };

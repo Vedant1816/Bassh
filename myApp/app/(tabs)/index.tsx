@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 /* ---------------- TYPES ---------------- */
 
@@ -106,8 +106,8 @@ export default function HomeScreen() {
     (async () => {
       setLoadingCards(true);
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/clubs/nearby?lat=${location.lat}&lng=${location.lng}`,
+      const res = await fetchWithFallback(
+        `/api/clubs/nearby?lat=${location.lat}&lng=${location.lng}`,
         await withAuthHeaders({ method: "GET" })
       );
 
@@ -135,8 +135,8 @@ export default function HomeScreen() {
 
     (async () => {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/api/map/heatmap`,
+        const res = await fetchWithFallback(
+          `/api/map/heatmap`,
           await withAuthHeaders({
             method: "POST",
             headers: { "Content-Type": "application/json" },

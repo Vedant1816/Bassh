@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.harshsehra.myApp",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby events on the map.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show nearby events on the map."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show nearby events on the map.",
+        "NSCameraUsageDescription": "This app needs camera access to scan QR codes for entry verification."
       }
     },
     "android": {
@@ -34,7 +35,8 @@
       "usesCleartextTraffic": true,
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ]
     },
     "web": {
@@ -48,6 +50,12 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to show nearby events on the map."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Bassh to access your camera to scan QR codes."
         }
       ],
       [

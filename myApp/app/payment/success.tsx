@@ -2,9 +2,10 @@ import { View, Text, StyleSheet, Image, ScrollView, Pressable, ActivityIndicator
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
+import { Colors } from "@/constants/Colors";
 
 export default function PaymentSuccess() {
-  const { qr, booking_id } = useLocalSearchParams();
+  const { qr, booking_id, amount } = useLocalSearchParams();
   const router = useRouter();
   const [qrUri, setQrUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -13,102 +14,117 @@ export default function PaymentSuccess() {
     console.log("🎉 [FRONTEND] Payment success page loaded");
     console.log("🎉 [FRONTEND] Params:", { 
       has_qr: !!qr, 
-      booking_id: booking_id || "not provided" 
+      booking_id: booking_id || "not provided",
+      amount: amount || "not provided"
     });
 
-    // Handle QR code - decode if URL encoded
     if (qr) {
       try {
         const qrStr = Array.isArray(qr) ? qr[0] : qr;
-        // Decode URL-encoded string
         const decoded = decodeURIComponent(qrStr);
         
-        // Check if it's already a data URL
         if (decoded.startsWith("data:image")) {
           setQrUri(decoded);
         } else {
-          // If it's just base64, add the data URL prefix
           setQrUri(`data:image/png;base64,${decoded}`);
         }
         
         console.log("✅ [FRONTEND] QR code processed");
       } catch (error) {
         console.error("❌ [FRONTEND] Error processing QR code:", error);
-        // Try using it as-is
         const qrStr = Array.isArray(qr) ? qr[0] : qr;
         setQrUri(qrStr.startsWith("data:") ? qrStr : `data:image/png;base64,${qrStr}`);
       }
     }
     
     setLoading(false);
-  }, [qr, booking_id]);
+  }, [qr, booking_id, amount]);
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#EC4899" />
+        <ActivityIndicator size="large" color="#22C55E" />
         <Text style={styles.loadingText}>Loading your booking...</Text>
       </View>
     );
   }
 
-  if (!qrUri) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <Text style={styles.title}>Payment Successful! 🎉</Text>
-        <Text style={styles.sub}>Your booking has been confirmed</Text>
-        {booking_id && (
-          <Text style={styles.bookingId}>
-            Booking ID: {Array.isArray(booking_id) ? booking_id[0] : booking_id}
-          </Text>
-        )}
-        <Pressable style={styles.button} onPress={() => router.replace("/(tabs)")}>
-          <Text style={styles.buttonText}>Go to Home</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const displayAmount = amount ? (Array.isArray(amount) ? amount[0] : amount) : "2,007.8";
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>🎉 Payment Successful</Text>
-          <Text style={styles.subtitle}>Your booking has been confirmed</Text>
-
-          <View style={styles.qrContainer}>
-            <Image
-              source={{ uri: qrUri }}
-              style={styles.qr}
-              resizeMode="contain"
-            />
+          {/* Large Green Checkmark Circle */}
+          <View style={styles.successCircle}>
+            <Text style={styles.checkmark}>✓</Text>
           </View>
 
-          <Text style={styles.instruction}>
-            Show this QR code at the venue entry
+          {/* Title */}
+          <Text style={styles.title}>Payment successful</Text>
+
+          {/* Amount Display */}
+          <Text style={styles.amount}>₹ {displayAmount}</Text>
+
+          {/* Subtitle */}
+          <Text style={styles.subtitle}>
+            You paid total of Rs. {displayAmount}
           </Text>
 
+          {/* Congratulations Message */}
+          <Text style={styles.congratsMessage}>
+            Congratulations 🎉{"\n"}Table Booked Successfully.
+          </Text>
+
+          {/* QR Code Section */}
+          {qrUri && (
+            <View style={styles.qrSection}>
+              <View style={styles.qrContainer}>
+                <Image
+                  source={{ uri: qrUri }}
+                  style={styles.qr}
+                  resizeMode="contain"
+                />
+              </View>
+              
+              <Text style={styles.qrInstruction}>
+                Show this QR code at the venue entry
+              </Text>
+            </View>
+          )}
+
+          {/* Booking ID */}
           {booking_id && (
-            <View style={styles.bookingInfo}>
-              <Text style={styles.bookingLabel}>Booking ID</Text>
-              <Text style={styles.bookingValue}>
+            <View style={styles.bookingIdContainer}>
+              <Text style={styles.bookingIdLabel}>Booking ID</Text>
+              <Text style={styles.bookingIdValue}>
                 {Array.isArray(booking_id) ? booking_id[0] : booking_id}
               </Text>
             </View>
           )}
 
-          <Pressable 
-            style={styles.button} 
-            onPress={() => router.replace("/(tabs)")}
-          >
-            <Text style={styles.buttonText}>Go to Home</Text>
-          </Pressable>
+          {/* Action Buttons */}
+          <View style={styles.actions}>
+            <Pressable 
+              style={styles.primaryButton}
+              onPress={() => router.replace("/(tabs)/booking")}
+            >
+              <Text style={styles.primaryButtonText}>View Tickets</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.secondaryButton}
+              onPress={() => router.replace("/(tabs)")}
+            >
+              <Text style={styles.secondaryButtonText}>? Having any issue?</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -118,35 +134,82 @@ export default function PaymentSuccess() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#16A34A", // Green background
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#16A34A",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: Colors.dark.text,
+    fontSize: 16,
+    marginTop: 16,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
   },
   content: {
     alignItems: "center",
     width: "100%",
   },
+  successCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#22C55E", // Lighter green for circle
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  checkmark: {
+    fontSize: 60,
+    color: Colors.dark.text,
+    fontWeight: "700",
+  },
   title: {
-    color: "#fff",
     fontSize: 28,
     fontWeight: "700",
-    marginBottom: 8,
+    color: Colors.dark.text,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  amount: {
+    fontSize: 48,
+    fontWeight: "800",
+    color: Colors.dark.text,
+    marginBottom: 16,
     textAlign: "center",
   },
   subtitle: {
-    color: "#9ca3af",
     fontSize: 16,
-    marginBottom: 32,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.9)",
+    marginBottom: 24,
     textAlign: "center",
   },
+  congratsMessage: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: Colors.dark.text,
+    textAlign: "center",
+    lineHeight: 26,
+    marginBottom: 40,
+  },
+  qrSection: {
+    alignItems: "center",
+    marginBottom: 32,
+    width: "100%",
+  },
   qrContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.dark.text,
     padding: 20,
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -154,65 +217,69 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   qr: {
-    width: 250,
-    height: 250,
+    width: 220,
+    height: 220,
   },
-  instruction: {
-    color: "#9ca3af",
+  qrInstruction: {
     fontSize: 14,
+    color: "rgba(255, 255, 255, 0.8)",
     textAlign: "center",
-    marginBottom: 24,
   },
-  bookingInfo: {
-    backgroundColor: "#1a1a1a",
-    padding: 16,
+  bookingIdContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: 32,
     width: "100%",
     alignItems: "center",
   },
-  bookingLabel: {
-    color: "#9ca3af",
+  bookingIdLabel: {
     fontSize: 12,
-    marginBottom: 4,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginBottom: 6,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  bookingValue: {
-    color: "#fff",
-    fontSize: 16,
+    letterSpacing: 1,
     fontWeight: "600",
-    fontFamily: "monospace",
   },
-  bookingId: {
-    color: "#9ca3af",
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  button: {
-    backgroundColor: "#EC4899",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    minWidth: 200,
-    marginTop: 8,
-  },
-  buttonText: {
-    color: "#fff",
+  bookingIdValue: {
     fontSize: 16,
     fontWeight: "700",
-    textAlign: "center",
+    color: Colors.dark.text,
+    fontFamily: "monospace",
+    letterSpacing: 1,
   },
-  loadingText: {
-    color: "#9ca3af",
-    fontSize: 16,
-    marginTop: 16,
+  actions: {
+    width: "100%",
+    gap: 16,
   },
-  sub: {
-    color: "#9ca3af",
+  primaryButton: {
+    backgroundColor: Colors.dark.text,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  primaryButtonText: {
     fontSize: 16,
-    textAlign: "center",
-    marginBottom: 16,
+    fontWeight: "700",
+    color: "#16A34A",
+  },
+  secondaryButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.dark.text,
   },
 });

@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function DobScreen() {
   const router = useRouter();
@@ -57,8 +57,8 @@ export default function DobScreen() {
     setLoading(true);
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/users/me`,
+      const res = await fetchWithFallback(
+        `/api/users/me`,
         await withAuthHeaders({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

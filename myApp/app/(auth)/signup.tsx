@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -38,8 +38,8 @@ export default function SignupScreen() {
     /* -------- CREATE USER PROFILE -------- */
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/users`,
+      const res = await fetchWithFallback(
+        `/api/users`,
         await withAuthHeaders({
           method: "POST",
           headers: { "Content-Type": "application/json" },

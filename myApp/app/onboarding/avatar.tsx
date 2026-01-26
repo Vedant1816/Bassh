@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 // Conditionally import ImagePicker to handle cases where native module isn't available
 let ImagePicker: any = null;
@@ -69,8 +69,8 @@ export default function AvatarScreen() {
     setUploadedImage(null);
     setLoading(true);
     try {
-      await fetch(
-        `${API_BASE_URL}/api/users/me`,
+      await fetchWithFallback(
+        `/api/users/me`,
         await withAuthHeaders({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -93,8 +93,8 @@ export default function AvatarScreen() {
     try {
       // For now, we'll use the uploaded image URI directly
       // In production, you'd upload to a storage service first
-      await fetch(
-        `${API_BASE_URL}/api/users/me`,
+      await fetchWithFallback(
+        `/api/users/me`,
         await withAuthHeaders({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
