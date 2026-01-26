@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 const { width } = Dimensions.get("window");
 
@@ -40,8 +40,8 @@ export default function EventDetailScreen() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(
-          `${API_BASE_URL}/api/events/${id}`,
+        const res = await fetchWithFallback(
+          `/api/events/${id}`,
           await withAuthHeaders({ method: "GET" })
         );
 
@@ -238,7 +238,11 @@ export default function EventDetailScreen() {
         </View>
         <Pressable
           style={styles.bookFooterBtn}
-          onPress={() => id && router.push(`event/${id}/book`)}
+          onPress={() => {
+            if (id) {
+              router.push(`/event/${id}/book` as any);
+            }
+          }}
         >
           <Text style={styles.bookFooterBtnText}>Book tickets</Text>
         </Pressable>

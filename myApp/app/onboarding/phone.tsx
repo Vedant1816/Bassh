@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function PhoneScreen() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function PhoneScreen() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/send-whatsapp-otp`, {
+      const res = await fetchWithFallback(`/api/auth/send-whatsapp-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: fullPhone }),

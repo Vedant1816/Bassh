@@ -3,13 +3,14 @@ import supabaseAdmin from "@/app/services/supabase-admin";
 
 export const runtime = "nodejs";
 
-export const GET = withAuth(async (_req: Request, params: any, user: any) => {
-  const bookingId = params.id;
-  console.log("📋 [BOOKINGS] Get booking detail request for booking:", bookingId);
+export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
+  console.log("📋 [BOOKINGS] Get user bookings request");
 
   try {
-    // Fetch the specific booking
-    const { data: booking, error } = await supabaseAdmin
+    const userId = user.id;
+
+    // Fetch all bookings for the user
+    const { data: bookings, error } = await supabaseAdmin
       .from("bookings")
       .select(`
         id,
@@ -19,53 +20,41 @@ export const GET = withAuth(async (_req: Request, params: any, user: any) => {
         booking_status,
         entry_status,
         entered_at,
-        qr_used,
-        qr_used_at,
         total_amount,
         participants,
         qr_code,
-        created_at,
         events!bookings_event_id_fkey (
-          id,
           name,
           event_date,
           start_time,
           banner_image_url,
-          dj_name,
           clubs!events_club_id_fkey (
-            id,
             club_name,
             address_text
           )
         )
       `)
-      .eq("id", bookingId)
-      .eq("user_id", user.id)
-      .single();
+      .eq("user_id", userId)
+      .eq("booking_status", "confirmed")
+      .order("booking_date", { ascending: false });
 
     if (error) {
-      console.error("❌ [BOOKINGS] Failed to fetch booking:", error);
+      console.error("❌ [BOOKINGS] Failed to fetch bookings:", error);
       return Response.json(
-        { error: "Failed to fetch booking", details: error.message },
+        { error: "Failed to fetch bookings" },
         { status: 500 }
       );
     }
 
-    if (!booking) {
-      return Response.json(
-        { error: "Booking not found" },
-        { status: 404 }
-      );
-    }
-
-    console.log(`✅ [BOOKINGS] Found booking: ${booking.id}`);
+    console.log(`✅ [BOOKINGS] Found ${bookings?.length || 0} bookings`);
 
     return Response.json({
-      booking,
+      bookings: bookings || [],
+      total: bookings?.length || 0,
     });
 
   } catch (err: any) {
-    console.error("❌ [BOOKINGS] Get booking error:", err);
+    console.error("❌ [BOOKINGS] Get bookings error:", err);
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }

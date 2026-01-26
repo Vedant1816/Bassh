@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function OtpScreen() {
   const router = useRouter();
@@ -25,8 +25,8 @@ export default function OtpScreen() {
       setLoading(true);
       setError("");
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/auth/verify-whatsapp-otp`,
+      const res = await fetchWithFallback(
+        `/api/auth/verify-whatsapp-otp`,
         await withAuthHeaders({
           method: "POST",
           headers: { "Content-Type": "application/json" },

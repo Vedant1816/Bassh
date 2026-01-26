@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function AboutYouScreen() {
   const router = useRouter();
@@ -29,15 +29,8 @@ export default function AboutYouScreen() {
 
     setLoading(true);
     try {
-      if (!API_BASE_URL) {
-        console.error("❌ API_BASE_URL not configured");
-        alert("API server not configured. Please set EXPO_PUBLIC_API_URL in .env");
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(
-        `${API_BASE_URL}/api/users/me`,
+      const res = await fetchWithFallback(
+        `/api/users/me`,
         await withAuthHeaders({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

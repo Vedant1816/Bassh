@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function VerifyPhoneScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
@@ -30,8 +30,8 @@ export default function VerifyPhoneScreen() {
     }
 
     // Save phone number AFTER verification
-    await fetch(
-      `${API_BASE_URL}/api/users/me`,
+    await fetchWithFallback(
+      `/api/users/me`,
       await withAuthHeaders({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

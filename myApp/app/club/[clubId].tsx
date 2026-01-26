@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL } from "@/_services/api-config";
+import { fetchWithFallback } from "@/_services/api-config";
 
 export default function ClubProfile() {
   const params = useLocalSearchParams<{ clubId?: string; clubid?: string }>();
@@ -23,8 +23,8 @@ export default function ClubProfile() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(
-        `${API_BASE_URL}/api/clubs/${clubId}`,
+      const res = await fetchWithFallback(
+        `/api/clubs/${clubId}`,
         await withAuthHeaders({ method: "GET" })
       );
       const data = await res.json();

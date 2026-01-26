@@ -25,6 +25,8 @@ export async function withAuthHeaders(
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;
       console.log("✅ Auth token attached to request");
+      console.log("🔐 [FRONTEND] Access Token:", session.access_token);
+      console.log("🔐 [FRONTEND] Token length:", session.access_token.length);
     } else {
       console.warn("⚠️ No session or access token available");
     }

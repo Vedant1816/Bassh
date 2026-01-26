@@ -13,8 +13,9 @@ import {
   InteractionManager,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { withAuthHeaders, authFetch } from "@/_services/auth-fetch";
-import { API_BASE_URL, fetchWithFallback } from "@/_services/api-config";
+import { withAuthHeaders } from "@/_services/auth-fetch";
+import { fetchWithFallback } from "@/_services/api-config";
+import { Colors } from "@/constants/Colors";
 
 interface TicketSelection {
   pricingId: string;
@@ -48,7 +49,6 @@ export default function EventBookingScreen() {
   const [currentParticipantIndex, setCurrentParticipantIndex] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [finalPrice, setFinalPrice] = useState(0);
-  const [bookingId, setBookingId] = useState<string | null>(null);
   const [priceBreakdown, setPriceBreakdown] = useState<Array<{ label: string; amount: number; count?: number }>>([]);
   const [pendingRazorpayOptions, setPendingRazorpayOptions] = useState<any>(null);
 
@@ -58,8 +58,8 @@ export default function EventBookingScreen() {
     if (!id) return;
 
     (async () => {
-      const res = await fetch(
-        `${API_BASE_URL}/api/bookings/event/${id}`,
+      const res = await fetchWithFallback(
+        `/api/bookings/event/${id}`,
         await withAuthHeaders({ method: "GET" })
       );
 
@@ -126,18 +126,16 @@ export default function EventBookingScreen() {
       return;
     }
 
-    // Determine participant count based on ticket types
     let participantCount = 0;
     selections.forEach((sel) => {
       const isCouple = sel.label.toLowerCase().includes("couple");
       if (isCouple) {
-        participantCount += sel.quantity * 2; // Each couple ticket = 2 participants
+        participantCount += sel.quantity * 2;
       } else {
-        participantCount += sel.quantity; // Each regular ticket = 1 participant
+        participantCount += sel.quantity;
       }
     });
 
-    // Initialize participants array
     const initialParticipants: Participant[] = Array.from({ length: participantCount }).map(() => ({
       name: "",
       gender: "",
@@ -164,7 +162,6 @@ export default function EventBookingScreen() {
   const handleNextParticipant = () => {
     const current = participants[currentParticipantIndex];
     
-    // Validation
     if (!current.name.trim()) {
       Alert.alert("Error", "Please enter name");
       return;
@@ -181,7 +178,6 @@ export default function EventBookingScreen() {
     if (currentParticipantIndex < participants.length - 1) {
       setCurrentParticipantIndex(currentParticipantIndex + 1);
     } else {
-      // All participants filled, calculate final price and show summary
       calculateFinalPrice();
     }
   };
@@ -193,14 +189,12 @@ export default function EventBookingScreen() {
     const stagParticipants: Participant[] = [];
     const breakdown: Array<{ label: string; amount: number; count?: number }> = [];
 
-    // First pass: Handle explicit couple tickets and stag tickets
     selections.forEach((sel) => {
       const labelLower = sel.label.toLowerCase();
       const isCoupleTicket = labelLower.includes("couple");
       const isStagTicket = labelLower.includes("stag");
       
       if (isCoupleTicket) {
-        // Couple ticket: 2 participants = 1 couple_price
         let coupleCount = 0;
         for (let i = 0; i < sel.quantity; i++) {
           if (participantIdx + 1 < participants.length) {
@@ -218,7 +212,6 @@ export default function EventBookingScreen() {
           });
         }
       } else if (isStagTicket) {
-        // Explicit stag tickets: collect participants for stag pricing
         for (let i = 0; i < sel.quantity; i++) {
           if (participantIdx < participants.length) {
             stagParticipants.push(participants[participantIdx]);
@@ -226,7 +219,6 @@ export default function EventBookingScreen() {
           }
         }
       } else {
-        // Regular tickets: collect participants for pairing logic
         for (let i = 0; i < sel.quantity; i++) {
           if (participantIdx < participants.length) {
             regularParticipants.push(participants[participantIdx]);
@@ -236,7 +228,6 @@ export default function EventBookingScreen() {
       }
     });
 
-    // Handle explicit stag ticket participants
     if (stagParticipants.length > 0) {
       const stagTicket = Array.from(selections.values()).find(
         (s) => s.label.toLowerCase().includes("stag")
@@ -274,7 +265,6 @@ export default function EventBookingScreen() {
       }
     }
 
-    // Handle regular ticket participants with pairing logic
     if (regularParticipants.length > 0) {
       const males: Participant[] = [];
       const females: Participant[] = [];
@@ -291,16 +281,13 @@ export default function EventBookingScreen() {
         }
       });
 
-      // Get pricing info from first regular ticket selection
       const regularTicket = Array.from(selections.values()).find(
         (s) => !s.label.toLowerCase().includes("couple") && !s.label.toLowerCase().includes("stag")
       );
 
       if (regularTicket) {
-        // Pair up females with males
         const pairsCount = Math.min(females.length, males.length);
         
-        // Each pair uses couple_price (if available, else regular price)
         if (pairsCount > 0) {
           const couplePrice = regularTicket.couplePrice || regularTicket.price;
           const pairTotal = couplePrice * pairsCount;
@@ -312,7 +299,6 @@ export default function EventBookingScreen() {
           });
         }
 
-        // Remaining males use stag_price (if available, else regular price)
         const remainingMales = males.length - pairsCount;
         if (remainingMales > 0) {
           const stagPrice = regularTicket.stagPrice || regularTicket.price;
@@ -325,7 +311,6 @@ export default function EventBookingScreen() {
           });
         }
 
-        // Remaining females use regular price
         const remainingFemales = females.length - pairsCount;
         if (remainingFemales > 0) {
           const femaleTotal = regularTicket.price * remainingFemales;
@@ -337,7 +322,6 @@ export default function EventBookingScreen() {
           });
         }
 
-        // Others use regular price
         if (others.length > 0) {
           const otherTotal = regularTicket.price * others.length;
           total += otherTotal;
@@ -348,7 +332,6 @@ export default function EventBookingScreen() {
           });
         }
       } else {
-        // Fallback: use first selection pricing
         const firstSelection = Array.from(selections.values())[0];
         if (firstSelection) {
           const fallbackTotal = firstSelection.price * regularParticipants.length;
@@ -369,46 +352,22 @@ export default function EventBookingScreen() {
   };
 
   const handleCheckout = async () => {
-    console.log("🔄 [FRONTEND] handleCheckout called");
-    console.log("🔄 [FRONTEND] Event ID:", id);
-    console.log("🔄 [FRONTEND] Final price:", finalPrice);
-    console.log("🔄 [FRONTEND] Participants:", participants.length);
-    
-    // Validation
-    if (!id) {
-      console.error("❌ [FRONTEND] Missing event ID");
-      Alert.alert("Error", "Event ID is missing");
+    if (!id || finalPrice <= 0 || !participants || participants.length === 0) {
+      Alert.alert("Error", "Invalid booking details");
       return;
     }
     
-    if (finalPrice <= 0) {
-      console.error("❌ [FRONTEND] Invalid price:", finalPrice);
-      Alert.alert("Error", "Invalid price. Please check your selections.");
-      return;
-    }
-    
-    if (!participants || participants.length === 0) {
-      console.error("❌ [FRONTEND] No participants");
-      Alert.alert("Error", "Please add at least one participant.");
-      return;
-    }
-    
-    // Validate all participants have required fields
     const invalidParticipants = participants.filter(
       (p) => !p.name || !p.gender || !p.age
     );
     if (invalidParticipants.length > 0) {
-      console.error("❌ [FRONTEND] Invalid participants:", invalidParticipants);
       Alert.alert("Error", "Please fill in all required participant details.");
       return;
     }
     
     try {
       setProcessing(true);
-      console.log("✅ [FRONTEND] Validation passed, starting checkout...");
   
-      // 1️⃣ CREATE BOOKING
-      console.log("📝 [FRONTEND] Creating booking...");
       const bookingRes = await fetchWithFallback(
         `/api/bookings/create`,
         await withAuthHeaders({
@@ -428,17 +387,13 @@ export default function EventBookingScreen() {
       );
   
       const bookingData = await bookingRes.json();
-      console.log("📝 [FRONTEND] Booking response:", bookingData);
   
       if (!bookingRes.ok) {
-        console.error("❌ [FRONTEND] Booking creation failed:", bookingData);
         setProcessing(false);
         Alert.alert("Booking failed", bookingData.error || "Unknown error");
         return;
       }
   
-      // 2️⃣ CREATE RAZORPAY ORDER
-      console.log("💳 [FRONTEND] Creating Razorpay order...");
       const orderRes = await fetchWithFallback(
         `/api/payments/checkout/create-order`,
         await withAuthHeaders({
@@ -452,20 +407,17 @@ export default function EventBookingScreen() {
       );
   
       const order = await orderRes.json();
-      console.log("💳 [FRONTEND] Order response:", order);
   
       if (!orderRes.ok) {
-        console.error("❌ [FRONTEND] Order creation failed:", order);
         setProcessing(false);
         Alert.alert("Payment error", order.error || "Failed to create order");
         return;
       }
   
-      // 3️⃣ OPEN RAZORPAY (NATIVE)
       const options = {
         key: order.key,
         order_id: order.order_id,
-        amount: order.amount || finalPrice * 100, // Use order amount (in paise)
+        amount: order.amount || finalPrice * 100,
         currency: "INR",
         name: event?.name || "Event Booking",
         description: "Event Ticket Payment",
@@ -476,21 +428,10 @@ export default function EventBookingScreen() {
         theme: { color: "#EC4899" },
       };
 
-      console.log("💳 [FRONTEND] Opening Razorpay with options:", {
-        order_id: options.order_id,
-        amount: options.amount,
-      });
-
-      // Store options and booking data, then close modal
-      // Razorpay will open in the Modal's onDismiss callback
-      console.log("💳 [FRONTEND] Storing Razorpay options, closing modal...");
-      setPendingRazorpayOptions({ ...options, bookingData }); // Store both options and booking data
+      setPendingRazorpayOptions({ ...options, bookingData });
       setShowSummary(false);
-      setProcessing(false); // Reset processing to allow UI to update
-      // Don't open Razorpay here - wait for modal onDismiss callback
+      setProcessing(false);
     } catch (err: any) {
-      console.error("❌ [FRONTEND] handleCheckout error:", err);
-      console.error("❌ [FRONTEND] Error stack:", err.stack);
       setProcessing(false);
       Alert.alert("Error", err.message || "Something went wrong. Please try again.");
     }
@@ -499,13 +440,11 @@ export default function EventBookingScreen() {
   const totalTickets = getTotalTickets();
   const totalPrice = getTotalPrice();
 
-  /* ---------------- UI ---------------- */
-
   if (loading) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <ActivityIndicator color="#fff" size="large" />
+        <ActivityIndicator color={Colors.dark.primary} size="large" />
       </View>
     );
   }
@@ -694,63 +633,43 @@ export default function EventBookingScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onDismiss={() => {
-          console.log("✅ [FRONTEND] Summary modal fully dismissed");
-          // Open Razorpay after modal is fully dismissed
           if (pendingRazorpayOptions) {
-            console.log("💳 [FRONTEND] Opening Razorpay checkout after modal dismissal...");
             const { bookingData: storedBookingData, ...options } = pendingRazorpayOptions;
-            setPendingRazorpayOptions(null); // Clear pending options
+            setPendingRazorpayOptions(null);
             
-            // Wait for all interactions and animations to complete
             InteractionManager.runAfterInteractions(() => {
-                        // Additional delay to ensure view hierarchy is fully ready
-                        setTimeout(async () => {
-                          setProcessing(true); // Show loading during payment
+              setTimeout(async () => {
+                setProcessing(true);
 
-                          // Dynamically import Razorpay to avoid crash on app load
-                          let RazorpayCheckout: any;
-                          try {
-                            // @ts-ignore - react-native-razorpay doesn't have types
-                            RazorpayCheckout = require("react-native-razorpay").default;
-                          } catch (importError: any) {
-                            console.error("❌ [FRONTEND] Failed to load Razorpay module:", importError);
-                            Alert.alert(
-                              "Payment Error", 
-                              "Payment gateway not available. Please rebuild the app or contact support.",
-                              [{ text: "OK", onPress: () => setProcessing(false) }]
-                            );
-                            return;
-                          }
+                let RazorpayCheckout: any;
+                try {
+                  RazorpayCheckout = require("react-native-razorpay").default;
+                } catch (importError: any) {
+                  Alert.alert(
+                    "Payment Error", 
+                    "Payment gateway not available.",
+                    [{ text: "OK", onPress: () => setProcessing(false) }]
+                  );
+                  return;
+                }
 
-                          // Validate Razorpay SDK is available
-                          if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
-                            console.error("❌ [FRONTEND] RazorpayCheckout is not available");
-                            Alert.alert("Payment Error", "Payment gateway not available. Please try again.");
-                            setProcessing(false);
-                            return;
-                          }
+                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+                  Alert.alert("Payment Error", "Payment gateway not available.");
+                  setProcessing(false);
+                  return;
+                }
 
-                          console.log("💳 [FRONTEND] Calling RazorpayCheckout.open()...");
-                          console.log("💳 [FRONTEND] View hierarchy should be ready now");
+                const currentBookingId = storedBookingData.booking_id;
 
-                          // Get booking data from stored options
-                          const currentBookingId = storedBookingData.booking_id;
-
-                          RazorpayCheckout.open(options)
+                RazorpayCheckout.open(options)
                   .then(async (response: any) => {
-                    console.log("✅ [FRONTEND] Payment successful callback triggered!");
-                    console.log("✅ [FRONTEND] Response:", response);
-                    
                     if (!response || !response.razorpay_payment_id) {
-                      console.error("❌ [FRONTEND] Invalid payment response");
                       setProcessing(false);
-                      Alert.alert("Payment Error", "Invalid payment response. Please contact support.");
+                      Alert.alert("Payment Error", "Invalid payment response.");
                       return;
                     }
                     
-                    // 4️⃣ VERIFY PAYMENT
-                    console.log("🔐 [FRONTEND] Verifying payment...");
-                    setProcessing(true); // Keep loading during verification
+                    setProcessing(true);
                     
                     try {
                       const verifyRes = await fetchWithFallback(
@@ -768,70 +687,44 @@ export default function EventBookingScreen() {
                       );
 
                       const verified = await verifyRes.json();
-                      console.log("🔐 [FRONTEND] Verification response:", verified);
 
                       if (!verifyRes.ok) {
-                        console.error("❌ [FRONTEND] Verification failed:", verified);
                         setProcessing(false);
                         Alert.alert(
                           "Payment verification failed", 
-                          verified.error || "Unable to verify payment. Please contact support.",
-                          [
-                            { text: "OK", onPress: () => router.back() }
-                          ]
+                          verified.error || "Unable to verify payment.",
+                          [{ text: "OK", onPress: () => router.back() }]
                         );
                         return;
                       }
 
-                      // Check for QR code (could be 'qr' or 'qr_code')
                       const qrCode = verified.qr || verified.qr_code;
-                      
-                      // If QR code is missing but payment was verified, still proceed
-                      // (QR can be regenerated later)
-                      if (!qrCode) {
-                        console.warn("⚠️ [FRONTEND] QR code missing from response, but payment verified");
-                        // Still proceed to success page - QR can be shown later
-                      }
-
-                      console.log("✅ [FRONTEND] Payment verified successfully!");
-                      console.log("🎉 [FRONTEND] Navigating to success page...");
-                      
-                      // ✅ SUCCESS → GO TO SUCCESS SCREEN
                       setProcessing(false);
                       
-                      // URL encode the QR code if it exists (it's a data URL, so encode it properly)
                       const qrParam = qrCode ? encodeURIComponent(qrCode) : "";
-                      const bookingIdParam = currentBookingId;
                       
-                      // Use replace to prevent going back to payment screen
                       if (qrCode) {
-                        router.replace(`/payment/success?qr=${qrParam}&booking_id=${bookingIdParam}`);
+                        router.replace(`/payment/success?qr=${qrParam}&booking_id=${currentBookingId}&amount=${finalPrice}`);
                       } else {
-                        // Navigate without QR - it can be fetched from booking later
-                        router.replace(`/payment/success?booking_id=${bookingIdParam}`);
+                        router.replace(`/payment/success?booking_id=${currentBookingId}&amount=${finalPrice}`);
                       }
                     } catch (verifyError: any) {
-                      console.error("❌ [FRONTEND] Verification error:", verifyError);
                       setProcessing(false);
                       Alert.alert(
                         "Verification Error",
-                        "Payment was successful but verification failed. Please contact support with your booking ID.",
+                        "Payment successful but verification failed.",
                         [
                           { 
                             text: "OK", 
-                            onPress: () => router.replace(`/payment/success?booking_id=${currentBookingId}`)
+                            onPress: () => router.replace(`/payment/success?booking_id=${currentBookingId}&amount=${finalPrice}`)
                           }
                         ]
                       );
                     }
                   })
                   .catch((error: any) => {
-                    console.error("❌ [FRONTEND] Razorpay error:", error);
-                    console.error("❌ [FRONTEND] Error details:", JSON.stringify(error, null, 2));
-                    
                     setProcessing(false);
                     
-                    // Check if cancelled
                     const isCancelled = 
                       error?.description === "User closed the checkout form by pressing back button" ||
                       error?.code === "BAD_REQUEST_ERROR" ||
@@ -840,15 +733,13 @@ export default function EventBookingScreen() {
                     if (isCancelled) {
                       Alert.alert(
                         "Payment cancelled", 
-                        "Your booking is still pending. You can complete the payment later.",
-                        [
-                          { text: "OK", onPress: () => router.back() }
-                        ]
+                        "Your booking is still pending.",
+                        [{ text: "OK", onPress: () => router.back() }]
                       );
                     } else {
                       Alert.alert(
                         "Payment error", 
-                        error?.description || error?.message || "Payment could not be completed. Please try again.",
+                        error?.description || error?.message || "Payment could not be completed.",
                         [
                           { text: "Retry", onPress: () => handleCheckout() },
                           { text: "Cancel", style: "cancel", onPress: () => router.back() }
@@ -856,7 +747,7 @@ export default function EventBookingScreen() {
                       );
                     }
                   });
-              }, 500); // Additional delay after interactions complete
+              }, 500);
             });
           }
         }}
@@ -899,21 +790,11 @@ export default function EventBookingScreen() {
 
             <Pressable
               style={[styles.checkoutBtn, processing && styles.checkoutBtnDisabled]}
-              onPress={() => {
-                console.log("🔘 [FRONTEND] Checkout button pressed");
-                console.log("🔘 [FRONTEND] Processing state:", processing);
-                console.log("🔘 [FRONTEND] Final price:", finalPrice);
-                console.log("🔘 [FRONTEND] Participants:", participants);
-                if (!processing) {
-                  handleCheckout();
-                } else {
-                  console.log("⚠️ [FRONTEND] Checkout already in progress, ignoring press");
-                }
-              }}
+              onPress={handleCheckout}
               disabled={processing}
             >
               {processing ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color={Colors.dark.text} />
               ) : (
                 <Text style={styles.checkoutBtnText}>Checkout</Text>
               )}
@@ -927,60 +808,64 @@ export default function EventBookingScreen() {
 
 /* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: Colors.dark.background },
   scrollView: { padding: 20, paddingTop: 60 },
   backBtn: { marginBottom: 12 },
-  backText: { color: "#fff", fontSize: 22 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
-  subtitle: { color: "#9ca3af", marginBottom: 32 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between" },
-  sectionTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  availabilityText: { color: "#9ca3af" },
+  backText: { color: Colors.dark.text, fontSize: 22 },
+  title: { color: Colors.dark.text, fontSize: 22, fontWeight: "700" },
+  subtitle: { color: Colors.dark.textSecondary, marginBottom: 32 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  sectionTitle: { color: Colors.dark.text, fontSize: 18, fontWeight: "700" },
+  availabilityText: { color: Colors.dark.textSecondary },
   ticketCard: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
-  ticketTitle: { color: "#fff", fontSize: 16 },
-  ticketPrice: { color: "#fff", marginTop: 6, fontSize: 16, fontWeight: "600" },
-  ticketSubPrice: { color: "#9ca3af", marginTop: 4, fontSize: 12 },
+  ticketTitle: { color: Colors.dark.text, fontSize: 16 },
+  ticketPrice: { color: Colors.dark.text, marginTop: 6, fontSize: 16, fontWeight: "600" },
+  ticketSubPrice: { color: Colors.dark.textSecondary, marginTop: 4, fontSize: 12 },
   quantityControls: { flexDirection: "row", alignItems: "center", gap: 16 },
   quantityBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.dark.text,
     alignItems: "center",
     justifyContent: "center",
   },
-  quantityBtnText: { fontSize: 20, fontWeight: "700", color: "#000" },
-  quantityText: { color: "#fff", fontSize: 18 },
+  quantityBtnText: { fontSize: 20, fontWeight: "700", color: Colors.dark.background },
+  quantityText: { color: Colors.dark.text, fontSize: 18 },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     padding: 20,
-    backgroundColor: "#0f0f0f",
+    backgroundColor: Colors.dark.surface,
     flexDirection: "row",
     justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: Colors.dark.border,
   },
-  footerTickets: { color: "#9ca3af" },
-  footerPrice: { color: "#fff", fontSize: 24, fontWeight: "700" },
+  footerTickets: { color: Colors.dark.textSecondary },
+  footerPrice: { color: Colors.dark.text, fontSize: 24, fontWeight: "700" },
   proceedBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.dark.primary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 12,
   },
-  proceedBtnText: { color: "#000", fontWeight: "700" },
+  proceedBtnText: { color: Colors.dark.text, fontWeight: "700" },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: Colors.dark.background,
   },
   modalHeader: {
     flexDirection: "row",
@@ -989,24 +874,26 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: "#1a1a1a",
+    borderBottomColor: Colors.dark.border,
   },
-  modalClose: { color: "#a855f7", fontSize: 16 },
-  modalTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  modalClose: { color: Colors.dark.primary, fontSize: 16 },
+  modalTitle: { color: Colors.dark.text, fontSize: 18, fontWeight: "700" },
   modalContent: { flex: 1, padding: 20 },
   inputLabel: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 14,
     fontWeight: "600",
     marginTop: 20,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     padding: 16,
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   genderRow: {
     flexDirection: "row",
@@ -1017,63 +904,67 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     alignItems: "center",
     borderWidth: 2,
     borderColor: "transparent",
   },
   genderBtnActive: {
-    borderColor: "#a855f7",
-    backgroundColor: "#2a1a3a",
+    borderColor: Colors.dark.primary,
+    backgroundColor: Colors.dark.card,
   },
   genderBtnText: {
-    color: "#9ca3af",
+    color: Colors.dark.textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },
   genderBtnTextActive: {
-    color: "#a855f7",
+    color: Colors.dark.primary,
   },
   nextBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.dark.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 32,
   },
   nextBtnText: {
-    color: "#000",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "700",
   },
   summarySectionTitle: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 18,
     fontWeight: "700",
     marginTop: 24,
     marginBottom: 12,
   },
   participantCard: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   participantName: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "600",
   },
   participantDetails: {
-    color: "#9ca3af",
+    color: Colors.dark.textSecondary,
     fontSize: 14,
     marginTop: 4,
   },
   priceSummary: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     padding: 20,
     marginTop: 24,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   breakdownRow: {
     flexDirection: "row",
@@ -1082,31 +973,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   breakdownLabel: {
-    color: "#9ca3af",
+    color: Colors.dark.textSecondary,
     fontSize: 14,
   },
   breakdownAmount: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 14,
     fontWeight: "600",
   },
   breakdownDivider: {
     height: 1,
-    backgroundColor: "#333",
+    backgroundColor: Colors.dark.border,
     marginVertical: 12,
   },
   breakdownTotalLabel: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 18,
     fontWeight: "700",
   },
   finalPrice: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 24,
     fontWeight: "800",
   },
   checkoutBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.dark.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -1116,7 +1007,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   checkoutBtnText: {
-    color: "#000",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "700",
   },
