@@ -27,7 +27,18 @@ export const GET = withAuth(async (_req: Request, params: { id: string }, _user:
       .eq("club_id", id)
       .order("event_date", { ascending: true });
 
-    return Response.json({ club, events: events ?? [] });
+    const { data: discounts } = await supabaseAdmin
+      .from("discounts")
+      .select("*")
+      .eq("club_id", id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    return Response.json({
+      club,
+      events: events ?? [],
+      discounts: discounts ?? [],
+    });
   } catch (err: any) {
     console.error("❌ Get club error:", err);
     return Response.json(

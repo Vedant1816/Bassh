@@ -87,8 +87,19 @@ export default function EventBookingScreen() {
         setEvent(data.event);
         setPricing(data.pricing || []);
         setAvailableTickets(data.event?.available_tickets || 0);
-        setDiscounts(data.discounts || []);
-        console.log("🎟️ [BOOKING] Available discounts:", data.discounts);
+      }
+
+      // Fetch event discounts from dedicated discount API for checkout
+      const discountRes = await fetchWithFallback(
+        `/api/discounts/event?event_id=${id}`,
+        await withAuthHeaders({ method: "GET" })
+      );
+      const discountData = await discountRes.json();
+      if (discountRes.ok && discountData.discounts) {
+        setDiscounts(discountData.discounts);
+        console.log("🎟️ [BOOKING] Available discounts:", discountData.discounts);
+      } else {
+        setDiscounts([]);
       }
 
       setLoading(false);
@@ -430,13 +441,39 @@ export default function EventBookingScreen() {
 
     setPriceBreakdown(breakdown);
     setSubtotal(total);
-
-    // Apply discount and calculate final price
-    const finalTotal = calculateDiscount(total);
-    setFinalPrice(finalTotal);
+    setAppliedDiscount(null);
+    setDiscountAmount(0);
+    setFinalPrice(total);
 
     setShowParticipantForm(false);
     setShowSummary(true);
+  };
+
+  const getDiscountValue = (discount: Discount, currentSubtotal: number): number => {
+    if (discount.discount_type === "percentage") {
+      let value = currentSubtotal * (discount.discount_value / 100);
+      if (discount.max_discount != null && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return value;
+    }
+    return discount.discount_value;
+  };
+
+  const toggleEventDiscount = (discount: Discount) => {
+    const isApplicable = isDiscountApplicable(discount, subtotal);
+    if (!isApplicable) return;
+    const isCurrentlyApplied = String(appliedDiscount?.id) === String(discount.id);
+    if (isCurrentlyApplied) {
+      setAppliedDiscount(null);
+      setDiscountAmount(0);
+      setFinalPrice(subtotal);
+    } else {
+      const value = getDiscountValue(discount, subtotal);
+      setAppliedDiscount(discount);
+      setDiscountAmount(value);
+      setFinalPrice(subtotal - value);
+    }
   };
 
   const handleCheckout = async () => {
@@ -480,7 +517,8 @@ export default function EventBookingScreen() {
   
       if (!bookingRes.ok) {
         setProcessing(false);
-        Alert.alert("Booking failed", bookingData.error || "Unknown error");
+        const errorMsg = bookingData.error || "Unknown error";
+        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&event_id=${id}`);
         return;
       }
   
@@ -500,7 +538,8 @@ export default function EventBookingScreen() {
   
       if (!orderRes.ok) {
         setProcessing(false);
-        Alert.alert("Payment error", order.error || "Failed to create order");
+        const errorMsg = order.error || "Failed to create order";
+        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
         return;
       }
   
@@ -523,7 +562,8 @@ export default function EventBookingScreen() {
       setProcessing(false);
     } catch (err: any) {
       setProcessing(false);
-      Alert.alert("Error", err.message || "Something went wrong. Please try again.");
+      const errorMsg = err.message || "Something went wrong. Please try again.";
+      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&event_id=${id}`);
     }
   };
 
@@ -740,31 +780,31 @@ export default function EventBookingScreen() {
               setTimeout(async () => {
                 setProcessing(true);
 
+                const currentBookingId = storedBookingData.booking_id;
+
                 let RazorpayCheckout: any;
                 try {
                   RazorpayCheckout = require("react-native-razorpay").default;
                 } catch (importError: any) {
-                  Alert.alert(
-                    "Payment Error", 
-                    "Payment gateway not available.",
-                    [{ text: "OK", onPress: () => setProcessing(false) }]
-                  );
-                  return;
-                }
-
-                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
-                  Alert.alert("Payment Error", "Payment gateway not available.");
+                  const errorMsg = "Payment gateway not available";
+                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                   setProcessing(false);
                   return;
                 }
 
-                const currentBookingId = storedBookingData.booking_id;
+                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+                  const errorMsg = "Payment gateway not available";
+                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
+                  setProcessing(false);
+                  return;
+                }
 
                 RazorpayCheckout.open(options)
                   .then(async (response: any) => {
                     if (!response || !response.razorpay_payment_id) {
                       setProcessing(false);
-                      Alert.alert("Payment Error", "Invalid payment response.");
+                      const errorMsg = "Invalid payment response";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                       return;
                     }
                     
@@ -789,11 +829,8 @@ export default function EventBookingScreen() {
 
                       if (!verifyRes.ok) {
                         setProcessing(false);
-                        Alert.alert(
-                          "Payment verification failed", 
-                          verified.error || "Unable to verify payment.",
-                          [{ text: "OK", onPress: () => router.back() }]
-                        );
+                        const errorMsg = verified.error || "Unable to verify payment";
+                        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                         return;
                       }
 
@@ -809,16 +846,8 @@ export default function EventBookingScreen() {
                       }
                     } catch (verifyError: any) {
                       setProcessing(false);
-                      Alert.alert(
-                        "Verification Error",
-                        "Payment successful but verification failed.",
-                        [
-                          { 
-                            text: "OK", 
-                            onPress: () => router.replace(`/payment/success?booking_id=${currentBookingId}&amount=${finalPrice}`)
-                          }
-                        ]
-                      );
+                      const errorMsg = verifyError?.message || "Payment verification failed";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     }
                   })
                   .catch((error: any) => {
@@ -830,20 +859,13 @@ export default function EventBookingScreen() {
                       (error?.description && error.description.toLowerCase().includes("cancelled"));
 
                     if (isCancelled) {
-                      Alert.alert(
-                        "Payment cancelled", 
-                        "Your booking is still pending.",
-                        [{ text: "OK", onPress: () => router.back() }]
-                      );
+                      // For cancelled payments, still redirect to failure page but with a friendly message
+                      const errorMsg = "Payment was cancelled. Your booking is still pending.";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     } else {
-                      Alert.alert(
-                        "Payment error", 
-                        error?.description || error?.message || "Payment could not be completed.",
-                        [
-                          { text: "Retry", onPress: () => handleCheckout() },
-                          { text: "Cancel", style: "cancel", onPress: () => router.back() }
-                        ]
-                      );
+                      // For actual payment errors, redirect to failure page
+                      const errorMsg = error?.description || error?.message || "Payment could not be completed";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     }
                   });
               }, 500);
@@ -924,15 +946,18 @@ export default function EventBookingScreen() {
 
             {discounts.length > 0 && (
               <View style={styles.discountsSection}>
-                <Text style={styles.discountsSectionTitle}>Discounts</Text>
+                <Text style={styles.discountsSectionTitle}>Offers (tap to select/deselect)</Text>
                 {discounts.map((discount) => {
                   const isApplicable = isDiscountApplicable(discount, subtotal);
-                  const isApplied = appliedDiscount?.id === discount.id;
+                  const isApplied = String(appliedDiscount?.id) === String(discount.id);
 
                   return (
-                    <View
+                    <Pressable
                       key={discount.id}
                       style={[styles.discountRow, !isApplicable && styles.discountRowDisabled]}
+                      onPress={() => isApplicable && toggleEventDiscount(discount)}
+                      disabled={!isApplicable}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
                       <View style={styles.discountRowLeft}>
                         <Text style={[styles.discountName, !isApplicable && styles.discountNameDisabled]}>
@@ -951,11 +976,13 @@ export default function EventBookingScreen() {
                         )}
                       </View>
                       <Text style={[styles.discountBadge, !isApplicable && styles.discountBadgeDisabled]}>
-                        {discount.discount_type === "percentage"
-                          ? `${discount.discount_value}%`
-                          : `₹${discount.discount_value}`}
+                        {isApplicable ? (isApplied ? "Deselect" : "Select") : (
+                          discount.discount_type === "percentage"
+                            ? `${discount.discount_value}%`
+                            : `₹${discount.discount_value}`
+                        )}
                       </Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>

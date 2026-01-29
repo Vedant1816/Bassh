@@ -61,14 +61,16 @@ export default function EventDetailScreen() {
         setClub(data.club);
         setPricing(data.pricing ?? []);
 
-        // Fetch discounts
+        // Fetch event offers from dedicated discount API
         const discountRes = await fetchWithFallback(
-          `/api/events/${id}/discounts`,
+          `/api/discounts/event?event_id=${id}`,
           await withAuthHeaders({ method: "GET" })
         );
         const discountData = await discountRes.json();
-        if (discountRes.ok) {
-          setDiscounts(discountData.discounts || []);
+        if (discountRes.ok && discountData.discounts) {
+          setDiscounts(discountData.discounts);
+        } else {
+          setDiscounts([]);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load event");

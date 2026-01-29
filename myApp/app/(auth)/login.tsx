@@ -1,145 +1,337 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import supabasePublic from "@/_services/supabase-public";
+import { withAuthHeaders } from "@/_services/auth-fetch";
+import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
+import { Colors } from "@/constants/Colors";
 
-export default function LoginScreen() {
+const { height: INITIAL_HEIGHT } = Dimensions.get("window");
+const CURTAIN_HEIGHT_RATIO = 1;
+
+/* Signup curtain: dark pink at top → lighter toward bottom */
+const SIGNUP_GRADIENT_COLORS = [
+  "#701a3a",
+  "#9d174d",
+  Colors.dark.primaryDark,
+  Colors.dark.primary,
+  Colors.dark.primaryLight,
+] as const;
+
+const LOGIN_BUTTON_GRADIENT = [
+  Colors.dark.primaryLight,
+  Colors.dark.primary,
+  Colors.dark.primaryDark,
+] as const;
+
+export default function AuthScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
 
-  const validateForm = (): string | null => {
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+  const [isSignupOpen, setIsSignupOpen] = useState(true);
+  const slideAnim = useState(new Animated.Value(1))[0];
 
-    if (!trimmedEmail) {
-      return "Email is required";
-    }
+  const curtainHeight = SCREEN_HEIGHT * CURTAIN_HEIGHT_RATIO;
 
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      return "Please enter a valid email address";
-    }
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
 
-    if (!trimmedPassword) {
-      return "Password is required";
-    }
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupError, setSignupError] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
 
-    return null;
+  const toggleCurtain = (openSignup: boolean) => {
+    Keyboard.dismiss();
+    Animated.spring(slideAnim, {
+      toValue: openSignup ? 1 : 0,
+      useNativeDriver: true,
+      tension: 55,
+      friction: 12,
+      velocity: openSignup ? 0 : 2,
+    }).start();
+    setIsSignupOpen(openSignup);
+    setLoginError("");
+    setSignupError("");
   };
 
   const handleLogin = async () => {
-    // Validate form before submission
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
+    if (!loginEmail || !loginPassword) {
+      setLoginError("Email and password required");
+      return;
+    }
+    setLoginError("");
+    const { error } = await supabasePublic.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError(error.message);
+      return;
+    }
+    await redirectToRoleHome(router);
+  };
+
+  const handleSignup = async () => {
+    if (!signupEmail?.trim() || !signupPassword || !signupConfirmPassword) {
+      setSignupError("Please fill in email, password, and confirm password");
+      return;
+    }
+    if (signupPassword.length < 6) {
+      setSignupError("Password must be at least 6 characters");
+      return;
+    }
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Password and confirm password do not match");
+      return;
+    }
+    setSignupError("");
+    setSignupLoading(true);
+
+    const { error } = await supabasePublic.auth.signUp({
+      email: signupEmail.trim(),
+      password: signupPassword.trim(),
+    });
+
+    if (error) {
+      setSignupError(error.message);
+      setSignupLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError("");
-
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
+    /* Create user profile (from signup.tsx) */
     try {
-      const { data, error } = await supabasePublic.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: trimmedPassword,
-      });
-
-      if (error) {
-        console.error("Login error:", error);
-        setError(error.message || "Login failed. Please try again.");
-        setLoading(false);
-        return;
+      const res = await fetchWithFallback(
+        "/api/users",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: signupEmail.trim(),
+            role: "user",
+          }),
+        })
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("[Signup] Profile creation failed:", err);
       }
-
-      // Verify session was created
-      const { data: sessionData, error: sessionError } = await supabasePublic.auth.getSession();
-      
-      if (sessionError || !sessionData.session) {
-        console.error("Session error:", sessionError);
-        setError("Failed to create session. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Log the access token
-      const token = sessionData.session.access_token;
-      console.log("🔑 Access Token:", token);
-      console.log("Login successful, redirecting based on role...");
-      await redirectToRoleHome(router);
-    } catch (err: any) {
-      console.error("Unexpected login error:", err);
-      setError(err.message || "An unexpected error occurred. Please try again.");
-      setLoading(false);
+    } catch (e) {
+      console.warn("[Signup] API unreachable, continuing anyway");
     }
+
+    /* Redirect to onboarding (signup flow – same as signup.tsx) */
+    router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
+    setSignupLoading(false);
   };
+
+  const loginTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 72],
+  });
+
+  const curtainTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-curtainHeight, 0],
+  });
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
-
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Email address"
-            placeholderTextColor="#6B7280"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-
-          <Pressable
-            onPress={handleLogin}
-            disabled={loading || !email.trim() || !password.trim()}
-            style={[styles.button, (loading || !email.trim() || !password.trim()) && styles.buttonDisabled]}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardView}
+        >
+          {/* LOGIN (BACKGROUND) */}
+          <Animated.View
+            style={[
+              styles.formContainer,
+              { transform: [{ translateY: loginTranslateY }] },
+            ]}
           >
-            <Text style={styles.buttonText}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Text>
-          </Pressable>
-
-          {error && (
-            <Text style={styles.error} numberOfLines={3}>
-              {error}
-            </Text>
-          )}
-          {__DEV__ && error && (
-            <Text style={[styles.error, { fontSize: 10, marginTop: 4 }]}>
-              Check console for details
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Don't have an account?{" "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.push("/signup")}
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              Sign up
-            </Text>
-          </Text>
-        </View>
-      </View>
+              <View style={styles.formCard}>
+                <Text style={styles.loginTitle}>Welcome back</Text>
+                <Text style={styles.loginSubtitle}>
+                  Sign in to continue to BASSH
+                </Text>
+
+                <TextInput
+                  placeholder="Email"
+                  placeholderTextColor={Colors.dark.textTertiary}
+                  style={styles.input}
+                  value={loginEmail}
+                  onChangeText={setLoginEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
+
+                <TextInput
+                  placeholder="Password"
+                  placeholderTextColor={Colors.dark.textTertiary}
+                  secureTextEntry
+                  style={styles.input}
+                  value={loginPassword}
+                  onChangeText={setLoginPassword}
+                />
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.primaryButtonPressed,
+                  ]}
+                  onPress={handleLogin}
+                >
+                  <LinearGradient
+                    colors={[...LOGIN_BUTTON_GRADIENT]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.primaryButtonGradient}
+                  >
+                    <Text style={styles.primaryButtonText}>Sign in</Text>
+                  </LinearGradient>
+                </Pressable>
+
+                {loginError ? (
+                  <Text style={styles.error} numberOfLines={2}>
+                    {loginError}
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  onPress={() => toggleCurtain(true)}
+                  style={({ pressed }) => [
+                    styles.createAccountWrap,
+                    pressed && styles.createAccountWrapPressed,
+                  ]}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={styles.createAccountLabel}>
+                    Don't have an account?{" "}
+                    <Text style={styles.createAccountLink}>Create account</Text>
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Animated.View>
+
+          {/* CURTAIN (SIGNUP) – full screen pink gradient */}
+          <Animated.View
+            style={[
+              styles.curtainPanel,
+              {
+                height: curtainHeight,
+                transform: [{ translateY: curtainTranslateY }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[...SIGNUP_GRADIENT_COLORS]}
+              locations={[0, 0.28, 0.55, 0.8, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.curtainGradient}
+            >
+              <ScrollView
+                contentContainerStyle={[
+                  styles.curtainContent,
+                  { paddingTop: insets.top + 32 },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.curtainLogo}>BASSH</Text>
+                <Text style={styles.curtainTagline}>Create your account</Text>
+
+                <TextInput
+                  placeholder="Email"
+                  placeholderTextColor="rgba(255,255,255,0.55)"
+                  style={styles.curtainInput}
+                  value={signupEmail}
+                  onChangeText={setSignupEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
+
+                <TextInput
+                  placeholder="Password (min 6 characters)"
+                  placeholderTextColor="rgba(255,255,255,0.55)"
+                  secureTextEntry
+                  style={styles.curtainInput}
+                  value={signupPassword}
+                  onChangeText={setSignupPassword}
+                />
+
+                <TextInput
+                  placeholder="Confirm password"
+                  placeholderTextColor="rgba(255,255,255,0.55)"
+                  secureTextEntry
+                  style={styles.curtainInput}
+                  value={signupConfirmPassword}
+                  onChangeText={setSignupConfirmPassword}
+                />
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.curtainButton,
+                    pressed && styles.curtainButtonPressed,
+                    signupLoading && styles.curtainButtonDisabled,
+                  ]}
+                  onPress={handleSignup}
+                  disabled={signupLoading}
+                >
+                  <Text style={styles.curtainButtonText}>
+                    {signupLoading ? "Creating…" : "Sign up"}
+                  </Text>
+                </Pressable>
+
+                {signupError ? (
+                  <Text style={styles.curtainError} numberOfLines={2}>
+                    {signupError}
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  onPress={() => toggleCurtain(false)}
+                  style={styles.switchWrap}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={styles.switchText}>
+                    Already have an account?{" "}
+                    <Text style={styles.switchTextBold}>Sign in</Text>
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            </LinearGradient>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </View>
   );
 }
@@ -147,89 +339,201 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
+    backgroundColor: Colors.dark.background,
   },
-  card: {
+  keyboardView: {
+    flex: 1,
+  },
+  formContainer: {
+    position: "absolute",
     width: "100%",
-    maxWidth: 400,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    backgroundColor: "#000000",
+    height: INITIAL_HEIGHT,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  formCard: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 28,
     padding: 32,
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 40,
-    elevation: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    color: "#EC4899",
-    marginBottom: 8,
+  loginTitle: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    color: "#9CA3AF",
-    marginBottom: 32,
-  },
-  form: {
-    gap: 16,
+  loginSubtitle: {
+    fontSize: 15,
+    color: Colors.dark.textSecondary,
+    marginBottom: 28,
   },
   input: {
-    width: "100%",
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: "#FFFFFF",
+    backgroundColor: Colors.dark.background,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 14,
     fontSize: 16,
+    color: Colors.dark.text,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
-  button: {
-    width: "100%",
-    borderRadius: 8,
-    backgroundColor: "#DB2777",
-    paddingVertical: 12,
+  primaryButton: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.dark.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+      },
+      android: { elevation: 6 },
+    }),
+  },
+  primaryButtonPressed: {
+    opacity: 0.92,
+  },
+  primaryButtonGradient: {
+    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 5,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: "#FFFFFF",
+  primaryButtonText: {
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 16,
-    fontWeight: "600",
+    letterSpacing: 0.3,
   },
   error: {
+    color: Colors.dark.error,
+    fontSize: 13,
     textAlign: "center",
-    fontSize: 14,
-    color: "#F87171",
-    marginTop: 8,
+    marginTop: 14,
+    paddingHorizontal: 8,
   },
-  footer: {
+  createAccountWrap: {
+    marginTop: 28,
+    alignItems: "center",
+  },
+  createAccountWrapPressed: {
+    opacity: 0.7,
+  },
+  createAccountLabel: {
+    fontSize: 15,
+    color: Colors.dark.textSecondary,
+  },
+  createAccountLink: {
+    color: Colors.dark.primary,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+
+  /* Curtain – full screen pink gradient */
+  curtainPanel: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+    zIndex: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  curtainGradient: {
+    flex: 1,
+    width: "100%",
+  },
+  curtainContent: {
+    paddingHorizontal: 28,
+    paddingBottom: 48,
+  },
+  curtainLogo: {
+    fontSize: 36,
+    fontWeight: "800",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 6,
+    letterSpacing: 2,
+  },
+  curtainTagline: {
+    fontSize: 17,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.9)",
+    textAlign: "center",
+    marginBottom: 28,
+  },
+  curtainInput: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 14,
+    fontSize: 16,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  curtainButton: {
+    backgroundColor: "#fff",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  curtainButtonPressed: {
+    opacity: 0.9,
+  },
+  curtainButtonDisabled: {
+    opacity: 0.7,
+  },
+  curtainButtonText: {
+    color: Colors.dark.primary,
+    fontWeight: "700",
+    fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  curtainError: {
+    color: "rgba(255,255,255,0.95)",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  switchWrap: {
     marginTop: 24,
+    alignItems: "center",
   },
-  footerText: {
-    textAlign: "center",
-    fontSize: 14,
-    color: "#6B7280",
+  switchText: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.85)",
   },
-  footerLink: {
-    color: "#EC4899",
+  switchTextBold: {
+    fontWeight: "700",
     textDecorationLine: "underline",
   },
 });
