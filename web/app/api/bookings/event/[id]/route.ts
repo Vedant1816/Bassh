@@ -83,6 +83,28 @@ export const GET = withAuth(
 
       const availableTickets = (event.max_attendees || 999999) - (bookedCount || 0);
 
+      /* -------- DISCOUNTS -------- */
+      let discounts: any[] = [];
+      const eventDate = new Date(event.event_date);
+      const dayOfWeek = eventDate.getDay();
+      const eventDayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+      const { data: discountRows, error: discountsError } = await supabaseAdmin
+        .from("discounts")
+        .select("*")
+        .eq("event_id", eventId)
+        .eq("is_active", true)
+        .lte("start_date", event.event_date)
+        .gte("end_date", event.event_date);
+
+      if (!discountsError && discountRows) {
+        discounts = discountRows.filter((d) => {
+          if (!d.applicable_days || d.applicable_days.length === 0) return true;
+          return d.applicable_days.includes(eventDayNumber);
+        });
+        console.log("✅ Discounts fetched:", discounts.length, "applicable");
+      }
+
       return Response.json({
         event: {
           ...event,
@@ -90,6 +112,7 @@ export const GET = withAuth(
           booked_count: bookedCount || 0,
         },
         pricing: pricing ?? [],
+        discounts,
       });
     } catch (err: any) {
       console.error("❌ Booking event fetch error:", err);

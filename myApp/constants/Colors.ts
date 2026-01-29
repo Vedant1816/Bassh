@@ -47,7 +47,6 @@ export const Colors = {
     infoBg: 'rgba(59, 130, 246, 0.1)',
     infoBorder: 'rgba(59, 130, 246, 0.3)',
     
-    // Legacy support (for existing components)
     tint: tintColorDark,
     icon: '#9CA3AF',
     tabIconDefault: '#9CA3AF',
