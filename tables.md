@@ -12,6 +12,7 @@ This document contains the complete schema for all database tables in the Bassh 
 - [events](#events)
 - [event_ticket_pricing](#event_ticket_pricing)
 - [bookings](#bookings)
+- [transactions](#transactions)
 - [staff](#staff)
 - [discounts](#discounts)
 - [phone_otps](#phone_otps)
@@ -171,6 +172,36 @@ Booking records for event tickets.
 
 ---
 
+## transactions
+
+Payment transaction records for both event bookings and direct bill (cover) payments.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | Primary Key | Transaction ID |
+| `user_id` | UUID | Foreign Key → `users.id` | User who made the payment |
+| `club_id` | UUID | Foreign Key → `clubs.id` | Club receiving the payment |
+| `event_id` | UUID | Foreign Key → `events.id`, Nullable | Event (null for bill/cover payments) |
+| `booking_id` | UUID | Foreign Key → `bookings.id`, Nullable | Booking (null for bill/cover payments) |
+| `razorpay_order_id` | Text | Optional | Razorpay order ID |
+| `razorpay_payment_id` | Text | Optional | Razorpay payment ID |
+| `amount` | Decimal | | Payment amount |
+| `status` | Enum | | Status: `'pending'`, `'success'`, `'failed'` |
+| `created_at` | Timestamp | | Record creation timestamp |
+| `updated_at` | Timestamp | | Record last update timestamp |
+
+**Relationships:**
+- Many-to-one with `users` (via `user_id`)
+- Many-to-one with `clubs` (via `club_id`)
+- Many-to-one with `events` (via `event_id`), optional
+- Many-to-one with `bookings` (via `booking_id`), optional
+
+**Notes:**
+- Event ticket payments: `booking_id` and `event_id` set; transaction may be created on verify.
+- Bill/cover payments: `booking_id` and `event_id` are null; record created before Razorpay order.
+
+---
+
 ## staff
 
 Staff member information and club associations.
@@ -272,6 +303,11 @@ Supabase Storage bucket for event-related images.
 - `'pending'` - Waiting for approval
 - `'approved'` - Approved by club
 - `'rejected'` - Rejected by club
+
+### Transaction Status
+- `'pending'` - Payment initiated, awaiting completion
+- `'success'` - Payment completed successfully
+- `'failed'` - Payment failed or signature invalid
 
 ### Gender
 - `'male'`
