@@ -12,8 +12,11 @@ import {
   Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
+import { Colors } from "@/constants/Colors";
+import { GradientButton } from "@/components/ui/GradientButton";
 
 const { width } = Dimensions.get("window");
 
@@ -25,6 +28,7 @@ export default function EventDetailScreen() {
   const [event, setEvent] = useState<any>(null);
   const [club, setClub] = useState<any>(null);
   const [pricing, setPricing] = useState<any[]>([]);
+  const [discounts, setDiscounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,8 +60,19 @@ export default function EventDetailScreen() {
         setEvent(data.event);
         setClub(data.club);
         setPricing(data.pricing ?? []);
+
+        // Fetch event offers from dedicated discount API
+        const discountRes = await fetchWithFallback(
+          `/api/discounts/event?event_id=${id}`,
+          await withAuthHeaders({ method: "GET" })
+        );
+        const discountData = await discountRes.json();
+        if (discountRes.ok && discountData.discounts) {
+          setDiscounts(discountData.discounts);
+        } else {
+          setDiscounts([]);
+        }
       } catch (e) {
-        console.error("Error fetching event:", e);
         setError(e instanceof Error ? e.message : "Failed to load event");
       } finally {
         setLoading(false);
@@ -88,8 +103,8 @@ export default function EventDetailScreen() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <ActivityIndicator color="#EC4899" size="large" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <ActivityIndicator color={Colors.dark.primary} size="large" />
+        <Text style={styles.loadingText}>Loading…</Text>
       </View>
     );
   }
@@ -122,19 +137,10 @@ export default function EventDetailScreen() {
           <Image source={{ uri: bannerUrl }} style={styles.bannerImage} />
           <View style={styles.bannerOverlay} />
           
-          {/* HEADER BUTTONS */}
-          <View style={styles.headerButtons}>
-            <Pressable style={styles.headerBtn} onPress={() => router.back()}>
-              <Text style={styles.headerBtnText}>‹</Text>
+          <View style={styles.headerRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+              <Text style={styles.backBtnText}>←</Text>
             </Pressable>
-            <View style={styles.headerRight}>
-              <Pressable style={styles.headerBtn}>
-                <Text style={styles.headerBtnText}>🔖</Text>
-              </Pressable>
-              <Pressable style={[styles.headerBtn, { marginLeft: 12 }]}>
-                <Text style={styles.headerBtnText}>↗</Text>
-              </Pressable>
-            </View>
           </View>
 
           {/* EVENT INFO CARD */}
@@ -158,10 +164,8 @@ export default function EventDetailScreen() {
               {formatEventDate(event.event_date)}, {event.start_time || "6:00 PM"}
             </Text>
 
-            {/* LOCATION */}
             {club && (
               <Pressable style={styles.infoRow} onPress={openDirections}>
-                <Text style={styles.infoIcon}>📍</Text>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoTitle}>{club.club_name || "Venue"}</Text>
                   <Text style={styles.infoSubtitle}>
@@ -169,21 +173,17 @@ export default function EventDetailScreen() {
                     {club.guest_count ? ` · ${club.guest_count} guests` : ""}
                   </Text>
                 </View>
-                <Text style={styles.arrow}>›</Text>
+                <Text style={styles.arrow}>→</Text>
               </Pressable>
             )}
 
-            {/* SCHEDULE */}
-            <Pressable style={styles.infoRow}>
-              <Text style={styles.infoIcon}>📅</Text>
+            <View style={styles.infoRow}>
               <View style={styles.infoContent}>
                 <Text style={styles.infoTitle}>
-                  Gates open at {event.start_time ? getGatesOpenTime(event.start_time) : "5:30 PM"}
+                  Gates {event.start_time ? getGatesOpenTime(event.start_time) : "5:30 PM"}
                 </Text>
-                <Text style={styles.infoSubtitle}>View full schedule & timeline</Text>
               </View>
-              <Text style={styles.arrow}>›</Text>
-            </Pressable>
+            </View>
           </View>
         </View>
 
@@ -219,33 +219,71 @@ export default function EventDetailScreen() {
           </View>
         )}
 
-        {/* BOTTOM SPACING FOR STICKY FOOTER */}
-        <View style={{ height: 120 }} />
+        {/* OFFERS – at end */}
+        {discounts.length > 0 && (
+          <View style={styles.offersSection}>
+            <Text style={styles.offersSectionTitle}>Offers for this event</Text>
+            {discounts.map((offer: any) => (
+              <Pressable
+                key={offer.id}
+                style={({ pressed }) => [
+                  styles.offerCard,
+                  pressed && styles.offerCardPressed,
+                ]}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  if (id) router.push(`/event/${id}/book` as any);
+                }}
+              >
+                <View style={styles.offerCardLeft}>
+                  {offer.discount_type === "percentage" ? (
+                    <>
+                      <Text style={styles.offerFlat}>FLAT</Text>
+                      <Text style={styles.offerValue}>
+                        {offer.discount_value}% OFF
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.offerValue}>
+                      ₹{offer.discount_value} OFF
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.offerCardRight}>
+                  <Text style={styles.offerDetail}>
+                    {offer.description || "Valid for this event"}
+                  </Text>
+                  {offer.min_purchase > 0 && (
+                    <Text style={styles.offerMeta}>
+                      Min booking ₹{offer.min_purchase}
+                    </Text>
+                  )}
+                  <Text style={styles.offerCta}>Book now ›</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FLOATING ASK ANYTHING BUTTON */}
-      <Pressable style={styles.askButton}>
-        <Text style={styles.askIcon}>💬</Text>
-        <Text style={styles.askText}>Ask anything</Text>
-      </Pressable>
-
-      {/* STICKY FOOTER: MIN PRICE + BOOK TICKETS */}
+      {/* STICKY FOOTER */}
       <View style={styles.bookFooter}>
         <View style={styles.bookFooterLeft}>
           <Text style={styles.bookFooterPrice}>
             {minPrice != null ? `₹${minPrice}` : "—"}
           </Text>
         </View>
-        <Pressable
+        <GradientButton
           style={styles.bookFooterBtn}
-          onPress={() => {
-            if (id) {
-              router.push(`/event/${id}/book` as any);
-            }
-          }}
+          textStyle={styles.bookFooterBtnText}
+          onPress={() => id && router.push(`/event/${id}/book` as any)}
         >
-          <Text style={styles.bookFooterBtnText}>Book tickets</Text>
-        </Pressable>
+          Book tickets
+        </GradientButton>
       </View>
     </View>
   );
@@ -267,18 +305,19 @@ function getGatesOpenTime(startTime: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: Colors.dark.background,
   },
   scrollView: {
     flex: 1,
   },
   loadingText: {
-    color: "#9CA3AF",
+    color: Colors.dark.textSecondary,
     marginTop: 12,
+    fontSize: 14,
   },
   error: {
-    color: "#EF4444",
-    fontSize: 16,
+    color: Colors.dark.error,
+    fontSize: 15,
     marginTop: 16,
   },
   bannerContainer: {
@@ -299,42 +338,104 @@ const styles = StyleSheet.create({
     height: 300,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
-  headerButtons: {
+  headerRow: {
     position: "absolute",
     top: 50,
     left: 0,
     right: 0,
     flexDirection: "row",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     zIndex: 10,
   },
-  headerRight: {
-    flexDirection: "row",
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  headerBtnText: {
+  backBtnText: {
     color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "500",
   },
   eventCard: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#000",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: Colors.dark.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
     paddingTop: 24,
+  },
+  offersSection: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  offersSectionTitle: {
+    color: Colors.dark.text,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  offerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.dark.primary,
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  offerCardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
+  },
+  offerCardLeft: {
+    flex: 0,
+  },
+  offerFlat: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  offerValue: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  offerCardRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    marginLeft: 16,
+  },
+  offerDetail: {
+    color: "rgba(255,255,255,0.95)",
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 4,
+    textAlign: "right",
+  },
+  offerMeta: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: "right",
+  },
+  offerCta: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "right",
   },
   tagsRow: {
     flexDirection: "row",
@@ -342,54 +443,50 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tag: {
-    backgroundColor: "#1a1a1a",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: Colors.dark.card,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
   tagText: {
-    color: "#fff",
+    color: Colors.dark.textSecondary,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   eventTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#fff",
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 6,
   },
   eventDateTime: {
-    fontSize: 16,
-    color: "#fbbf24",
+    fontSize: 15,
+    color: Colors.dark.primary,
     fontWeight: "600",
-    marginBottom: 20,
+    marginBottom: 18,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    paddingVertical: 4,
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 12,
+    marginBottom: 14,
+    paddingVertical: 2,
   },
   infoContent: {
     flex: 1,
   },
   infoTitle: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 2,
   },
   infoSubtitle: {
-    color: "#9ca3af",
+    color: Colors.dark.textSecondary,
     fontSize: 13,
   },
   arrow: {
-    color: "#9ca3af",
-    fontSize: 20,
+    color: Colors.dark.textSecondary,
+    fontSize: 16,
     marginLeft: 8,
   },
   section: {
@@ -397,42 +494,42 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 16,
+    fontSize: 17,
+    fontWeight: "600",
+    color: Colors.dark.text,
+    marginBottom: 12,
   },
   performerCard: {
     flexDirection: "row",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: Colors.dark.card,
+    borderRadius: 10,
+    padding: 14,
     alignItems: "center",
   },
   performerImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: "#f97316",
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.border,
   },
   performerInfo: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 14,
   },
   performerName: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 6,
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
   },
   knowMore: {
-    color: "#9ca3af",
-    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
   },
   aboutText: {
-    color: "#d1d5db",
-    fontSize: 15,
-    lineHeight: 24,
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+    lineHeight: 22,
   },
   bookFooter: {
     position: "absolute",
@@ -442,50 +539,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#0f0f0f",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: Colors.dark.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.dark.border,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#1a1a1a",
   },
   bookFooterLeft: {},
   bookFooterPrice: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "700",
+    color: Colors.dark.text,
+    fontSize: 20,
+    fontWeight: "600",
   },
   bookFooterBtn: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    minWidth: 140,
   },
   bookFooterBtnText: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  askButton: {
-    position: "absolute",
-    bottom: 96,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#333",
-  },
-  askIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  askText: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",

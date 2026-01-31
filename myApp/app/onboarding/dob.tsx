@@ -8,54 +8,41 @@ import {
   Platform,
   ScrollView,
   Modal,
+  StatusBar,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
+import { LinearGradient } from "expo-linear-gradient";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function DobScreen() {
   const router = useRouter();
-
   const [dob, setDob] = useState<Date>(new Date(2000, 0, 1));
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  /* -------------------- HELPERS -------------------- */
-
   const formatDisplay = (d: Date) =>
-    `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}/${d.getFullYear()}`;
+    `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 
   const formatForAPI = (d: Date) =>
-    `${d.getFullYear()}-${(d.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+    `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
 
   const onChangeAndroid = (event: any, selected?: Date) => {
-    // Always hide picker first
     setShowPicker(false);
-    
-    // Only update date if user confirmed (not cancelled)
     if (event.type === "set" && selected) {
-      // Ensure date is not in the future
       const today = new Date();
       today.setHours(23, 59, 59, 999);
-      const finalDate = selected > today ? today : selected;
-      setDob(finalDate);
-      console.log("Date selected:", formatDisplay(finalDate));
-    } else if (event.type === "dismissed") {
-      console.log("Date picker dismissed");
+      setDob(selected > today ? today : selected);
     }
   };
 
-  /* -------------------- SAVE -------------------- */
-
   const save = async () => {
     setLoading(true);
-
     try {
       const res = await fetchWithFallback(
         `/api/users/me`,
@@ -65,14 +52,12 @@ export default function DobScreen() {
           body: JSON.stringify({ dob: formatForAPI(dob) }),
         })
       );
-
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
         alert(e.error || "Failed to save DOB");
         setLoading(false);
         return;
       }
-
       router.push("/onboarding/social");
     } catch (err: any) {
       alert(err.message || "Network error");
@@ -81,169 +66,138 @@ export default function DobScreen() {
     }
   };
 
-  /* -------------------- UI -------------------- */
-
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* HEADER */}
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backIcon}>‹</Text>
           </Pressable>
           <Text style={styles.headerTitle}>Welcome to BASH</Text>
-          <Text style={styles.step}>4/6</Text>
-        </View>
-
-        {/* CARD */}
-        <View style={styles.card}>
-          <Text style={styles.title}>What’s your date of birth?</Text>
-          <Text style={styles.subtitle}>
-            We use this to personalise your experience.
-          </Text>
-
-          {/* DOB FIELD */}
-          <Pressable
-            style={styles.dateInput}
-            onPress={() => setShowPicker(true)}
-          >
-            <Text style={styles.dateText}>{formatDisplay(dob)}</Text>
-            <Ionicons name="calendar-outline" size={22} color="#EC4899" />
+          <Pressable onPress={() => router.push("/onboarding/social")} style={styles.skipButton}>
+            <Text style={styles.skipButtonText}>Skip</Text>
           </Pressable>
-
-          {/* ANDROID PICKER */}
-          {showPicker && Platform.OS === "android" && (
-            <DateTimePicker
-              value={dob}
-              mode="date"
-              display="default"
-              onChange={onChangeAndroid}
-              maximumDate={new Date()}
-              minimumDate={new Date(1900, 0, 1)}
-            />
-          )}
-
-          {/* IOS PICKER */}
-          {Platform.OS === "ios" && (
-            <Modal visible={showPicker} transparent animationType="slide">
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalSheet}>
-                  <View style={styles.modalHeader}>
-                    <Pressable onPress={() => setShowPicker(false)}>
-                      <Text style={styles.done}>Done</Text>
-                    </Pressable>
-                  </View>
-
-                  <DateTimePicker
-                    value={dob}
-                    mode="date"
-                    display="spinner"
-                    onChange={(_, d) => {
-                      if (d) {
-                        // Ensure date is not in the future
-                        const today = new Date();
-                        today.setHours(23, 59, 59, 999);
-                        const finalDate = d > today ? today : d;
-                        setDob(finalDate);
-                      }
-                    }}
-                    maximumDate={new Date()}
-                    minimumDate={new Date(1900, 0, 1)}
-                  />
-                </View>
-              </View>
-            </Modal>
-          )}
-
-          {/* BUTTONS */}
-          <View style={styles.buttons}>
-            <Pressable style={styles.prev} onPress={() => router.back()}>
-              <Text style={styles.prevText}>Previous</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.next, loading && { opacity: 0.6 }]}
-              disabled={loading}
-              onPress={save}
-            >
-              <Text style={styles.nextText}>
-                {loading ? "Saving…" : "Continue"}
-              </Text>
-            </Pressable>
-          </View>
         </View>
+
+        <View style={styles.titleSection}>
+          <Text style={styles.title}>What's your date of birth?</Text>
+          <Text style={styles.subtitle}>We use this to personalise your experience.</Text>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.editButton}>Previous</Text>
+          </Pressable>
+        </View>
+
+        <Pressable style={styles.dateInput} onPress={() => setShowPicker(true)}>
+          <Text style={styles.dateText}>{formatDisplay(dob)}</Text>
+          <Ionicons name="calendar-outline" size={22} color="#E91E8C" />
+        </Pressable>
+
+        {showPicker && Platform.OS === "android" && (
+          <DateTimePicker
+            value={dob}
+            mode="date"
+            display="default"
+            onChange={onChangeAndroid}
+            maximumDate={new Date()}
+            minimumDate={new Date(1900, 0, 1)}
+          />
+        )}
+
+        {Platform.OS === "ios" && (
+          <Modal visible={showPicker} transparent animationType="slide">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalSheet}>
+                <View style={styles.modalHeader}>
+                  <Pressable onPress={() => setShowPicker(false)}>
+                    <Text style={styles.done}>Done</Text>
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={dob}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_, d) => {
+                    if (d) {
+                      const today = new Date();
+                      today.setHours(23, 59, 59, 999);
+                      setDob(d > today ? today : d);
+                    }
+                  }}
+                  maximumDate={new Date()}
+                  minimumDate={new Date(1900, 0, 1)}
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
       </ScrollView>
+
+      <View style={styles.bottomContainer}>
+        <Pressable onPress={save} disabled={loading} style={styles.buttonWrapper}>
+          <LinearGradient
+            colors={["#E91E8C", "#DB1A85"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.sendButton, loading && styles.buttonDisabled]}
+          >
+            <Text style={styles.buttonText}>{loading ? "Saving…" : "Continue"}</Text>
+          </LinearGradient>
+        </Pressable>
+        <View style={styles.homeIndicator} />
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
-/* -------------------- STYLES -------------------- */
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  scroll: { padding: 20, paddingTop: 60 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 30,
+  container: { flex: 1, backgroundColor: "#000000" },
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
   },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  step: { color: "#9CA3AF" },
-
-  card: { gap: 24 },
-  title: { fontSize: 24, fontWeight: "700", color: "#fff" },
-  subtitle: { color: "#9CA3AF", fontSize: 14 },
-
+  scrollContent: { flexGrow: 1, paddingTop: 60, paddingHorizontal: 24, paddingBottom: 120 },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, marginBottom: 32, gap: 12 },
+  backButton: { width: 32, height: 32, justifyContent: "center", alignItems: "center" },
+  backIcon: { fontSize: 32, color: "#FFFFFF", fontWeight: "300", marginLeft: -4 },
+  headerTitle: { flex: 1, fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
+  skipButton: { padding: 8 },
+  skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  titleSection: { marginBottom: 32 },
+  title: { fontSize: 32, fontWeight: "700", color: "#FFFFFF", marginBottom: 12 },
+  subtitle: { fontSize: 15, lineHeight: 20, color: "rgba(255, 255, 255, 0.6)", marginBottom: 8 },
+  editButton: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
   dateInput: {
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1,
-    borderColor: "rgba(236,72,153,0.4)",
-    borderRadius: 10,
+    borderColor: "rgba(233, 30, 140, 0.3)",
     padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  dateText: { color: "#fff", fontSize: 16 },
-
-  buttons: { flexDirection: "row", gap: 12, marginTop: 20 },
-  prev: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 10,
-    padding: 16,
-    alignItems: "center",
+  dateText: { color: "#FFFFFF", fontSize: 16 },
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 34,
   },
-  prevText: { color: "#fff", fontWeight: "600" },
-
-  next: {
-    flex: 1,
-    backgroundColor: "#EC4899",
-    borderRadius: 10,
-    padding: 16,
-    alignItems: "center",
-  },
-  nextText: { color: "#fff", fontWeight: "600" },
-
-  /* iOS modal */
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  modalSheet: {
-    backgroundColor: "#111",
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    alignItems: "flex-end",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333",
-  },
-  done: { color: "#EC4899", fontSize: 16, fontWeight: "600" },
+  buttonWrapper: { marginBottom: 16 },
+  sendButton: { height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center" },
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { fontSize: 17, fontWeight: "600", color: "#FFFFFF" },
+  homeIndicator: { height: 5, width: 134, backgroundColor: "#FFFFFF", borderRadius: 3, alignSelf: "center", marginTop: 12 },
+  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  modalSheet: { backgroundColor: "#111", paddingBottom: 20 },
+  modalHeader: { alignItems: "flex-end", padding: 12, borderBottomWidth: 1, borderBottomColor: "#333" },
+  done: { color: "#E91E8C", fontSize: 16, fontWeight: "600" },
 });

@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { Colors } from "@/constants/Colors";
+import { GradientButton } from "@/components/ui/GradientButton";
 
 interface TicketSelection {
   pricingId: string;
@@ -31,6 +32,17 @@ interface Participant {
   gender: string;
   age: number;
   email?: string;
+}
+
+interface Discount {
+  id: string;
+  discount_type: string;
+  discount_value: number;
+  min_purchase: number;
+  max_discount: number | null;
+  code: string | null;
+  name: string;
+  description: string | null;
 }
 
 export default function EventBookingScreen() {
@@ -51,8 +63,14 @@ export default function EventBookingScreen() {
   const [finalPrice, setFinalPrice] = useState(0);
   const [priceBreakdown, setPriceBreakdown] = useState<Array<{ label: string; amount: number; count?: number }>>([]);
   const [pendingRazorpayOptions, setPendingRazorpayOptions] = useState<any>(null);
+  
+  // Discount state
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
 
-  /* ---------------- LOAD EVENT + PRICING ---------------- */
+  /* ---------------- LOAD EVENT + PRICING + DISCOUNTS ---------------- */
 
   useEffect(() => {
     if (!id) return;
@@ -71,9 +89,85 @@ export default function EventBookingScreen() {
         setAvailableTickets(data.event?.available_tickets || 0);
       }
 
+      // Fetch event discounts from dedicated discount API for checkout
+      const discountRes = await fetchWithFallback(
+        `/api/discounts/event?event_id=${id}`,
+        await withAuthHeaders({ method: "GET" })
+      );
+      const discountData = await discountRes.json();
+      if (discountRes.ok && discountData.discounts) {
+        setDiscounts(discountData.discounts);
+        console.log("🎟️ [BOOKING] Available discounts:", discountData.discounts);
+      } else {
+        setDiscounts([]);
+      }
+
       setLoading(false);
     })();
   }, [id]);
+
+  /* ---------------- DISCOUNT CALCULATION ---------------- */
+
+  const calculateDiscount = (subtotalAmount: number) => {
+    // Find eligible discounts (meet min_purchase requirement)
+    const eligibleDiscounts = discounts.filter(
+      (d) => subtotalAmount >= d.min_purchase
+    );
+
+    if (eligibleDiscounts.length === 0) {
+      setAppliedDiscount(null);
+      setDiscountAmount(0);
+      return subtotalAmount;
+    }
+
+    // Calculate actual discount value for each eligible discount
+    const discountsWithValues = eligibleDiscounts.map((discount) => {
+      let discountValue = 0;
+      
+      if (discount.discount_type === "percentage") {
+        discountValue = subtotalAmount * (discount.discount_value / 100);
+        // Apply max_discount cap if set
+        if (discount.max_discount && discountValue > discount.max_discount) {
+          discountValue = discount.max_discount;
+        }
+      } else {
+        // Fixed discount
+        discountValue = discount.discount_value;
+      }
+
+      return { ...discount, calculatedValue: discountValue };
+    });
+
+    // Sort by calculated value (highest discount first)
+    discountsWithValues.sort((a, b) => b.calculatedValue - a.calculatedValue);
+
+    const bestDiscount = discountsWithValues[0];
+
+    setAppliedDiscount(bestDiscount);
+    setDiscountAmount(bestDiscount.calculatedValue);
+
+    console.log("💰 [DISCOUNT] Applied:", bestDiscount.name, "-₹" + bestDiscount.calculatedValue);
+
+    return subtotalAmount - bestDiscount.calculatedValue;
+  };
+
+  /* ---------------- CHECK IF DISCOUNT IS APPLICABLE ---------------- */
+
+  const isDiscountApplicable = (discount: Discount, currentSubtotal: number): boolean => {
+    return currentSubtotal >= discount.min_purchase;
+  };
+
+  const getDiscountDisplayValue = (discount: Discount, currentSubtotal: number): string => {
+    if (discount.discount_type === "percentage") {
+      let value = currentSubtotal * (discount.discount_value / 100);
+      if (discount.max_discount && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return `Save ₹${value.toFixed(0)} (${discount.discount_value}% off)`;
+    } else {
+      return `Save ₹${discount.discount_value}`;
+    }
+  };
 
   /* ---------------- TICKET LOGIC ---------------- */
 
@@ -346,9 +440,40 @@ export default function EventBookingScreen() {
     }
 
     setPriceBreakdown(breakdown);
+    setSubtotal(total);
+    setAppliedDiscount(null);
+    setDiscountAmount(0);
     setFinalPrice(total);
+
     setShowParticipantForm(false);
     setShowSummary(true);
+  };
+
+  const getDiscountValue = (discount: Discount, currentSubtotal: number): number => {
+    if (discount.discount_type === "percentage") {
+      let value = currentSubtotal * (discount.discount_value / 100);
+      if (discount.max_discount != null && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return value;
+    }
+    return discount.discount_value;
+  };
+
+  const toggleEventDiscount = (discount: Discount) => {
+    const isApplicable = isDiscountApplicable(discount, subtotal);
+    if (!isApplicable) return;
+    const isCurrentlyApplied = String(appliedDiscount?.id) === String(discount.id);
+    if (isCurrentlyApplied) {
+      setAppliedDiscount(null);
+      setDiscountAmount(0);
+      setFinalPrice(subtotal);
+    } else {
+      const value = getDiscountValue(discount, subtotal);
+      setAppliedDiscount(discount);
+      setDiscountAmount(value);
+      setFinalPrice(subtotal - value);
+    }
   };
 
   const handleCheckout = async () => {
@@ -376,6 +501,8 @@ export default function EventBookingScreen() {
           body: JSON.stringify({
             event_id: id,
             total_amount: finalPrice,
+            discount_id: appliedDiscount?.id || null,
+            discount_amount: discountAmount || 0,
             participants: participants.map((p) => ({
               name: p.name,
               gender: p.gender,
@@ -390,7 +517,8 @@ export default function EventBookingScreen() {
   
       if (!bookingRes.ok) {
         setProcessing(false);
-        Alert.alert("Booking failed", bookingData.error || "Unknown error");
+        const errorMsg = bookingData.error || "Unknown error";
+        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&event_id=${id}`);
         return;
       }
   
@@ -410,7 +538,8 @@ export default function EventBookingScreen() {
   
       if (!orderRes.ok) {
         setProcessing(false);
-        Alert.alert("Payment error", order.error || "Failed to create order");
+        const errorMsg = order.error || "Failed to create order";
+        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
         return;
       }
   
@@ -425,7 +554,7 @@ export default function EventBookingScreen() {
           email: "test@example.com",
           contact: "9999999999",
         },
-        theme: { color: "#EC4899" },
+        theme: { color: Colors.dark.primary },
       };
 
       setPendingRazorpayOptions({ ...options, bookingData });
@@ -433,7 +562,8 @@ export default function EventBookingScreen() {
       setProcessing(false);
     } catch (err: any) {
       setProcessing(false);
-      Alert.alert("Error", err.message || "Something went wrong. Please try again.");
+      const errorMsg = err.message || "Something went wrong. Please try again.";
+      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&event_id=${id}`);
     }
   };
 
@@ -455,7 +585,7 @@ export default function EventBookingScreen() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>‹</Text>
+          <Text style={styles.backText}>←</Text>
         </Pressable>
 
         <Text style={styles.title}>{event?.name}</Text>
@@ -463,11 +593,17 @@ export default function EventBookingScreen() {
           {event?.event_date} · {event?.start_time || "6 PM onwards"}
         </Text>
 
+        {discounts.length > 0 && (
+          <View style={styles.discountLine}>
+            <Text style={styles.discountLineText}>
+              {discounts.length} discount{discounts.length > 1 ? "s" : ""} available
+            </Text>
+          </View>
+        )}
+
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Choose tickets</Text>
-          <Text style={styles.availabilityText}>
-            {availableTickets} available
-          </Text>
+          <Text style={styles.sectionTitle}>Tickets</Text>
+          <Text style={styles.availabilityText}>{availableTickets} left</Text>
         </View>
 
         {pricing.map((p) => {
@@ -523,13 +659,14 @@ export default function EventBookingScreen() {
             </Text>
             <Text style={styles.footerPrice}>₹{totalPrice}</Text>
           </View>
-          <Pressable
+          <GradientButton
             style={styles.proceedBtn}
+            textStyle={styles.proceedBtnText}
             onPress={handleProceedToPayment}
             disabled={processing}
           >
-            <Text style={styles.proceedBtnText}>Proceed to payment</Text>
-          </Pressable>
+            Continue
+          </GradientButton>
         </View>
       )}
 
@@ -616,13 +753,15 @@ export default function EventBookingScreen() {
               keyboardType="numeric"
             />
 
-            <Pressable style={styles.nextBtn} onPress={handleNextParticipant}>
-              <Text style={styles.nextBtnText}>
-                {currentParticipantIndex < participants.length - 1
-                  ? "Next"
-                  : "Calculate Price"}
-              </Text>
-            </Pressable>
+            <GradientButton
+              style={styles.nextBtn}
+              textStyle={styles.nextBtnText}
+              onPress={handleNextParticipant}
+            >
+              {currentParticipantIndex < participants.length - 1
+                ? "Next"
+                : "Calculate Price"}
+            </GradientButton>
           </ScrollView>
         </View>
       </Modal>
@@ -641,31 +780,31 @@ export default function EventBookingScreen() {
               setTimeout(async () => {
                 setProcessing(true);
 
+                const currentBookingId = storedBookingData.booking_id;
+
                 let RazorpayCheckout: any;
                 try {
                   RazorpayCheckout = require("react-native-razorpay").default;
                 } catch (importError: any) {
-                  Alert.alert(
-                    "Payment Error", 
-                    "Payment gateway not available.",
-                    [{ text: "OK", onPress: () => setProcessing(false) }]
-                  );
-                  return;
-                }
-
-                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
-                  Alert.alert("Payment Error", "Payment gateway not available.");
+                  const errorMsg = "Payment gateway not available";
+                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                   setProcessing(false);
                   return;
                 }
 
-                const currentBookingId = storedBookingData.booking_id;
+                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+                  const errorMsg = "Payment gateway not available";
+                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
+                  setProcessing(false);
+                  return;
+                }
 
                 RazorpayCheckout.open(options)
                   .then(async (response: any) => {
                     if (!response || !response.razorpay_payment_id) {
                       setProcessing(false);
-                      Alert.alert("Payment Error", "Invalid payment response.");
+                      const errorMsg = "Invalid payment response";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                       return;
                     }
                     
@@ -690,11 +829,8 @@ export default function EventBookingScreen() {
 
                       if (!verifyRes.ok) {
                         setProcessing(false);
-                        Alert.alert(
-                          "Payment verification failed", 
-                          verified.error || "Unable to verify payment.",
-                          [{ text: "OK", onPress: () => router.back() }]
-                        );
+                        const errorMsg = verified.error || "Unable to verify payment";
+                        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                         return;
                       }
 
@@ -710,16 +846,8 @@ export default function EventBookingScreen() {
                       }
                     } catch (verifyError: any) {
                       setProcessing(false);
-                      Alert.alert(
-                        "Verification Error",
-                        "Payment successful but verification failed.",
-                        [
-                          { 
-                            text: "OK", 
-                            onPress: () => router.replace(`/payment/success?booking_id=${currentBookingId}&amount=${finalPrice}`)
-                          }
-                        ]
-                      );
+                      const errorMsg = verifyError?.message || "Payment verification failed";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     }
                   })
                   .catch((error: any) => {
@@ -731,20 +859,13 @@ export default function EventBookingScreen() {
                       (error?.description && error.description.toLowerCase().includes("cancelled"));
 
                     if (isCancelled) {
-                      Alert.alert(
-                        "Payment cancelled", 
-                        "Your booking is still pending.",
-                        [{ text: "OK", onPress: () => router.back() }]
-                      );
+                      // For cancelled payments, still redirect to failure page but with a friendly message
+                      const errorMsg = "Payment was cancelled. Your booking is still pending.";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     } else {
-                      Alert.alert(
-                        "Payment error", 
-                        error?.description || error?.message || "Payment could not be completed.",
-                        [
-                          { text: "Retry", onPress: () => handleCheckout() },
-                          { text: "Cancel", style: "cancel", onPress: () => router.back() }
-                        ]
-                      );
+                      // For actual payment errors, redirect to failure page
+                      const errorMsg = error?.description || error?.message || "Payment could not be completed";
+                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
                     }
                   });
               }, 500);
@@ -775,30 +896,107 @@ export default function EventBookingScreen() {
 
             <View style={styles.priceSummary}>
               <Text style={styles.summarySectionTitle}>Price Breakdown</Text>
+              
+              {/* Ticket breakdown */}
               {priceBreakdown.map((item, idx) => (
                 <View key={idx} style={styles.breakdownRow}>
                   <Text style={styles.breakdownLabel}>{item.label}</Text>
                   <Text style={styles.breakdownAmount}>₹{item.amount}</Text>
                 </View>
               ))}
+
+              {/* Show subtotal and discount if discount applied */}
+              {appliedDiscount && (
+                <>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Subtotal</Text>
+                    <Text style={styles.breakdownAmount}>₹{subtotal}</Text>
+                  </View>
+
+                  <View style={styles.breakdownRow}>
+                    <View>
+                      <Text style={[styles.breakdownLabel, { color: Colors.dark.success }]}>
+                        Discount Applied
+                      </Text>
+                      <Text style={[styles.breakdownLabel, { fontSize: 11, marginTop: 2 }]}>
+                        {appliedDiscount.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.breakdownAmount, { color: Colors.dark.success }]}>
+                      -₹{discountAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                </>
+              )}
+
               <View style={styles.breakdownDivider} />
+              
+              {/* Final Total */}
               <View style={styles.breakdownRow}>
                 <Text style={styles.breakdownTotalLabel}>Total</Text>
-                <Text style={styles.finalPrice}>₹{finalPrice}</Text>
+                <Text style={styles.finalPriceText}>₹{finalPrice.toFixed(2)}</Text>
               </View>
+
+              {appliedDiscount && (
+                <Text style={styles.savingsText}>
+                  −₹{discountAmount.toFixed(0)} from discount
+                </Text>
+              )}
             </View>
 
-            <Pressable
-              style={[styles.checkoutBtn, processing && styles.checkoutBtnDisabled]}
+            {discounts.length > 0 && (
+              <View style={styles.discountsSection}>
+                <Text style={styles.discountsSectionTitle}>Offers (tap to select/deselect)</Text>
+                {discounts.map((discount) => {
+                  const isApplicable = isDiscountApplicable(discount, subtotal);
+                  const isApplied = String(appliedDiscount?.id) === String(discount.id);
+
+                  return (
+                    <Pressable
+                      key={discount.id}
+                      style={[styles.discountRow, !isApplicable && styles.discountRowDisabled]}
+                      onPress={() => isApplicable && toggleEventDiscount(discount)}
+                      disabled={!isApplicable}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                      <View style={styles.discountRowLeft}>
+                        <Text style={[styles.discountName, !isApplicable && styles.discountNameDisabled]}>
+                          {discount.name}
+                          {isApplied && " · Applied"}
+                        </Text>
+                        {discount.description && (
+                          <Text style={[styles.discountDesc, !isApplicable && styles.discountDescDisabled]}>
+                            {discount.description}
+                          </Text>
+                        )}
+                        {isApplicable ? (
+                          <Text style={styles.discountSavings}>{getDiscountDisplayValue(discount, subtotal)}</Text>
+                        ) : (
+                          <Text style={styles.discountMin}>Min ₹{discount.min_purchase}</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.discountBadge, !isApplicable && styles.discountBadgeDisabled]}>
+                        {isApplicable ? (isApplied ? "Deselect" : "Select") : (
+                          discount.discount_type === "percentage"
+                            ? `${discount.discount_value}%`
+                            : `₹${discount.discount_value}`
+                        )}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            <GradientButton
+              style={styles.checkoutBtn}
+              textStyle={styles.checkoutBtnText}
               onPress={handleCheckout}
               disabled={processing}
+              loading={processing}
             >
-              {processing ? (
-                <ActivityIndicator color={Colors.dark.text} />
-              ) : (
-                <Text style={styles.checkoutBtnText}>Checkout</Text>
-              )}
-            </Pressable>
+              Checkout
+            </GradientButton>
           </ScrollView>
         </View>
       </Modal>
@@ -813,56 +1011,62 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 12 },
   backText: { color: Colors.dark.text, fontSize: 22 },
   title: { color: Colors.dark.text, fontSize: 22, fontWeight: "700" },
-  subtitle: { color: Colors.dark.textSecondary, marginBottom: 32 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
-  sectionTitle: { color: Colors.dark.text, fontSize: 18, fontWeight: "700" },
-  availabilityText: { color: Colors.dark.textSecondary },
+  subtitle: { color: Colors.dark.textSecondary, marginBottom: 16 },
+  discountLine: {
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  discountLineText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+  },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
+  sectionTitle: { color: Colors.dark.text, fontSize: 16, fontWeight: "600" },
+  availabilityText: { color: Colors.dark.textSecondary, fontSize: 13 },
   ticketCard: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
-  ticketTitle: { color: Colors.dark.text, fontSize: 16 },
-  ticketPrice: { color: Colors.dark.text, marginTop: 6, fontSize: 16, fontWeight: "600" },
-  ticketSubPrice: { color: Colors.dark.textSecondary, marginTop: 4, fontSize: 12 },
-  quantityControls: { flexDirection: "row", alignItems: "center", gap: 16 },
+  ticketTitle: { color: Colors.dark.text, fontSize: 15 },
+  ticketPrice: { color: Colors.dark.text, marginTop: 4, fontSize: 15, fontWeight: "600" },
+  ticketSubPrice: { color: Colors.dark.textSecondary, marginTop: 2, fontSize: 12 },
+  quantityControls: { flexDirection: "row", alignItems: "center", gap: 14 },
   quantityBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.dark.text,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  quantityBtnText: { fontSize: 20, fontWeight: "700", color: Colors.dark.background },
-  quantityText: { color: Colors.dark.text, fontSize: 18 },
+  quantityBtnText: { fontSize: 18, fontWeight: "600", color: Colors.dark.text },
+  quantityText: { color: Colors.dark.text, fontSize: 16 },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
+    padding: 16,
     backgroundColor: Colors.dark.surface,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: Colors.dark.border,
   },
-  footerTickets: { color: Colors.dark.textSecondary },
-  footerPrice: { color: Colors.dark.text, fontSize: 24, fontWeight: "700" },
-  proceedBtn: {
-    backgroundColor: Colors.dark.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  proceedBtnText: { color: Colors.dark.text, fontWeight: "700" },
+  footerTickets: { color: Colors.dark.textSecondary, fontSize: 13 },
+  footerPrice: { color: Colors.dark.text, fontSize: 20, fontWeight: "600" },
+  proceedBtn: { minWidth: 120 },
+  proceedBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
   modalContainer: {
     flex: 1,
     backgroundColor: Colors.dark.background,
@@ -876,38 +1080,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,
   },
-  modalClose: { color: Colors.dark.primary, fontSize: 16 },
-  modalTitle: { color: Colors.dark.text, fontSize: 18, fontWeight: "700" },
+  modalClose: { color: Colors.dark.primary, fontSize: 15 },
+  modalTitle: { color: Colors.dark.text, fontSize: 16, fontWeight: "600" },
   modalContent: { flex: 1, padding: 20 },
   inputLabel: {
     color: Colors.dark.text,
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 20,
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 18,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 14,
     color: Colors.dark.text,
-    fontSize: 16,
+    fontSize: 15,
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
   genderRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
+    gap: 10,
+    marginTop: 6,
   },
   genderBtn: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 8,
     backgroundColor: Colors.dark.surface,
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   genderBtnActive: {
     borderColor: Colors.dark.primary,
@@ -916,35 +1120,25 @@ const styles = StyleSheet.create({
   genderBtnText: {
     color: Colors.dark.textSecondary,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   genderBtnTextActive: {
     color: Colors.dark.primary,
   },
-  nextBtn: {
-    backgroundColor: Colors.dark.primary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 32,
-  },
-  nextBtnText: {
-    color: Colors.dark.text,
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  nextBtn: { marginTop: 28 },
+  nextBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   summarySectionTitle: {
     color: Colors.dark.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 24,
-    marginBottom: 12,
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: 20,
+    marginBottom: 10,
   },
   participantCard: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
@@ -960,9 +1154,9 @@ const styles = StyleSheet.create({
   },
   priceSummary: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 24,
+    borderRadius: 10,
+    padding: 16,
+    marginTop: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
@@ -970,45 +1164,97 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   breakdownLabel: {
     color: Colors.dark.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
   },
   breakdownAmount: {
     color: Colors.dark.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
   breakdownDivider: {
     height: 1,
     backgroundColor: Colors.dark.border,
-    marginVertical: 12,
+    marginVertical: 10,
   },
   breakdownTotalLabel: {
     color: Colors.dark.text,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  finalPrice: {
-    color: Colors.dark.text,
-    fontSize: 24,
-    fontWeight: "800",
-  },
-  checkoutBtn: {
-    backgroundColor: Colors.dark.primary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 32,
-  },
-  checkoutBtnDisabled: {
-    opacity: 0.6,
-  },
-  checkoutBtnText: {
-    color: Colors.dark.text,
     fontSize: 16,
+    fontWeight: "600",
+  },
+  finalPriceText: {
+    color: Colors.dark.text,
+    fontSize: 20,
     fontWeight: "700",
   },
+  savingsText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    marginTop: 10,
+  },
+  discountsSection: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  discountsSectionTitle: {
+    color: Colors.dark.text,
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  discountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  discountRowDisabled: {
+    opacity: 0.5,
+  },
+  discountRowLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  discountName: {
+    color: Colors.dark.text,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  discountNameDisabled: {
+    color: Colors.dark.textSecondary,
+  },
+  discountDesc: {
+    color: Colors.dark.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  discountDescDisabled: {
+    color: Colors.dark.textTertiary,
+  },
+  discountSavings: {
+    color: Colors.dark.success,
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  discountMin: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  discountBadge: {
+    color: Colors.dark.primary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  discountBadgeDisabled: {
+    color: Colors.dark.textTertiary,
+  },
+  checkoutBtn: { marginTop: 24, marginBottom: 16 },
+  checkoutBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });
