@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { fetchWithFallback } from "@/_services/api-config";
 
@@ -58,9 +59,10 @@ export default function SearchBar({
 
   return (
     <View style={styles.container}>
+      <Ionicons name="search" size={19} color="#9E9E9E" />
       <TextInput
         placeholder={placeholder}
-        placeholderTextColor="#888"
+        placeholderTextColor="#9E9E9E"
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
@@ -74,12 +76,22 @@ export default function SearchBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#2a2a2a",
-    borderRadius: 16,
-    padding: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    minHeight: 55,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 21,
   },
   input: {
-    color: "#fff",
+    flex: 1,
+    color: "#FFFFFF",
     fontSize: 16,
+    lineHeight: 24,
+    padding: 0,
   },
 });

@@ -11,12 +11,14 @@ import {
   ScrollView,
   Dimensions,
   Modal,
+  StatusBar,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { fetchWithFallback } from "@/_services/api-config";
-import { Colors } from "@/constants/Colors";
 
-const { width } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const width = SCREEN_WIDTH;
 const FEATURED_CARD_WIDTH = width * 0.65;
 const GRID_CARD_WIDTH = (width - 60) / 2;
 
@@ -329,21 +331,44 @@ export default function EventsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.dark.primary} />
-        <Text style={styles.loadingText}>Loading events...</Text>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient
+          colors={["#8B0045", "#2D0A1F", "#000000"]}
+          locations={[0, 0.4, 1]}
+          style={styles.gradientBackground}
+        />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#E91E8C" />
+          <Text style={styles.loadingText}>Loading events...</Text>
+        </View>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorIcon}>⚠️</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={fetchEvents}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient
+          colors={["#8B0045", "#2D0A1F", "#000000"]}
+          locations={[0, 0.4, 1]}
+          style={styles.gradientBackground}
+        />
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorIcon}>⚠️</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable style={styles.retryButtonWrapper} onPress={fetchEvents}>
+            <LinearGradient
+              colors={["#E91E8C", "#DB1A85"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -352,13 +377,24 @@ export default function EventsScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={["#8B0045", "#2D0A1F", "#000000"]}
+        locations={[0, 0.4, 1]}
+        style={styles.gradientBackground}
+      />
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Events</Text>
+        </View>
       <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor="#E91E8C"
           />
         }
       >
@@ -432,7 +468,7 @@ export default function EventsScreen() {
             <View style={styles.gridContainer}>
               {displayEvents.map((event) => (
                 <View key={event.id} style={styles.gridCardWrapper}>
-                  {renderGridCard({ item: event, index: 0 })}
+                  {renderGridCard({ item: event })}
                 </View>
               ))}
             </View>
@@ -441,6 +477,10 @@ export default function EventsScreen() {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
+      </View>
+      <View style={styles.bottomContainer}>
+        <View style={styles.homeIndicator} />
+      </View>
     </View>
   );
 }
@@ -448,17 +488,42 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#000000",
+  },
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
+  },
+  content: {
+    flex: 1,
+    paddingTop: 60,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  scrollView: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 24,
   },
   loadingText: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
     marginTop: 12,
     fontSize: 16,
   },
@@ -467,45 +532,48 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: {
-    color: Colors.dark.error,
+    color: "rgba(255, 255, 255, 0.9)",
     fontSize: 16,
     textAlign: "center",
     marginBottom: 24,
   },
+  retryButtonWrapper: {
+    marginBottom: 16,
+  },
   retryButton: {
-    backgroundColor: Colors.dark.primary,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 12,
   },
   retryButtonText: {
-    color: Colors.dark.text,
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 17,
     fontWeight: "600",
   },
-  
   section: {
     marginTop: 24,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "700",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     marginBottom: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
 
   featuredList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   featuredCard: {
     width: FEATURED_CARD_WIDTH,
     marginRight: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   featuredImageContainer: {
     width: "100%",
@@ -519,7 +587,7 @@ const styles = StyleSheet.create({
   featuredPlaceholder: {
     width: "100%",
     height: "100%",
-    backgroundColor: Colors.dark.card,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -554,24 +622,24 @@ const styles = StyleSheet.create({
   },
   venueText: {
     fontSize: 12,
-    color: Colors.dark.primary,
+    color: "#E91E8C",
     fontWeight: "600",
   },
   featuredName: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     marginBottom: 8,
     lineHeight: 24,
   },
   featuredDate: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
     fontWeight: "500",
   },
 
   categoriesList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   categoryCard: {
     width: 110,
@@ -582,9 +650,9 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
@@ -595,7 +663,7 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     textAlign: "center",
   },
 
@@ -604,57 +672,57 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
-    paddingRight: 20,
+    paddingRight: 24,
   },
   filterList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     flex: 1,
   },
   filterChip: {
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     marginRight: 10,
   },
   filterChipActive: {
-    backgroundColor: Colors.dark.primary,
-    borderColor: Colors.dark.primary,
+    backgroundColor: "#E91E8C",
+    borderColor: "#E91E8C",
   },
   filterChipText: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
   },
   filterChipTextActive: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
   },
   clearFiltersButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: Colors.dark.error,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
     borderRadius: 20,
   },
   clearFiltersText: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
   },
 
   resultsSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     marginBottom: 12,
   },
   resultsText: {
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
     fontWeight: "500",
   },
 
   gridSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   gridContainer: {
     flexDirection: "row",
@@ -666,11 +734,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   gridCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   gridImageContainer: {
     width: "100%",
@@ -684,7 +752,7 @@ const styles = StyleSheet.create({
   gridPlaceholder: {
     width: "100%",
     height: "100%",
-    backgroundColor: Colors.dark.card,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -711,19 +779,19 @@ const styles = StyleSheet.create({
   gridName: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     marginBottom: 6,
     lineHeight: 18,
     minHeight: 36,
   },
   gridVenue: {
     fontSize: 11,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
     marginBottom: 4,
   },
   gridDate: {
     fontSize: 11,
-    color: Colors.dark.textTertiary,
+    color: "rgba(255, 255, 255, 0.5)",
     fontWeight: "500",
   },
 
@@ -738,15 +806,31 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
   },
 
   bottomSpacing: {
     height: 100,
+  },
+
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 34,
+    alignItems: "center",
+  },
+  homeIndicator: {
+    height: 5,
+    width: 134,
+    backgroundColor: "rgba(255, 255, 255, 0.4)",
+    borderRadius: 3,
   },
 });

@@ -137,7 +137,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => router.push('/(tabs)/booking')}
+            onPress={() => router.push('/bookings')}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>

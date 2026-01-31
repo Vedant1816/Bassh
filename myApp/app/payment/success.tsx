@@ -113,7 +113,7 @@ export default function PaymentSuccess() {
           <View style={styles.actions}>
             <Pressable 
               style={styles.primaryButton}
-              onPress={() => router.replace("/(tabs)/booking")}
+              onPress={() => router.replace("/bookings")}
             >
               <Text style={styles.primaryButtonText}>View Tickets</Text>
             </Pressable>

@@ -1,9 +1,12 @@
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, StatusBar, Dimensions, KeyboardAvoidingView, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
+import { LinearGradient } from "expo-linear-gradient";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function VerifyPhoneScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
@@ -29,7 +32,6 @@ export default function VerifyPhoneScreen() {
       return;
     }
 
-    // Save phone number AFTER verification
     await fetchWithFallback(
       `/api/users/me`,
       await withAuthHeaders({
@@ -43,56 +45,178 @@ export default function VerifyPhoneScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Enter OTP</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <StatusBar barStyle="light-content" />
 
-      <TextInput
-        style={styles.input}
-        keyboardType="number-pad"
-        maxLength={6}
-        value={otp}
-        onChangeText={setOtp}
+      <LinearGradient
+        colors={["#8B0045", "#2D0A1F", "#000000"]}
+        locations={[0, 0.4, 1]}
+        style={styles.gradientBackground}
       />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backIcon}>‹</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Welcome to BASH</Text>
+          <Pressable onPress={() => router.replace("/onboarding/avatar")} style={styles.skipButton}>
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </Pressable>
+        </View>
 
-      <Pressable style={styles.button} onPress={verify} disabled={loading}>
-        <Text style={styles.buttonText}>
-          {loading ? "Verifying..." : "Verify"}
-        </Text>
-      </Pressable>
-    </View>
+        <View style={styles.titleSection}>
+          <Text style={styles.title}>Enter OTP</Text>
+          <Text style={styles.subtitle}>
+            Enter the code we sent to {phone}
+          </Text>
+        </View>
+
+        <TextInput
+          style={styles.input}
+          keyboardType="number-pad"
+          maxLength={6}
+          value={otp}
+          onChangeText={setOtp}
+          placeholder="000000"
+          placeholderTextColor="rgba(255,255,255,0.4)"
+        />
+
+        {error && <Text style={styles.error}>{error}</Text>}
+      </View>
+
+      <View style={styles.bottomContainer}>
+        <Pressable
+          onPress={verify}
+          disabled={loading || otp.length !== 6}
+          style={styles.buttonWrapper}
+        >
+          <LinearGradient
+            colors={["#E91E8C", "#DB1A85"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[
+              styles.sendButton,
+              (loading || otp.length !== 6) && styles.buttonDisabled,
+            ]}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Verifying..." : "Verify"}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+        <View style={styles.homeIndicator} />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
-    padding: 24,
+    backgroundColor: "#000000",
+  },
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
+  },
+  content: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 32,
+    gap: 12,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
     justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontWeight: "300",
+    marginLeft: -4,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  skipButton: { padding: 8 },
+  skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  titleSection: {
+    marginBottom: 40,
   },
   title: {
-    color: "#fff",
-    fontSize: 24,
-    marginBottom: 20,
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: "rgba(255, 255, 255, 0.6)",
   },
   input: {
-    backgroundColor: "#1F1F1F",
-    color: "#fff",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    color: "#FFFFFF",
     padding: 16,
     borderRadius: 12,
     fontSize: 20,
     textAlign: "center",
     letterSpacing: 6,
   },
-  button: {
-    backgroundColor: "#EC4899",
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 20,
+  error: {
+    color: "#F87171",
+    marginTop: 12,
+    fontSize: 14,
+  },
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 34,
+  },
+  buttonWrapper: {
+    marginBottom: 16,
+  },
+  sendButton: {
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontSize: 16 },
-  error: { color: "#F87171", marginTop: 10 },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  homeIndicator: {
+    height: 5,
+    width: 134,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginTop: 12,
+  },
 });

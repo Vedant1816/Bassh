@@ -48,39 +48,34 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
 
   return (
     <>
+      {/* Main container: 178x40 (position/size applied by parent in index) */}
       <View style={styles.container}>
-        {/* Pink Circle Icon */}
-        <Pressable 
+        {/* Frame 1948755853 / Ellipse 2: 40x40 circle #FF007E */}
+        <Pressable
           style={styles.iconButton}
           onPress={() => setShowCityPicker(true)}
         >
           <View style={styles.iconCircle}>
-            <View style={styles.locationPin}>
-              <View style={styles.locationPinTop} />
-              <View style={styles.locationPinBottom} />
+            {/* lucide:map-pin 24x24 at 8,9 */}
+            <View style={styles.mapPinWrapper}>
+              <Ionicons name="location" size={24} color="#FFFFFF" />
             </View>
           </View>
         </Pressable>
 
-        {/* Text Content */}
-        <Pressable 
-          style={styles.textContainer}
+        {/* Frame 153: 128x40, left 50, flex column, gap 2 */}
+        <Pressable
+          style={styles.textBlock}
           onPress={() => setShowCityPicker(true)}
         >
+          {/* Frame 152: row, gap 4, 67x21 - Home + arrow */}
           <View style={styles.titleRow}>
             <Text style={styles.title}>{title}</Text>
-            <Text style={styles.chevron}>▾</Text>
+            <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={styles.arrowDown} />
           </View>
           <Text style={styles.address} numberOfLines={1}>
             {address || "Select location"}
           </Text>
-        </Pressable>
-
-        {/* Chat Icon */}
-        <Pressable style={styles.chatButton}>
-          <View style={styles.chatCircle}>
-            <Ionicons name="chatbubble-outline" size={22} color="#fff" />
-          </View>
         </Pressable>
       </View>
 
@@ -170,109 +165,90 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
 }
 
 const styles = StyleSheet.create({
+  /* Main: 178x40 */
   container: {
+    width: 178,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
+    padding: 0,
   },
 
-  // Pink Circle Icon
+  /* Frame 1948755853: 40x40, left 0, top 0 */
   iconButton: {
-    width: 56,
-    height: 56,
+    width: 40,
+    height: 40,
   },
 
   iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#EC4899",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-
-  // Location Pin Icon
-  locationPin: {
-    width: 28,
-    height: 28,
+    position: "absolute",
+    width: 40,
+    height: 40,
+    left: 0,
+    top: 0,
+    borderRadius: 20,
+    backgroundColor: "#FF007E",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  locationPinTop: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    borderWidth: 3,
-    borderColor: "#fff",
+  /* lucide:map-pin 24x24 at 8,9 */
+  mapPinWrapper: {
+    position: "absolute",
+    width: 24,
+    height: 24,
+    left: 8,
+    top: 9,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  locationPinBottom: {
-    width: 0,
-    height: 0,
-    backgroundColor: "transparent",
-    borderStyle: "solid",
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#fff",
-    marginTop: -3,
+  /* Frame 153: 128x40, left 50, flex column, gap 2 */
+  textBlock: {
+    position: "absolute",
+    width: 128,
+    height: 40,
+    left: 50,
+    top: 0,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    padding: 0,
+    gap: 2,
   },
 
-  iconText: {
-    fontSize: 28,
-  },
-
-  // Text Content
-  textContainer: {
-    flex: 1,
-  },
-
+  /* Frame 152: row, gap 4, 67x21 */
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 2,
+    padding: 0,
+    gap: 4,
+    width: 67,
+    height: 21,
   },
 
+  /* Home: Antebas Black, 17px, weight 900, #FFFFFF */
   title: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "700",
+    fontWeight: "900",
+    fontSize: 17,
+    lineHeight: 21,
+    color: "#FFFFFF",
   },
 
-  chevron: {
-    color: "#fff",
-    fontSize: 18,
+  /* vuesax/linear/arrow-down 15x15 */
+  arrowDown: {
+    width: 15,
+    height: 15,
   },
 
+  /* Karol Bagh...: DM Sans, 13px, #E7E7E7 */
   address: {
-    color: "#9ca3af",
-    fontSize: 15,
-  },
-
-  // Chat Button
-  chatButton: {
-    width: 48,
-    height: 48,
-  },
-
-  chatCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    justifyContent: "center",
-    alignItems: "center",
+    width: 128,
+    height: 17,
+    fontWeight: "400",
+    fontSize: 13,
+    lineHeight: 17,
+    color: "#E7E7E7",
   },
 
   // Modal Styles
