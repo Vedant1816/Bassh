@@ -9,7 +9,7 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
   try {
     const userId = user.id;
 
-    // Fetch all bookings for the user
+    // Fetch confirmed and cancelled only (exclude pending); sort by created_at newest first
     const { data: bookings, error } = await supabaseAdmin
       .from("bookings")
       .select(`
@@ -23,6 +23,7 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
         total_amount,
         participants,
         qr_code,
+        created_at,
         events!bookings_event_id_fkey (
           name,
           event_date,
@@ -35,8 +36,8 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
         )
       `)
       .eq("user_id", userId)
-      .eq("booking_status", "confirmed")
-      .order("booking_date", { ascending: false });
+      .in("booking_status", ["confirmed", "cancelled"])
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("❌ [BOOKINGS] Failed to fetch bookings:", error);

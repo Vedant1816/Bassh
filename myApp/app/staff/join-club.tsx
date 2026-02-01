@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { Colors } from "@/constants/Colors";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 export default function JoinClubScreen() {
   const router = useRouter();
@@ -96,12 +97,13 @@ export default function JoinClubScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+      <DismissKeyboardView style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconCircle}>
             <Text style={styles.emoji}>🏢</Text>
@@ -209,6 +211,7 @@ export default function JoinClubScreen() {
           </Text>
         </View>
       </ScrollView>
+      </DismissKeyboardView>
     </KeyboardAvoidingView>
   );
 }

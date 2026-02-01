@@ -2,11 +2,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Colors } from "@/constants/Colors";
-
-// Red theme (mirrors success.tsx green)
-const RED_BG = "#B91C1C";       // ~ same depth as success #16A34A
-const RED_CIRCLE = "#DC2626";   // lighter red for circle ~ #22C55E
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function PaymentFailure() {
   const { booking_id, amount, error_message, event_id, club_id } = useLocalSearchParams();
@@ -30,7 +27,7 @@ export default function PaymentFailure() {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar style="light" />
-        <ActivityIndicator size="large" color={RED_CIRCLE} />
+        <ActivityIndicator size="large" color="#EF4444" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -40,7 +37,6 @@ export default function PaymentFailure() {
   const displayError = error_message
     ? (Array.isArray(error_message) ? error_message[0] : error_message)
     : "Payment could not be completed.";
-
   const handleRetry = () => {
     if (event_id) {
       const eventId = Array.isArray(event_id) ? event_id[0] : event_id;
@@ -57,43 +53,51 @@ export default function PaymentFailure() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
+      {/* Red gradient blur at top - mirrors success green */}
+      <LinearGradient
+        colors={["#DC2626", "#000000"]}
+        locations={[0.36, 1]}
+        style={styles.gradientBlur}
+      />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          {/* Large Red X Circle - same as success checkmark circle */}
+          {/* Red X Circle - same size as success checkmark circle */}
           <View style={styles.failureCircle}>
-            <Text style={styles.xMark}>✕</Text>
+            <Ionicons name="close" size={56} color="#7F1D1D" />
           </View>
 
-          {/* Title */}
+          {/* Payment failed */}
           <Text style={styles.title}>Payment failed</Text>
 
-          {/* Amount Display - same as success */}
-          <Text style={styles.amount}>₹ {displayAmount}</Text>
+          {/* Amount with Rupee Icon - same layout as success */}
+          <View style={styles.amountContainer}>
+            <Text style={styles.rupeeSymbol}>₹</Text>
+            <Text style={styles.amount}>{displayAmount}</Text>
+          </View>
 
-          {/* Subtitle - mirrors success "You paid total of..." */}
-          <Text style={styles.subtitle}>
-            Attempted amount Rs. {displayAmount}
-          </Text>
+          {/* Divider Line */}
+          <View style={styles.divider} />
 
-          {/* Failure Message - mirrors success congrats block */}
-          <Text style={styles.failMessage}>
-            {displayError}
-          </Text>
+          {/* Attempted amount */}
+          <Text style={styles.subtitle}>Attempted amount Rs. {displayAmount}</Text>
 
-          {/* Booking ID - same structure as success */}
-          {booking_id && (
-            <View style={styles.bookingIdContainer}>
-              <Text style={styles.bookingIdLabel}>Booking ID</Text>
-              <Text style={styles.bookingIdValue}>
-                {Array.isArray(booking_id) ? booking_id[0] : booking_id}
+          {/* Error message card - mirrors success discount card but red */}
+          <View style={styles.errorCard}>
+            <View style={styles.errorContent}>
+              <View style={styles.errorIcon}>
+                <Ionicons name="alert-circle" size={24} color="#DC2626" />
+              </View>
+              <Text style={styles.errorText} numberOfLines={4}>
+                {displayError}
               </Text>
             </View>
-          )}
+          </View>
 
-          {/* Action Buttons - same two-button layout as success */}
+          {/* Action Buttons - same layout as success */}
           <View style={styles.actions}>
             <Pressable style={styles.primaryButton} onPress={handleRetry}>
               <Text style={styles.primaryButtonText}>Try Again</Text>
@@ -103,11 +107,14 @@ export default function PaymentFailure() {
               style={styles.secondaryButton}
               onPress={() => router.replace("/(tabs)")}
             >
-              <Text style={styles.secondaryButtonText}>? Having any issue?</Text>
+              <Text style={styles.secondaryButtonText}>Having any issue?</Text>
             </Pressable>
           </View>
         </View>
       </ScrollView>
+
+      {/* Home Indicator */}
+      <View style={styles.homeIndicator} />
     </View>
   );
 }
@@ -115,127 +122,189 @@ export default function PaymentFailure() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: RED_BG,
+    backgroundColor: "#000000",
   },
+
+  gradientBlur: {
+    position: "absolute",
+    width: 418,
+    height: 475,
+    left: -21,
+    top: -246,
+    opacity: 0.6,
+  },
+
   loadingContainer: {
     flex: 1,
-    backgroundColor: RED_BG,
+    backgroundColor: "#000000",
     justifyContent: "center",
     alignItems: "center",
   },
+
   loadingText: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 16,
     marginTop: 16,
+    fontFamily: "System",
   },
+
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 80,
-    paddingBottom: 40,
-    paddingHorizontal: 24,
+    paddingTop: 115,
+    paddingBottom: 50,
+    paddingHorizontal: 16,
   },
+
   content: {
     alignItems: "center",
     width: "100%",
   },
+
+  // Red X circle (88x88 - same as success)
   failureCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: RED_CIRCLE,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "#EF4444",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 39,
   },
-  xMark: {
-    fontSize: 60,
-    color: Colors.dark.text,
-    fontWeight: "700",
-  },
+
+  // Payment failed
   title: {
-    fontSize: 28,
+    fontFamily: "System",
     fontWeight: "700",
-    color: Colors.dark.text,
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  amount: {
-    fontSize: 48,
-    fontWeight: "800",
-    color: Colors.dark.text,
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  failMessage: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.dark.text,
-    textAlign: "center",
+    fontSize: 26,
     lineHeight: 26,
-    marginBottom: 40,
+    color: "#FFFFFF",
+    marginBottom: 26,
+    textAlign: "center",
   },
-  bookingIdContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginBottom: 32,
+
+  // Amount with rupee symbol
+  amountContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 21,
+  },
+
+  rupeeSymbol: {
+    fontFamily: "System",
+    fontWeight: "700",
+    fontSize: 26,
+    color: "#FFFFFF",
+  },
+
+  amount: {
+    fontFamily: "System",
+    fontWeight: "700",
+    fontSize: 26,
+    lineHeight: 26,
+    color: "#FFFFFF",
+  },
+
+  // Divider line
+  divider: {
+    width: 319,
+    height: 1,
+    backgroundColor: "#515151",
+    marginBottom: 26,
+  },
+
+  // Attempted amount
+  subtitle: {
+    fontFamily: "System",
+    fontWeight: "600",
+    fontSize: 20,
+    lineHeight: 20,
+    color: "#FFFFFF",
+    marginBottom: 19,
+    textAlign: "center",
+  },
+
+  // Red error card (mirrors success discount card)
+  errorCard: {
     width: "100%",
+    backgroundColor: "rgba(220, 38, 38, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.24)",
+    borderRadius: 18,
+    paddingVertical: 19,
+    paddingHorizontal: 10,
+    marginBottom: 19,
+  },
+
+  errorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 21,
+  },
+
+  errorIcon: {
+    width: 33,
+    height: 32,
+    justifyContent: "center",
     alignItems: "center",
   },
-  bookingIdLabel: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.8)",
-    marginBottom: 6,
-    textTransform: "uppercase",
-    letterSpacing: 1,
+
+  errorText: {
+    flex: 1,
+    fontFamily: "System",
     fontWeight: "600",
-  },
-  bookingIdValue: {
     fontSize: 16,
-    fontWeight: "700",
-    color: Colors.dark.text,
-    fontFamily: "monospace",
-    letterSpacing: 1,
+    lineHeight: 18,
+    color: "#FFFFFF",
   },
+
+  // Action buttons
   actions: {
     width: "100%",
-    gap: 16,
+    gap: 12,
   },
+
   primaryButton: {
-    backgroundColor: Colors.dark.text,
+    width: "100%",
+    backgroundColor: "#EF4444",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
+
   primaryButtonText: {
+    fontFamily: "System",
     fontSize: 16,
     fontWeight: "700",
-    color: RED_BG,
+    color: "#FFFFFF",
   },
+
   secondaryButton: {
+    width: "100%",
     backgroundColor: "transparent",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderWidth: 1,
+    borderColor: "#515151",
   },
+
   secondaryButtonText: {
+    fontFamily: "System",
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.dark.text,
+    color: "#FFFFFF",
+  },
+
+  // Home indicator
+  homeIndicator: {
+    position: "absolute",
+    width: 134,
+    height: 5,
+    left: "50%",
+    bottom: 8,
+    marginLeft: -67,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 100,
   },
 });

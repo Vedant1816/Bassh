@@ -9,8 +9,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-const ANIMATION_DURATION = 220;
-const SMOOTH_EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
+const ANIMATION_DURATION = 380;
+const SMOOTH_EASING = Easing.bezier(0.33, 0.01, 0.2, 1);
 const BUTTON_SIZE = 48;
 const BUTTON_GAP = 10;
 /** Height of secondary buttons column for up/down animation */

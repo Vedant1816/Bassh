@@ -19,8 +19,12 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
+import supabase from "@/_services/supabase-public";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 interface Participant {
   name: string;
@@ -69,6 +73,17 @@ export default function ClubProfile() {
   const [billAmount, setBillAmount] = useState("");
   const [processingPayment, setProcessingPayment] = useState(false);
   const [applicableDiscounts, setApplicableDiscounts] = useState<Discount[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalanceLoading, setWalletBalanceLoading] = useState(false);
+  const [bookingWalletBalance, setBookingWalletBalance] = useState<number>(0);
+  const [bookingWalletLoading, setBookingWalletLoading] = useState(false);
+  const [appliedBillDiscount, setAppliedBillDiscount] = useState<Discount | null>(null);
+  const [billDiscountAmount, setBillDiscountAmount] = useState(0);
+
+  // Book entry (table booking) discount state
+  const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -103,10 +118,63 @@ export default function ClubProfile() {
 
   /* ================= PAY BILL LOGIC ================= */
 
+  const fetchWalletBalance = async () => {
+    try {
+      setWalletBalanceLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
+      if (!user) return;
+      
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+      
+      const val = Number(customer?.wallet_balance);
+      const balance = Number.isNaN(val) ? 0 : val;
+      
+      // UPDATE: Set both balances
+      setWalletBalance(balance);
+      setBookingWalletBalance(balance);
+    } catch {
+      setWalletBalance(0);
+      setBookingWalletBalance(0);
+    } finally {
+      setWalletBalanceLoading(false);
+      setBookingWalletLoading(false);
+    }
+  };
+
+  const fetchBookingWalletBalance = async () => {
+    try {
+      setBookingWalletLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
+      if (!user) return;
+      
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+      
+      const val = Number(customer?.wallet_balance);
+      setBookingWalletBalance(Number.isNaN(val) ? 0 : val);
+    } catch {
+      setBookingWalletBalance(0);
+    } finally {
+      setBookingWalletLoading(false);
+    }
+  };
+
   const handlePayBill = () => {
     setBillAmount("");
     setApplicableDiscounts([]);
+    setAppliedBillDiscount(null);
+    setBillDiscountAmount(0);
     setShowPayBillModal(true);
+    fetchWalletBalance();
   };
 
   const formatCurrency = (amount: string) => {
@@ -122,13 +190,88 @@ export default function ClubProfile() {
     const formatted = formatCurrency(text);
     setBillAmount(formatted);
 
-    // Update applicable discounts based on amount
     const amount = parseFloat(formatted) || 0;
     if (amount > 0) {
       const applicable = discounts.filter(d => amount >= d.min_purchase);
       setApplicableDiscounts(applicable);
+      if (appliedBillDiscount && amount < appliedBillDiscount.min_purchase) {
+        setAppliedBillDiscount(null);
+        setBillDiscountAmount(0);
+      } else if (appliedBillDiscount) {
+        setBillDiscountAmount(getBillDiscountValue(appliedBillDiscount, amount));
+      }
     } else {
       setApplicableDiscounts([]);
+      setAppliedBillDiscount(null);
+      setBillDiscountAmount(0);
+    }
+  };
+
+  const getBillDiscountValue = (discount: Discount, amount: number): number => {
+    if (discount.discount_type === "percentage") {
+      let value = amount * (discount.discount_value / 100);
+      if (discount.max_discount != null && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return value;
+    }
+    return discount.discount_value;
+  };
+
+  const toggleBillDiscount = (discount: Discount) => {
+    const amount = parseFloat(billAmount) || 0;
+    if (amount < discount.min_purchase) return;
+    const isApplied = String(appliedBillDiscount?.id) === String(discount.id);
+    if (isApplied) {
+      setAppliedBillDiscount(null);
+      setBillDiscountAmount(0);
+    } else {
+      const value = getBillDiscountValue(discount, amount);
+      setAppliedBillDiscount(discount);
+      setBillDiscountAmount(value);
+    }
+  };
+
+  const handlePayWithWallet = async () => {
+    const subtotal = parseFloat(billAmount);
+    const finalAmount = Math.max(0, subtotal - billDiscountAmount);
+    if (!subtotal || subtotal <= 0) {
+      Alert.alert("Error", "Please enter a valid amount");
+      return;
+    }
+    if (finalAmount < 1) {
+      Alert.alert("Error", "Amount to pay must be at least ₹1 after discount");
+      return;
+    }
+    if (walletBalance < finalAmount) {
+      Alert.alert("Insufficient Balance", `Wallet has ₹${walletBalance.toFixed(0)}. Add more money to use wallet.`);
+      return;
+    }
+    try {
+      setProcessingPayment(true);
+      const res = await fetchWithFallback(
+        "/api/payments/bill/pay-with-wallet",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ club_id: clubId, amount: finalAmount }),
+        })
+      );
+      const data = await res.json();
+      setProcessingPayment(false);
+      if (!res.ok) {
+        Alert.alert("Error", data.error || "Failed to pay with wallet");
+        return;
+      }
+      setShowPayBillModal(false);
+      setBillAmount("");
+      setAppliedBillDiscount(null);
+      setBillDiscountAmount(0);
+      setWalletBalance(data.wallet_balance ?? walletBalance - finalAmount);
+      Alert.alert("Success", `Payment of ₹${finalAmount.toFixed(2)} completed from wallet!`, [{ text: "OK" }]);
+    } catch (err: any) {
+      setProcessingPayment(false);
+      Alert.alert("Error", err.message || "Something went wrong");
     }
   };
 
@@ -145,15 +288,16 @@ export default function ClubProfile() {
   };
 
   const handleProceedBillPayment = async () => {
-    const amount = parseFloat(billAmount);
+    const subtotal = parseFloat(billAmount);
+    const finalAmount = Math.max(0, subtotal - billDiscountAmount);
     
-    if (!amount || amount <= 0) {
+    if (!subtotal || subtotal <= 0) {
       Alert.alert("Error", "Please enter a valid amount");
       return;
     }
 
-    if (amount < 1) {
-      Alert.alert("Error", "Amount must be at least ₹1");
+    if (finalAmount < 1) {
+      Alert.alert("Error", "Amount to pay must be at least ₹1 after discount");
       return;
     }
 
@@ -162,7 +306,7 @@ export default function ClubProfile() {
 
       console.log("💳 [FRONTEND] Creating bill payment...");
 
-      // Create bill payment transaction record
+      // Create bill payment transaction record (use discounted amount)
       const billRes = await fetchWithFallback(
         `/api/payments/bill/create`,
         await withAuthHeaders({
@@ -170,7 +314,7 @@ export default function ClubProfile() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             club_id: clubId,
-            amount: amount,
+            amount: finalAmount,
           }),
         })
       );
@@ -196,7 +340,7 @@ export default function ClubProfile() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             transaction_id: billData.transaction_id,
-            amount: amount,
+            amount: finalAmount,
           }),
         })
       );
@@ -215,7 +359,7 @@ export default function ClubProfile() {
       const options = {
         key: order.key,
         order_id: order.order_id,
-        amount: order.amount || amount * 100,
+        amount: order.amount || finalAmount * 100,
         currency: "INR",
         name: club?.club_name || "Bill Payment",
         description: "Restaurant Bill Payment",
@@ -287,7 +431,7 @@ export default function ClubProfile() {
                 console.log("✅ [FRONTEND] Payment verified successfully");
                 Alert.alert(
                   "Success",
-                  `Payment of ₹${amount.toFixed(2)} completed successfully!`,
+                  `Payment of ₹${finalAmount.toFixed(2)} completed successfully!`,
                   [
                     {
                       text: "OK",
@@ -468,9 +612,80 @@ export default function ClubProfile() {
     }
 
     setPriceBreakdown(breakdown);
-    setFinalPrice(total);
+    setSubtotal(total);
+    setAppliedDiscount(null);
+    setDiscountAmount(0);
+
+    // Apply best eligible discount if any
+    const eligibleDiscounts = discounts.filter((d) => total >= d.min_purchase);
+    if (eligibleDiscounts.length > 0) {
+      const discountsWithValues = eligibleDiscounts.map((discount) => {
+        let value = 0;
+        if (discount.discount_type === "percentage") {
+          value = total * (discount.discount_value / 100);
+          if (discount.max_discount != null && value > discount.max_discount) {
+            value = discount.max_discount;
+          }
+        } else {
+          value = discount.discount_value;
+        }
+        return { ...discount, calculatedValue: value };
+      });
+      discountsWithValues.sort((a, b) => b.calculatedValue - a.calculatedValue);
+      const best = discountsWithValues[0];
+      setAppliedDiscount(best);
+      setDiscountAmount(best.calculatedValue);
+      setFinalPrice(total - best.calculatedValue);
+    } else {
+      setFinalPrice(total);
+    }
+
     setShowParticipantForm(false);
     setShowSummary(true);
+    
+    // Fetch wallet balance for booking
+    fetchBookingWalletBalance();
+  };
+
+  const isDiscountApplicable = (discount: Discount, currentSubtotal: number): boolean =>
+    currentSubtotal >= discount.min_purchase;
+
+  const getDiscountDisplayValueBooking = (discount: Discount, currentSubtotal: number): string => {
+    if (discount.discount_type === "percentage") {
+      let value = currentSubtotal * (discount.discount_value / 100);
+      if (discount.max_discount != null && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return `Save ₹${value.toFixed(0)} (${discount.discount_value}% off)`;
+    }
+    return `Save ₹${discount.discount_value}`;
+  };
+
+  const getDiscountValue = (discount: Discount, currentSubtotal: number): number => {
+    if (discount.discount_type === "percentage") {
+      let value = currentSubtotal * (discount.discount_value / 100);
+      if (discount.max_discount != null && value > discount.max_discount) {
+        value = discount.max_discount;
+      }
+      return value;
+    }
+    return discount.discount_value;
+  };
+
+  const toggleBookingDiscount = (discount: Discount) => {
+    const isApplicable = isDiscountApplicable(discount, subtotal);
+    if (!isApplicable) return;
+    const isCurrentlyApplied = String(appliedDiscount?.id) === String(discount.id);
+    if (isCurrentlyApplied) {
+      setAppliedDiscount(null);
+      setDiscountAmount(0);
+      setFinalPrice(subtotal);
+    } else {
+      const value = getDiscountValue(discount, subtotal);
+      setAppliedDiscount(discount);
+      setDiscountAmount(value);
+      setFinalPrice(subtotal - value);
+    }
   };
 
   const handleCheckout = async () => {
@@ -499,6 +714,8 @@ export default function ClubProfile() {
             club_id: clubId,
             booking_date: selectedDate.toISOString().split('T')[0],
             total_amount: finalPrice,
+            discount_id: appliedDiscount?.id ?? null,
+            discount_amount: discountAmount || 0,
             participants: participants.map((p) => ({
               name: p.name,
               gender: p.gender,
@@ -563,6 +780,71 @@ export default function ClubProfile() {
     }
   };
 
+  const handlePayBookingWithWallet = async () => {
+    if (!clubId || finalPrice <= 0) {
+      Alert.alert("Error", "Invalid booking amount");
+      return;
+    }
+
+    if (bookingWalletBalance < finalPrice) {
+      Alert.alert(
+        "Insufficient Balance",
+        `Wallet has ₹${bookingWalletBalance.toFixed(0)}. Please use card payment or add money to wallet.`
+      );
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      const res = await fetchWithFallback(
+        "/api/payments/table/pay-with-wallet",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            club_id: clubId,
+            booking_date: selectedDate.toISOString().split('T')[0],
+            total_amount: finalPrice,
+            discount_id: appliedDiscount?.id ?? null,
+            discount_amount: discountAmount || 0,
+            participants: participants.map((p) => ({
+              name: p.name,
+              gender: p.gender,
+              age: p.age,
+              email: p.email || "",
+            })),
+          }),
+        })
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setProcessing(false);
+        Alert.alert("Payment Failed", data.error || "Failed to process wallet payment");
+        return;
+      }
+
+      setProcessing(false);
+      setShowSummary(false);
+      
+      setBookingWalletBalance(data.wallet_balance ?? bookingWalletBalance - finalPrice);
+      
+      const qrCode = data.qr_code || data.qr;
+      const qrParam = qrCode ? encodeURIComponent(qrCode) : "";
+      
+      if (qrCode) {
+        router.replace(`/payment/success?qr=${qrParam}&booking_id=${data.booking_id}&amount=${finalPrice}`);
+      } else {
+        router.replace(`/payment/success?booking_id=${data.booking_id}&amount=${finalPrice}`);
+      }
+    } catch (err: any) {
+      setProcessing(false);
+      Alert.alert("Error", err.message || "Something went wrong");
+    }
+  };
+
   const generateDateOptions = () => {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -586,6 +868,16 @@ export default function ClubProfile() {
 
   const dateOptions = generateDateOptions();
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  // Only show events after current date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcomingEvents = events.filter((e) => {
+    if (!e.event_date) return false;
+    const d = new Date(e.event_date);
+    d.setHours(0, 0, 0, 0);
+    return d > today;
+  });
 
   return (
     <>
@@ -707,7 +999,7 @@ export default function ClubProfile() {
                 <Text style={styles.chevron}>▾</Text>
               </View>
 
-              {events.map((event) => (
+              {upcomingEvents.map((event) => (
                 <Pressable
                   key={event.id}
                   style={styles.eventCard}
@@ -751,19 +1043,21 @@ export default function ClubProfile() {
 
         {/* BOTTOM BUTTONS */}
         <View style={styles.bottomButtonsContainer}>
-          <Pressable style={styles.bookTableBtn} onPress={handleBookTable}>
-            <Text style={styles.bookTableText}>Book entry</Text>
-          </Pressable>
-          
-          <View style={{ flex: 1 }}>
-            <GradientButton
-              style={styles.payBillBtn}
-              textStyle={styles.payBillText}
-              onPress={handlePayBill}
-            >
-              Pay bill
-            </GradientButton>
-          </View>
+          <GradientButton
+            variant="gray"
+            style={styles.bottomActionBtn}
+            textStyle={styles.bottomActionBtnText}
+            onPress={handleBookTable}
+          >
+            Book entry
+          </GradientButton>
+          <GradientButton
+            style={styles.bottomActionBtn}
+            textStyle={styles.bottomActionBtnText}
+            onPress={handlePayBill}
+          >
+            Pay  bill
+          </GradientButton>
         </View>
       </View>
 
@@ -773,10 +1067,7 @@ export default function ClubProfile() {
         animationType="slide"
         presentationStyle="fullScreen"
       >
-        <KeyboardAvoidingView 
-          style={styles.payBillContainer}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+        <View style={styles.payBillContainer}>
           <StatusBar barStyle="light-content" />
           
           {/* Header */}
@@ -793,77 +1084,179 @@ export default function ClubProfile() {
             </Pressable>
           </View>
 
-          {/* Distance Warning */}
-          <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>
-              You're {club?.distance_km?.toFixed(1) || "10.3"} km away from this restaurant
-            </Text>
-            <Text style={styles.warningSubtext}>
-              Please ensure you're paying at the correct outlet
-            </Text>
-          </View>
-
-          {/* Amount Input */}
-          <View style={styles.amountSection}>
-            <Text style={styles.amountLabel}>Enter your bill amount</Text>
-            <View style={styles.amountInputContainer}>
-              <Text style={styles.rupeeSymbol}>₹</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={billAmount}
-                onChangeText={handleBillAmountChange}
-                placeholder="0.00"
-                placeholderTextColor="#333"
-                keyboardType="decimal-pad"
-                autoFocus
-              />
+          {/* SCROLLABLE CONTENT */}
+          <ScrollView 
+            style={styles.payBillContent}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.payBillScrollContent}
+          >
+            {/* Distance Warning */}
+            <View style={styles.warningBanner}>
+              <Text style={styles.warningText}>
+                You're {club?.distance_km?.toFixed(1) || "10.3"} km away from this restaurant
+              </Text>
+              <Text style={styles.warningSubtext}>
+                Please ensure you're paying at the correct outlet
+              </Text>
             </View>
 
-            {/* Cashback Banner */}
-            {applicableDiscounts.length > 0 && (
-              <Pressable style={styles.cashbackBanner}>
-                <Text style={styles.cashbackText}>
-                  {applicableDiscounts.length} offer{applicableDiscounts.length > 1 ? "s" : ""} available
-                </Text>
-                <Text style={styles.cashbackArrow}>›</Text>
-              </Pressable>
-            )}
-          </View>
+            {/* Amount Input */}
+            <View style={styles.amountSection}>
+              <Text style={styles.amountLabel}>Enter your bill amount</Text>
+              <View style={styles.amountInputContainer}>
+                <Text style={styles.rupeeSymbol}>₹</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  value={billAmount}
+                  onChangeText={handleBillAmountChange}
+                  placeholder="0.00"
+                  placeholderTextColor="#333"
+                  keyboardType="decimal-pad"
+                />
+              </View>
 
-          {/* Available Offers */}
-          {applicableDiscounts.length > 0 && (
-            <ScrollView style={styles.offersSection}>
-              <Text style={styles.offersSectionTitle}>Available Offers</Text>
-              {applicableDiscounts.map((discount) => (
-                <View key={discount.id} style={styles.offerBox}>
-                  <Text style={styles.offerBoxTitle}>{discount.name}</Text>
-                  {discount.description && (
-                    <Text style={styles.offerBoxDesc}>{discount.description}</Text>
-                  )}
-                  <Text style={styles.offerBoxSave}>
-                    {getDiscountDisplayValue(discount, parseFloat(billAmount) || 0)}
+              {applicableDiscounts.length > 0 && (
+                <Pressable style={styles.cashbackBanner}>
+                  <Text style={styles.cashbackText}>
+                    {applicableDiscounts.length} offer{applicableDiscounts.length > 1 ? "s" : ""} available
+                  </Text>
+                  <Text style={styles.cashbackArrow}>›</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Available Offers - tap to apply discount */}
+            {applicableDiscounts.length > 0 && (
+              <View style={styles.offersSection}>
+                <Text style={styles.discountsSectionTitle}>Available Offers (tap to apply)</Text>
+                {applicableDiscounts.map((discount) => {
+                  const isApplied = String(appliedBillDiscount?.id) === String(discount.id);
+                  return (
+                    <Pressable
+                      key={discount.id}
+                      style={[
+                        styles.offerCard,
+                        isApplied && styles.offerCardApplied,
+                      ]}
+                      onPress={() => toggleBillDiscount(discount)}
+                    >
+                      <View style={styles.offerCardCorner} pointerEvents="none">
+                        <LinearGradient
+                          colors={["#DB4494", "#DB138D"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.offerCardCornerGradient}
+                        />
+                      </View>
+                      <View style={styles.offerCardIcon}>
+                        <Ionicons
+                          name="pricetag"
+                          size={20}
+                          color={isApplied ? "#FF007E" : "#FF007E"}
+                          style={{ transform: [{ rotate: "90deg" }] }}
+                        />
+                      </View>
+                      <View style={styles.offerCardContent}>
+                        <Text style={styles.offerCardTitle} numberOfLines={1}>
+                          {discount.name}
+                        </Text>
+                        <Text style={styles.offerCardDesc} numberOfLines={1}>
+                          {getDiscountDisplayValue(discount, parseFloat(billAmount) || 0)}
+                        </Text>
+                      </View>
+                      <View style={[styles.offerCardBtn, isApplied && styles.offerCardBtnApplied]}>
+                        <Text style={styles.offerCardBtnText}>{isApplied ? "Applied" : "Apply"}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Bill breakdown when discount applied */}
+            {parseFloat(billAmount) > 0 && appliedBillDiscount && billDiscountAmount > 0 && (
+              <View style={styles.billBreakdown}>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Subtotal</Text>
+                  <Text style={styles.breakdownAmount}>₹{parseFloat(billAmount).toFixed(2)}</Text>
+                </View>
+                <View style={styles.breakdownRow}>
+                  <Text style={[styles.breakdownLabel, { color: "#4ADE80" }]}>
+                    Discount ({appliedBillDiscount.name})
+                  </Text>
+                  <Text style={[styles.breakdownAmount, { color: "#4ADE80" }]}>
+                    -₹{billDiscountAmount.toFixed(2)}
                   </Text>
                 </View>
-              ))}
-            </ScrollView>
-          )}
+                <View style={styles.breakdownDivider} />
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownTotalLabel}>Amount to pay</Text>
+                  <Text style={styles.finalPriceText}>₹{(parseFloat(billAmount) - billDiscountAmount).toFixed(2)}</Text>
+                </View>
+              </View>
+            )}
 
-          {/* Proceed Button */}
-          <View style={styles.proceedButtonContainer}>
-            <GradientButton
-              style={[
-                styles.proceedButton,
-                (!billAmount || parseFloat(billAmount) <= 0) && styles.proceedButtonDisabled
-              ]}
-              textStyle={styles.proceedButtonText}
-              onPress={handleProceedBillPayment}
-              disabled={!billAmount || parseFloat(billAmount) <= 0 || processingPayment}
-              loading={processingPayment}
-            >
-              Proceed ›
-            </GradientButton>
-          </View>
-        </KeyboardAvoidingView>
+            {/* Wallet balance */}
+            {parseFloat(billAmount) > 0 && (
+              <View style={styles.walletBalanceRow}>
+                <Ionicons name="wallet-outline" size={18} color="#9ca3af" />
+                <Text style={styles.walletBalanceText}>
+                  Wallet: ₹{walletBalanceLoading ? "..." : walletBalance.toFixed(0)}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ height: 100 }} />
+          </ScrollView>
+
+          {/* PAYMENT BUTTONS - Fixed at bottom */}
+          {parseFloat(billAmount) > 0 && (
+            <View style={styles.paymentButtonsContainer}>
+              {walletBalance >= Math.max(0, parseFloat(billAmount) - billDiscountAmount) ? (
+                <View style={styles.paymentOptionsRow}>
+                  <GradientButton
+                    variant="green"
+                    style={[styles.payOptionButton, processingPayment && styles.paymentButtonDisabled]}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handlePayWithWallet}
+                    disabled={processingPayment}
+                    loading={processingPayment}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="wallet-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Wallet</Text>
+                    </View>
+                  </GradientButton>
+                  <GradientButton
+                    style={[styles.payOptionButton, processingPayment && styles.paymentButtonDisabled]}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handleProceedBillPayment}
+                    disabled={processingPayment}
+                    loading={processingPayment}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="card-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Card</Text>
+                    </View>
+                  </GradientButton>
+                </View>
+              ) : (
+                <GradientButton
+                  style={[
+                    styles.fullPayButton,
+                    (!billAmount || parseFloat(billAmount) <= 0) && styles.paymentButtonDisabled
+                  ]}
+                  textStyle={styles.fullPayButtonText}
+                  onPress={handleProceedBillPayment}
+                  disabled={!billAmount || parseFloat(billAmount) <= 0 || processingPayment}
+                  loading={processingPayment}
+                >
+                  Proceed to Payment
+                </GradientButton>
+              )}
+            </View>
+          )}
+        </View>
       </Modal>
 
       {/* TABLE BOOKING MODAL */}
@@ -952,7 +1345,7 @@ export default function ClubProfile() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
+        <DismissKeyboardView style={styles.modalContainer}>
           <StatusBar barStyle="light-content" />
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setShowParticipantForm(false)}>
@@ -1039,7 +1432,7 @@ export default function ClubProfile() {
                 : "Calculate Price"}
             </GradientButton>
           </ScrollView>
-        </View>
+        </DismissKeyboardView>
       </Modal>
 
       {/* SUMMARY MODAL */}
@@ -1178,23 +1571,168 @@ export default function ClubProfile() {
                 </View>
               ))}
 
+              {appliedDiscount && (
+                <>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Subtotal</Text>
+                    <Text style={styles.breakdownAmount}>₹{subtotal}</Text>
+                  </View>
+                  <View style={styles.breakdownRow}>
+                    <View>
+                      <Text style={[styles.breakdownLabel, { color: "#4ADE80" }]}>
+                        Discount Applied
+                      </Text>
+                      <Text style={[styles.breakdownLabel, { fontSize: 11, marginTop: 2 }]}>
+                        {appliedDiscount.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.breakdownAmount, { color: "#4ADE80" }]}>
+                      -₹{discountAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                </>
+              )}
+
               <View style={styles.breakdownDivider} />
               
               <View style={styles.breakdownRow}>
                 <Text style={styles.breakdownTotalLabel}>Total</Text>
                 <Text style={styles.finalPriceText}>₹{finalPrice.toFixed(2)}</Text>
               </View>
+
+              {appliedDiscount && (
+                <Text style={styles.savingsText}>
+                  −₹{discountAmount.toFixed(0)} from discount
+                </Text>
+              )}
             </View>
 
-            <GradientButton
-              style={styles.checkoutBtn}
-              textStyle={styles.checkoutBtnText}
-              onPress={handleCheckout}
-              disabled={processing}
-              loading={processing}
-            >
-              Checkout
-            </GradientButton>
+            {discounts.length > 0 && (
+              <View style={styles.discountsSection}>
+                <Text style={styles.discountsSectionTitle}>Offers (tap to select/deselect)</Text>
+                {discounts.map((discount) => {
+                  const isApplicable = isDiscountApplicable(discount, subtotal);
+                  const isApplied = String(appliedDiscount?.id) === String(discount.id);
+
+                  return (
+                    <Pressable
+                      key={discount.id}
+                      style={[
+                        styles.offerCard,
+                        isApplied && styles.offerCardApplied,
+                        !isApplicable && styles.offerCardDisabled,
+                      ]}
+                      onPress={() => isApplicable && toggleBookingDiscount(discount)}
+                      disabled={!isApplicable}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                      <View style={styles.offerCardCorner} pointerEvents="none">
+                        <LinearGradient
+                          colors={["#DB4494", "#DB138D"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.offerCardCornerGradient}
+                        />
+                      </View>
+                      <View style={styles.offerCardIcon}>
+                        <Ionicons
+                          name="pricetag"
+                          size={20}
+                          color={isApplicable ? "#FF007E" : "#6B6B6B"}
+                          style={{ transform: [{ rotate: "90deg" }] }}
+                        />
+                      </View>
+                      <View style={styles.offerCardContent}>
+                        <Text
+                          style={[
+                            styles.offerCardTitle,
+                            !isApplicable && styles.offerCardTitleDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {discount.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.offerCardDesc,
+                            !isApplicable && styles.offerCardDescDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {isApplicable
+                            ? getDiscountDisplayValueBooking(discount, subtotal)
+                            : `Min ₹${discount.min_purchase}`}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.offerCardBtn,
+                          isApplied && styles.offerCardBtnApplied,
+                          !isApplicable && styles.offerCardBtnDisabled,
+                        ]}
+                      >
+                        <Text style={styles.offerCardBtnText}>
+                          {isApplied ? "Applied" : "APPLY"}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Wallet balance display */}
+            {finalPrice > 0 && (
+              <View style={styles.walletBalanceRow}>
+                <Ionicons name="wallet-outline" size={18} color="#9ca3af" />
+                <Text style={styles.walletBalanceText}>
+                  Wallet: ₹{bookingWalletLoading ? "..." : bookingWalletBalance.toFixed(0)}
+                </Text>
+              </View>
+            )}
+
+            {/* Payment buttons */}
+            <View style={styles.bookingPaymentButtons}>
+              {bookingWalletBalance >= finalPrice ? (
+                <View style={styles.paymentOptionsRow}>
+                  <GradientButton
+                    variant="green"
+                    style={[styles.payOptionButton, processing && styles.paymentButtonDisabled]}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handlePayBookingWithWallet}
+                    disabled={processing}
+                    loading={processing}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="wallet-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Wallet</Text>
+                    </View>
+                  </GradientButton>
+                  <GradientButton
+                    style={[styles.payOptionButton, processing && styles.paymentButtonDisabled]}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handleCheckout}
+                    disabled={processing}
+                    loading={processing}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="card-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Card</Text>
+                    </View>
+                  </GradientButton>
+                </View>
+              ) : (
+                <GradientButton
+                  style={[styles.fullPayButton, processing && styles.paymentButtonDisabled]}
+                  textStyle={styles.fullPayButtonText}
+                  onPress={handleCheckout}
+                  disabled={processing}
+                  loading={processing}
+                >
+                  Checkout with Card
+                </GradientButton>
+              )}
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -1303,32 +1841,16 @@ const styles = StyleSheet.create({
     borderTopColor: "#222",
   },
 
-  bookTableBtn: {
+  bottomActionBtn: {
     flex: 1,
-    height: 56,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-  },
-
-  bookTableText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  payBillBtn: {
-    width: "100%",
-    height: 56,
-    borderRadius: 16,
+    minHeight: 72,
+    height: 72,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  payBillText: {
+  bottomActionBtnText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
@@ -1511,6 +2033,66 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
+  payBillContent: {
+    flex: 1,
+  },
+
+  payBillScrollContent: {
+    paddingBottom: 20,
+  },
+
+  paymentButtonsContainer: {
+    backgroundColor: "#000",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#222",
+  },
+
+  paymentOptionsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  payOptionButton: {
+    flex: 1,
+    minHeight: 72,
+    height: 72,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  payOptionButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  payOptionButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  fullPayButton: {
+    height: 56,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  fullPayButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  paymentButtonDisabled: {
+    opacity: 0.6,
+  },
+
   payBillHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1631,7 +2213,6 @@ const styles = StyleSheet.create({
   },
 
   offersSection: {
-    flex: 1,
     paddingHorizontal: 16,
     marginTop: 24,
   },
@@ -1643,33 +2224,120 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  offerBox: {
-    backgroundColor: "#1a1a1a",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
-    marginBottom: 12,
-  },
-
-  offerBoxTitle: {
+  discountsSectionTitle: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: 12,
   },
 
-  offerBoxDesc: {
-    color: "#ccc",
+  discountsSection: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
+
+  savingsText: {
+    color: "rgba(255,255,255,0.6)",
     fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
+    marginTop: 10,
   },
 
-  offerBoxSave: {
-    color: Colors.dark.success,
-    fontSize: 14,
-    fontWeight: "600",
+  /* Offer cards - same as event/[id]/book.tsx */
+  offerCard: {
+    width: "100%",
+    minHeight: 82,
+    borderRadius: 8,
+    backgroundColor: "rgba(30,30,30,0.95)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 10,
+    paddingRight: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    position: "relative",
+    overflow: "visible",
+  },
+  offerCardApplied: {
+    backgroundColor: "rgba(255, 0, 126, 0.32)",
+  },
+  offerCardDisabled: {
+    backgroundColor: "rgba(55, 55, 55, 0.85)",
+    opacity: 0.85,
+  },
+  offerCardCorner: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 38,
+    height: 30,
+    borderRadius: 4,
+    overflow: "hidden",
+    transform: [{ rotate: "75deg" }],
+  },
+  offerCardCornerGradient: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.9,
+  },
+  offerCardIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 13,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  offerCardContent: {
+    flex: 1,
+    justifyContent: "center",
+    minWidth: 0,
+  },
+  offerCardTitle: {
+    fontFamily: "System",
+    fontWeight: "500",
+    fontSize: 20,
+    lineHeight: 20,
+    color: "#FFFFFF",
+    marginBottom: 6,
+  },
+  offerCardTitleDisabled: {
+    color: "#6B6B6B",
+  },
+  offerCardDesc: {
+    fontFamily: "System",
+    fontWeight: "500",
+    fontSize: 16,
+    lineHeight: 18,
+    color: "#A2A2A2",
+  },
+  offerCardDescDisabled: {
+    color: "#5A5A5A",
+  },
+  offerCardBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    minWidth: 97,
+    height: 33,
+    borderRadius: 4,
+    backgroundColor: "rgba(80,80,80,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(215,215,215,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  offerCardBtnApplied: {
+    backgroundColor: "#FF007E",
+    borderColor: "rgba(215, 215, 215, 0.45)",
+  },
+  offerCardBtnDisabled: {
+    backgroundColor: "rgba(40, 40, 40, 0.95)",
+    borderColor: "rgba(100, 100, 100, 0.4)",
+  },
+  offerCardBtnText: {
+    fontFamily: "System",
+    fontWeight: "500",
+    fontSize: 16,
+    lineHeight: 18,
+    color: "#FFFFFF",
   },
 
   proceedButtonContainer: {
@@ -1694,6 +2362,53 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  walletBalanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  billBreakdown: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 16,
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.3)",
+  },
+  walletBalanceText: {
+    color: "#9ca3af",
+    fontSize: 14,
+  },
+  payWithWalletBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: "#22c55e",
+  },
+  payWithWalletBtnDisabled: {
+    opacity: 0.6,
+  },
+  payWithWalletBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  payWithCardBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
   },
 
   // Modal styles
@@ -1974,5 +2689,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+
+  bookingPaymentButtons: {
+    marginTop: 24,
+    marginBottom: 16,
   },
 });

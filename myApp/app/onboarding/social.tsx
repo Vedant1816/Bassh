@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -38,10 +39,11 @@ export default function SocialScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
+      <DismissKeyboardView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backIcon}>‹</Text>
@@ -115,21 +117,22 @@ export default function SocialScreen() {
             <Text style={styles.addButtonText}>Add another social handle</Text>
           </Pressable>
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.bottomContainer}>
-        <Pressable onPress={finish} disabled={loading} style={styles.buttonWrapper}>
-          <LinearGradient
-            colors={["#E91E8C", "#DB1A85"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.sendButton, loading && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>{loading ? "Finishing..." : "Continue"}</Text>
-          </LinearGradient>
-        </Pressable>
-        <View style={styles.homeIndicator} />
-      </View>
+        <View style={styles.bottomContainer}>
+          <Pressable onPress={finish} disabled={loading} style={styles.buttonWrapper}>
+            <LinearGradient
+              colors={["#E91E8C", "#DB1A85"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.sendButton, loading && styles.buttonDisabled]}
+            >
+              <Text style={styles.buttonText}>{loading ? "Finishing..." : "Continue"}</Text>
+            </LinearGradient>
+          </Pressable>
+          <View style={styles.homeIndicator} />
+        </View>
+      </DismissKeyboardView>
     </KeyboardAvoidingView>
   );
 }

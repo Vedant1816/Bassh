@@ -10,12 +10,14 @@ export const POST = withAuth(async (req, _ctx, user) => {
   
   try {
     const body = await req.json();
-    const { event_id, participants, total_amount } = body;
-    
+    const { event_id, participants, total_amount, discount_amount } = body;
+    const money_saved = Number(discount_amount) || 0;
+
     console.log("🔄 [BACKEND] Request body:", {
       event_id,
       participants_count: participants?.length || 0,
       total_amount,
+      money_saved,
     });
 
     if (!event_id) {
@@ -65,6 +67,7 @@ export const POST = withAuth(async (req, _ctx, user) => {
     console.log("📅 [BACKEND] Booking date/time:", { booking_date, booking_time });
 
     /* ---------------- CREATE BOOKING ---------------- */
+    // Requires bookings.money_saved column (e.g. ALTER TABLE bookings ADD COLUMN money_saved numeric DEFAULT 0;)
     console.log("📝 [BACKEND] Creating booking...");
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from("bookings")
@@ -74,6 +77,7 @@ export const POST = withAuth(async (req, _ctx, user) => {
         club_id: event.club_id,
         participants,
         total_amount,
+        money_saved,
         booking_date,
         booking_time,
         booking_status: "pending",

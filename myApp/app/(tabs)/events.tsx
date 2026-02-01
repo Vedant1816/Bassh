@@ -14,6 +14,7 @@ import {
   StatusBar,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { fetchWithFallback } from "@/_services/api-config";
 
@@ -41,26 +42,6 @@ interface Event {
   };
 }
 
-const EXPLORE_CATEGORIES = [
-  // Music & Vibe
-  { id: "edm", name: "EDM", emoji: "⚡", searchTerm: "EDM" },
-  { id: "techno", name: "Techno", emoji: "🎛️", searchTerm: "techno" },
-  { id: "house", name: "House", emoji: "🏠", searchTerm: "house music" },
-  { id: "bollywood", name: "Bollywood", emoji: "🎬", searchTerm: "Bollywood night" },
-  { id: "hiphop", name: "Hip Hop", emoji: "🎤", searchTerm: "hip hop night" },
-  { id: "retro", name: "Retro", emoji: "📻", searchTerm: "retro night" },
-  
-  // Event Types
-  { id: "rave", name: "Rave", emoji: "🌈", searchTerm: "rave party" },
-  { id: "rooftop", name: "Rooftop", emoji: "🌃", searchTerm: "rooftop party" },
-  { id: "theme", name: "Theme Party", emoji: "🎭", searchTerm: "theme party" },
-  
-  // Drinks & Experience
-  { id: "cocktail", name: "Cocktails", emoji: "🍹", searchTerm: "cocktail night" },
-  { id: "ladies", name: "Ladies Night", emoji: "👯‍♀️", searchTerm: "ladies night" },
-  { id: "beer", name: "Beer", emoji: "🍺", searchTerm: "beer" },
-];
-
 const DATE_FILTERS = [
   { id: "all", label: "All" },
   { id: "today", label: "Today" },
@@ -77,8 +58,6 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -87,7 +66,7 @@ export default function EventsScreen() {
 
   useEffect(() => {
     applyFilters();
-  }, [events, selectedDateFilter, selectedCategory]);
+  }, [events, selectedDateFilter]);
 
   const fetchEvents = async () => {
     try {
@@ -153,19 +132,6 @@ export default function EventsScreen() {
       });
     }
 
-    // Category filter
-    if (selectedCategory) {
-      const category = EXPLORE_CATEGORIES.find(c => c.id === selectedCategory);
-      if (category) {
-        filtered = filtered.filter((event) => {
-          const eventCategories = event.categories || [];
-          return eventCategories.some(cat => 
-            cat.toLowerCase().includes(category.searchTerm.toLowerCase())
-          );
-        });
-      }
-    }
-
     setFilteredEvents(filtered);
   };
 
@@ -178,18 +144,12 @@ export default function EventsScreen() {
     router.push(`/event/${eventId}`);
   };
 
-  const handleCategoryPress = (categoryId: string) => {
-    // Navigate to category page
-    router.push(`/category/${categoryId}`);
-  };
-
   const handleDateFilterPress = (filterId: string) => {
     setSelectedDateFilter(filterId);
   };
 
   const clearFilters = () => {
     setSelectedDateFilter("all");
-    setSelectedCategory(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -226,18 +186,18 @@ export default function EventsScreen() {
           />
         ) : (
           <View style={styles.featuredPlaceholder}>
-            <Text style={styles.featuredPlaceholderText}>🎉</Text>
+            <Ionicons name="musical-notes-outline" size={48} color="rgba(255,255,255,0.4)" />
           </View>
         )}
         
         <View style={styles.bookmarkIcon}>
-          <Text style={styles.bookmarkText}>🔖</Text>
+          <Ionicons name="bookmark-outline" size={22} color="rgba(255,255,255,0.8)" />
         </View>
       </View>
 
       <View style={styles.featuredInfo}>
         <View style={styles.featuredVenue}>
-          <Text style={styles.venueIcon}>📍</Text>
+          <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.6)" style={styles.venueIconWrap} />
           <Text style={styles.venueText} numberOfLines={1}>
             {item.clubs?.address_text || item.clubs?.club_name || "Venue TBA"}
           </Text>
@@ -269,12 +229,12 @@ export default function EventsScreen() {
           />
         ) : (
           <View style={styles.gridPlaceholder}>
-            <Text style={styles.gridPlaceholderText}>🎉</Text>
+            <Ionicons name="musical-notes-outline" size={40} color="rgba(255,255,255,0.4)" />
           </View>
         )}
         
         <View style={styles.gridBookmarkIcon}>
-          <Text style={styles.gridBookmarkText}>🔖</Text>
+          <Ionicons name="bookmark-outline" size={18} color="rgba(255,255,255,0.8)" />
         </View>
       </View>
 
@@ -291,20 +251,6 @@ export default function EventsScreen() {
           {formatDate(item.event_date)}
         </Text>
       </View>
-    </Pressable>
-  );
-
-  // Category Card
-  const renderCategoryCard = (category: typeof EXPLORE_CATEGORIES[0]) => (
-    <Pressable
-      key={category.id}
-      style={styles.categoryCard}
-      onPress={() => handleCategoryPress(category.id)}
-    >
-      <View style={styles.categoryIconContainer}>
-        <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-      </View>
-      <Text style={styles.categoryName}>{category.name}</Text>
     </Pressable>
   );
 
@@ -356,7 +302,7 @@ export default function EventsScreen() {
           style={styles.gradientBackground}
         />
         <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <Ionicons name="warning-outline" size={64} color="rgba(255,255,255,0.6)" style={styles.errorIcon} />
           <Text style={styles.errorText}>{error}</Text>
           <Pressable style={styles.retryButtonWrapper} onPress={fetchEvents}>
             <LinearGradient
@@ -373,7 +319,7 @@ export default function EventsScreen() {
     );
   }
 
-  const displayEvents = selectedDateFilter !== "all" || selectedCategory ? filteredEvents : events;
+  const displayEvents = selectedDateFilter !== "all" ? filteredEvents : events;
 
   return (
     <View style={styles.container}>
@@ -416,19 +362,6 @@ export default function EventsScreen() {
           </View>
         )}
 
-        {/* Explore Events */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Explore events</Text>
-          
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          >
-            {EXPLORE_CATEGORIES.map(renderCategoryCard)}
-          </ScrollView>
-        </View>
-
         {/* Filter Bar */}
         <View style={styles.filterSection}>
           <ScrollView
@@ -440,9 +373,10 @@ export default function EventsScreen() {
           </ScrollView>
 
           {/* Clear Filters */}
-          {(selectedDateFilter !== "all" || selectedCategory) && (
+          {selectedDateFilter !== "all" && (
             <Pressable style={styles.clearFiltersButton} onPress={clearFilters}>
-              <Text style={styles.clearFiltersText}>✕ Clear</Text>
+              <Ionicons name="close" size={14} color="#FFFFFF" />
+              <Text style={styles.clearFiltersText}>Clear</Text>
             </Pressable>
           )}
         </View>
@@ -458,7 +392,7 @@ export default function EventsScreen() {
         <View style={styles.gridSection}>
           {displayEvents.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🎪</Text>
+              <Ionicons name="calendar-outline" size={64} color="rgba(255,255,255,0.4)" style={styles.emptyIcon} />
               <Text style={styles.emptyText}>No events found</Text>
               <Text style={styles.emptySubtext}>
                 Try changing your filters
@@ -528,7 +462,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorIcon: {
-    fontSize: 64,
     marginBottom: 16,
   },
   errorText: {
@@ -591,9 +524,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  featuredPlaceholderText: {
-    fontSize: 80,
-  },
   bookmarkIcon: {
     position: "absolute",
     top: 16,
@@ -605,9 +535,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  bookmarkText: {
-    fontSize: 22,
-  },
   featuredInfo: {
     padding: 16,
   },
@@ -616,8 +543,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  venueIcon: {
-    fontSize: 14,
+  venueIconWrap: {
     marginRight: 6,
   },
   venueText: {
@@ -636,35 +562,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255, 255, 255, 0.6)",
     fontWeight: "500",
-  },
-
-  categoriesList: {
-    paddingHorizontal: 24,
-  },
-  categoryCard: {
-    width: 110,
-    marginRight: 12,
-    alignItems: "center",
-  },
-  categoryIconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  categoryEmoji: {
-    fontSize: 40,
-  },
-  categoryName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    textAlign: "center",
   },
 
   filterSection: {
@@ -756,9 +653,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  gridPlaceholderText: {
-    fontSize: 60,
-  },
   gridBookmarkIcon: {
     position: "absolute",
     top: 12,
@@ -769,9 +663,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  gridBookmarkText: {
-    fontSize: 18,
   },
   gridInfo: {
     padding: 12,
@@ -800,7 +691,6 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 80,
     marginBottom: 16,
   },
   emptyText: {

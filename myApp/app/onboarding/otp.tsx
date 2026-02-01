@@ -11,6 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
@@ -104,11 +105,12 @@ export default function OtpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <StatusBar barStyle="light-content" />
+    <DismissKeyboardView>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <StatusBar barStyle="light-content" />
 
       {/* Gradient Background */}
       <LinearGradient
@@ -124,7 +126,7 @@ export default function OtpScreen() {
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backIcon}>‹</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Welcome to BASH 🎉</Text>
+          <Text style={styles.headerTitle}>Welcome to BASH</Text>
           <Pressable onPress={() => router.replace("/onboarding/avatar")} style={styles.skipButton}>
             <Text style={styles.skipButtonText}>Skip</Text>
           </Pressable>
@@ -204,7 +206,8 @@ export default function OtpScreen() {
         {/* Home Indicator */}
         <View style={styles.homeIndicator} />
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </DismissKeyboardView>
   );
 }
 

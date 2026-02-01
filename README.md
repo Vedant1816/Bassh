@@ -201,12 +201,14 @@ cp .env.example .env
 
 ```bash
 # From project root
-docker-compose up
+docker-compose up --build
 ```
 
 This will start:
-- Expo dev server on `http://localhost:8081`
-- Next.js API server on `http://localhost:3000`
+- **Expo** (myApp): dev server on `http://localhost:8081`
+- **Web** (Next.js API): dev server on `http://localhost:3000`
+
+See [web/Dockerfile](web/Dockerfile) and [myApp/Dockerfile](myApp/Dockerfile) for image definitions.
 
 #### 5. Run Locally (Alternative)
 
@@ -271,6 +273,8 @@ APP_URL=http://localhost:3000
 
 ## 🗄️ Database Schema
 
+Full schema and column details: [tables.md](./tables.md).
+
 ### Core Tables
 
 #### `users`
@@ -317,6 +321,7 @@ APP_URL=http://localhost:3000
 - `club_id` (UUID, Foreign Key → clubs.id)
 - `participants` (JSONB Array)
 - `total_amount` (Decimal)
+- `money_saved` (Decimal, Optional, Default 0) – Discount amount applied; shown on payment success
 - `booking_date` (Date), `booking_time` (Time)
 - `booking_status` (Enum: 'pending', 'confirmed', 'cancelled')
 - `razorpay_order_id`, `razorpay_payment_id`
@@ -361,7 +366,7 @@ Authorization: Bearer <supabase_access_token>
 
 **POST `/api/bookings/create`**
 - Create a new booking
-- Body: `event_id`, `participants[]`, `total_amount`
+- Body: `event_id`, `participants[]`, `total_amount`, `discount_id` (optional), `discount_amount` (optional; stored as `money_saved`)
 - Returns: `booking_id`
 
 **GET `/api/bookings/event/[id]`**
@@ -465,9 +470,11 @@ vercel deploy
 
 #### Docker
 ```bash
-docker build -t bassh-web ./web
-docker run -p 3000:3000 bassh-web
+cd web
+docker build -t bassh-web .
+docker run -p 3000:3000 --env-file .env bassh-web
 ```
+For production, use `npm run build` and `npm start` in the Dockerfile (see [web/Dockerfile](web/Dockerfile)).
 
 ### Environment Setup
 
