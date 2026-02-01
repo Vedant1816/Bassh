@@ -15,6 +15,7 @@ This document contains the complete schema for all database tables in the Bassh 
 - [transactions](#transactions)
 - [staff](#staff)
 - [discounts](#discounts)
+- [reviews](#reviews)
 - [phone_otps](#phone_otps)
 
 ---
@@ -58,6 +59,7 @@ Customer profile information for regular users.
 | `social_handle` | Text | Optional | Social media handle (legacy field) |
 | `avatar_url` | Text | Optional | URL to customer avatar image |
 | `onboarding_completed` | Boolean | Optional | Whether onboarding is completed |
+| `wallet_balance` | Numeric | NOT NULL, Default 0 | Current wallet balance in INR |
 | `created_at` | Timestamp | | Record creation timestamp |
 | `updated_at` | Timestamp | | Record last update timestamp |
 
@@ -151,6 +153,7 @@ Booking records for event tickets.
 | `club_id` | UUID | Foreign Key → `clubs.id` | Club hosting the event |
 | `participants` | JSONB Array | | Array of participant details (name, age, gender, etc.) |
 | `total_amount` | Decimal | | Total booking amount |
+| `money_saved` | Decimal | Optional, Default 0 | Discount amount applied at booking (shown on payment success) |
 | `booking_date` | Date | | Date of the booking (usually same as event date) |
 | `booking_time` | Time | | Time of the booking (usually same as event start time) |
 | `booking_status` | Enum | | Status: `'pending'`, `'confirmed'`, `'cancelled'` |
@@ -174,19 +177,22 @@ Booking records for event tickets.
 
 ## transactions
 
-Payment transaction records for both event bookings and direct bill (cover) payments.
+Payment transaction records for both event bookings, direct bill (cover) payments, and wallet top-ups.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | Primary Key | Transaction ID |
 | `user_id` | UUID | Foreign Key → `users.id` | User who made the payment |
-| `club_id` | UUID | Foreign Key → `clubs.id` | Club receiving the payment |
-| `event_id` | UUID | Foreign Key → `events.id`, Nullable | Event (null for bill/cover payments) |
-| `booking_id` | UUID | Foreign Key → `bookings.id`, Nullable | Booking (null for bill/cover payments) |
+| `club_id` | UUID | Foreign Key → `clubs.id`, Nullable | Club receiving the payment (null for wallet top-ups) |
+| `event_id` | UUID | Foreign Key → `events.id`, Nullable | Event (null for bill/cover/wallet payments) |
+| `booking_id` | UUID | Foreign Key → `bookings.id`, Nullable | Booking (null for bill/cover/wallet payments) |
 | `razorpay_order_id` | Text | Optional | Razorpay order ID |
 | `razorpay_payment_id` | Text | Optional | Razorpay payment ID |
 | `amount` | Decimal | | Payment amount |
 | `status` | Enum | | Status: `'pending'`, `'success'`, `'failed'` |
+| `is_wallet` | Boolean | NOT NULL, Default false | True when this is a wallet-related transaction |
+| `wallet_added` | Boolean | Optional | True when money was credited to wallet |
+| `wallet_used` | Boolean | Optional | True when wallet balance was debited for payment |
 | `created_at` | Timestamp | | Record creation timestamp |
 | `updated_at` | Timestamp | | Record last update timestamp |
 
@@ -199,6 +205,8 @@ Payment transaction records for both event bookings and direct bill (cover) paym
 **Notes:**
 - Event ticket payments: `booking_id` and `event_id` set; transaction may be created on verify.
 - Bill/cover payments: `booking_id` and `event_id` are null; record created before Razorpay order.
+- Wallet top-ups: `club_id`, `booking_id`, `event_id` are null; `is_wallet=true`; on verify, `wallet_added=true` and `customers.wallet_balance` is incremented.
+- Wallet payments: when paying with wallet, `wallet_used=true` and `customers.wallet_balance` is decremented.
 
 ---
 
@@ -242,6 +250,74 @@ Discount information for events.
 
 **Relationships:**
 - Many-to-one with `events` (via `event_id`)
+
+---
+
+## reviews
+
+User reviews for clubs, optionally linked to an event or booking.
+
+```sql
+create table public.reviews (
+  id uuid primary key default gen_random_uuid(),
+
+  user_id uuid not null,
+  club_id uuid not null,
+  event_id uuid null,
+  booking_id uuid null,
+
+  rating int not null check (rating between 1 and 5),
+  comment text,
+
+  is_verified boolean default false,
+  is_hidden boolean default false,
+  hidden_reason text,
+
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+
+  constraint reviews_user_fk
+    foreign key (user_id)
+    references auth.users (id)
+    on delete cascade,
+
+  constraint reviews_club_fk
+    foreign key (club_id)
+    references clubs (id)
+    on delete cascade,
+
+  constraint reviews_event_fk
+    foreign key (event_id)
+    references events (id)
+    on delete cascade,
+
+  constraint reviews_booking_fk
+    foreign key (booking_id)
+    references bookings (id)
+    on delete set null
+);
+```
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | Primary Key | Review ID |
+| `user_id` | UUID | Foreign Key → `auth.users.id` | User who wrote the review |
+| `club_id` | UUID | Foreign Key → `clubs.id` | Club being reviewed |
+| `event_id` | UUID | Foreign Key → `events.id`, Nullable | Event (optional context) |
+| `booking_id` | UUID | Foreign Key → `bookings.id`, Nullable | Booking (optional context) |
+| `rating` | Integer | Check 1–5 | Star rating (1 to 5) |
+| `comment` | Text | Optional | Review text |
+| `is_verified` | Boolean | Default false | Whether review is verified (e.g. from a booking) |
+| `is_hidden` | Boolean | Default false | Whether review is hidden from display |
+| `hidden_reason` | Text | Optional | Reason the review was hidden |
+| `created_at` | Timestamp | | Record creation timestamp |
+| `updated_at` | Timestamp | | Record last update timestamp |
+
+**Relationships:**
+- Many-to-one with `auth.users` (via `user_id`) — on delete cascade
+- Many-to-one with `clubs` (via `club_id`) — on delete cascade
+- Many-to-one with `events` (via `event_id`), optional — on delete cascade
+- Many-to-one with `bookings` (via `booking_id`), optional — on delete set null
 
 ---
 

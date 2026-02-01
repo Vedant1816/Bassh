@@ -17,6 +17,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -68,10 +69,11 @@ export default function DobScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
+      <DismissKeyboardView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backIcon}>‹</Text>
@@ -133,21 +135,22 @@ export default function DobScreen() {
             </View>
           </Modal>
         )}
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.bottomContainer}>
-        <Pressable onPress={save} disabled={loading} style={styles.buttonWrapper}>
-          <LinearGradient
-            colors={["#E91E8C", "#DB1A85"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.sendButton, loading && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>{loading ? "Saving…" : "Continue"}</Text>
-          </LinearGradient>
-        </Pressable>
-        <View style={styles.homeIndicator} />
-      </View>
+        <View style={styles.bottomContainer}>
+          <Pressable onPress={save} disabled={loading} style={styles.buttonWrapper}>
+            <LinearGradient
+              colors={["#E91E8C", "#DB1A85"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.sendButton, loading && styles.buttonDisabled]}
+            >
+              <Text style={styles.buttonText}>{loading ? "Saving…" : "Continue"}</Text>
+            </LinearGradient>
+          </Pressable>
+          <View style={styles.homeIndicator} />
+        </View>
+      </DismissKeyboardView>
     </KeyboardAvoidingView>
   );
 }

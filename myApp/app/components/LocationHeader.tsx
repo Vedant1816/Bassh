@@ -1,6 +1,15 @@
 import { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from "react-native";
+import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, StatusBar, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import MumbaiIcon from "@/app/components/Mumbai.Icon";
+import DelhiIcon from "@/app/components/Delhi.Icon";
+import BengaluruIcon from "@/app/components/Bengluru.Icon";
+import ChandigarhIcon from "@/app/components/Chandigarh.Icon";
+import HyderabadIcon from "@/app/components/Hyderabad.Icon";
+import KolkataIcon from "@/app/components/Kolkata.Icon";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface LocationHeaderProps {
   title: string;
@@ -32,6 +41,18 @@ const CITIES = [
   { name: "Mysore", lat: 12.2958, lng: 76.6394 },
 ];
 
+// Landmark-style icons (line-art feel) – light purple/lavender in UI
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
+const POPULAR_CITIES: { name: string; icon: IconName; lat: number; lng: number }[] = [
+  { name: "Delhi NCR", icon: "library-outline", lat: 28.7041, lng: 77.1025 },
+  { name: "Mumbai", icon: "boat-outline", lat: 19.0760, lng: 72.8777 },
+  { name: "Kolkata", icon: "school-outline", lat: 22.5726, lng: 88.3639 },
+  { name: "Bengaluru", icon: "business-outline", lat: 12.9716, lng: 77.5946 },
+  { name: "Hyderabad", icon: "partly-sunny-outline", lat: 17.3850, lng: 78.4867 },
+  { name: "Chandigarh", icon: "hand-left-outline", lat: 30.7333, lng: 76.7794 },
+];
+const POPULAR_CITY_ICON_COLOR = "#B8A9C9";
+
 export default function LocationHeader({ title, address, onLocationChange }: LocationHeaderProps) {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,7 +61,7 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
     city.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCitySelect = (city: typeof CITIES[0]) => {
+  const handleCitySelect = (city: { name: string; lat: number; lng: number }) => {
     onLocationChange?.(city);
     setShowCityPicker(false);
     setSearchQuery("");
@@ -48,27 +69,23 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
 
   return (
     <>
-      {/* Main container: 178x40 (position/size applied by parent in index) */}
+      {/* Main container: 178x40 */}
       <View style={styles.container}>
-        {/* Frame 1948755853 / Ellipse 2: 40x40 circle #FF007E */}
         <Pressable
           style={styles.iconButton}
           onPress={() => setShowCityPicker(true)}
         >
           <View style={styles.iconCircle}>
-            {/* lucide:map-pin 24x24 at 8,9 */}
             <View style={styles.mapPinWrapper}>
               <Ionicons name="location" size={24} color="#FFFFFF" />
             </View>
           </View>
         </Pressable>
 
-        {/* Frame 153: 128x40, left 50, flex column, gap 2 */}
         <Pressable
           style={styles.textBlock}
           onPress={() => setShowCityPicker(true)}
         >
-          {/* Frame 152: row, gap 4, 67x21 - Home + arrow */}
           <View style={styles.titleRow}>
             <Text style={styles.title}>{title}</Text>
             <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={styles.arrowDown} />
@@ -79,45 +96,49 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
         </Pressable>
       </View>
 
-      {/* CITY PICKER MODAL */}
+      {/* NEW CITY PICKER MODAL */}
       <Modal
         visible={showCityPicker}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
         onRequestClose={() => setShowCityPicker(false)}
       >
         <View style={styles.modalContainer}>
+          <StatusBar barStyle="light-content" />
+          <LinearGradient
+            colors={["#8B0045", "#2D0A1F", "#000000"]}
+            locations={[0, 0.4, 1]}
+            style={styles.gradientBackground}
+          />
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Pressable onPress={() => setShowCityPicker(false)}>
-              <Text style={styles.modalClose}>Cancel</Text>
+            <Pressable 
+              style={styles.backButton}
+              onPress={() => setShowCityPicker(false)}
+            >
+              <Ionicons name="chevron-down" size={28} color="#FFFFFF" />
             </Pressable>
-            <Text style={styles.modalTitle}>Select City</Text>
-            <View style={{ width: 60 }} />
+            <Text style={styles.modalTitle}>Location</Text>
+            <View style={{ width: 44 }} />
           </View>
 
-          {/* Search */}
+          {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+            <Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.5)" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search cities..."
-              placeholderTextColor="#666"
+              placeholder="Search city, area or locality"
+              placeholderTextColor="rgba(255,255,255,0.5)"
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
             />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery("")}>
-                <Ionicons name="close" size={20} color="#666" />
-              </Pressable>
-            )}
           </View>
 
-          {/* City List */}
-          <ScrollView style={styles.cityList}>
-            {/* Your Location Option */}
+          <ScrollView style={styles.content}>
+            {/* Use Current Location */}
             <Pressable
-              style={[styles.cityItem, styles.yourLocationItem]}
+              style={styles.currentLocationCard}
               onPress={() => {
                 onLocationChange?.({ 
                   name: "Your Location", 
@@ -128,35 +149,71 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
                 setSearchQuery("");
               }}
             >
-              <View style={styles.yourLocationIcon}>
-                <View style={styles.yourLocationDot} />
+              <View style={styles.currentLocationIcon}>
+                <View style={styles.currentLocationDot} />
               </View>
-              <Text style={styles.yourLocationText}>Your Location</Text>
-              <Ionicons name="chevron-forward" size={18} color="#666" />
+              <View style={styles.currentLocationText}>
+                <Text style={styles.currentLocationTitle}>Use current location</Text>
+                <Text style={styles.currentLocationSubtitle}>{address || "Sector 12, Chandigarh"}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
             </Pressable>
 
-            {/* Divider */}
-            <View style={styles.divider} />
-
-            {/* City List */}
-            {filteredCities.map((city) => (
-              <Pressable
-                key={city.name}
-                style={styles.cityItem}
-                onPress={() => handleCitySelect(city)}
-              >
-                <Ionicons name="location-outline" size={20} color="#9ca3af" style={styles.cityIcon} />
-                <Text style={styles.cityName}>{city.name}</Text>
-                <Ionicons name="chevron-forward" size={18} color="#666" />
-              </Pressable>
-            ))}
-            
-            {filteredCities.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No cities found</Text>
-                <Text style={styles.emptySubtext}>Try a different search term</Text>
+            {/* Popular Cities */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Popular cities</Text>
+              <View style={styles.cityGrid}>
+                {POPULAR_CITIES.map((city) => (
+                  <Pressable
+                    key={city.name}
+                    style={styles.cityCard}
+                    onPress={() => handleCitySelect({ name: city.name, lat: city.lat, lng: city.lng })}
+                  >
+                    <View style={styles.cityIconContainer}>
+                      {city.name === "Mumbai" ? (
+                        <MumbaiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : city.name === "Delhi NCR" ? (
+                        <DelhiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : city.name === "Bengaluru" ? (
+                        <BengaluruIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : city.name === "Chandigarh" ? (
+                        <ChandigarhIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : city.name === "Hyderabad" ? (
+                        <HyderabadIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : city.name === "Kolkata" ? (
+                        <KolkataIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      ) : (
+                        <Ionicons name={city.icon} size={36} color={POPULAR_CITY_ICON_COLOR} />
+                      )}
+                    </View>
+                    <Text style={styles.cityCardName}>{city.name}</Text>
+                  </Pressable>
+                ))}
               </View>
-            )}
+            </View>
+
+            {/* All Cities List */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>All cities</Text>
+              <View style={styles.citiesList}>
+                {filteredCities.map((city) => (
+                  <Pressable
+                    key={city.name}
+                    style={styles.cityListItem}
+                    onPress={() => handleCitySelect(city)}
+                  >
+                    <Text style={styles.cityListName}>{city.name}</Text>
+                  </Pressable>
+                ))}
+                
+                {filteredCities.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No cities found</Text>
+                    <Text style={styles.emptySubtext}>Try a different search term</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -165,7 +222,7 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
 }
 
 const styles = StyleSheet.create({
-  /* Main: 178x40 */
+  // Original Header Styles
   container: {
     width: 178,
     height: 40,
@@ -174,7 +231,6 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  /* Frame 1948755853: 40x40, left 0, top 0 */
   iconButton: {
     width: 40,
     height: 40,
@@ -192,7 +248,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* lucide:map-pin 24x24 at 8,9 */
   mapPinWrapper: {
     position: "absolute",
     width: 24,
@@ -203,7 +258,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* Frame 153: 128x40, left 50, flex column, gap 2 */
   textBlock: {
     position: "absolute",
     width: 128,
@@ -217,7 +271,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
 
-  /* Frame 152: row, gap 4, 67x21 */
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -227,7 +280,6 @@ const styles = StyleSheet.create({
     height: 21,
   },
 
-  /* Home: Antebas Black, 17px, weight 900, #FFFFFF */
   title: {
     fontWeight: "900",
     fontSize: 17,
@@ -235,13 +287,11 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  /* vuesax/linear/arrow-down 15x15 */
   arrowDown: {
     width: 15,
     height: 15,
   },
 
-  /* Karol Bagh...: DM Sans, 13px, #E7E7E7 */
   address: {
     width: 128,
     height: 17,
@@ -251,109 +301,176 @@ const styles = StyleSheet.create({
     color: "#E7E7E7",
   },
 
-  // Modal Styles
+  // NEW Modal Styles (OTP theme: gradient, pink accents)
   modalContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#000000",
+  },
+
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
   },
 
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 16,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2a2a2a",
+    paddingBottom: 16,
   },
 
-  modalClose: {
-    color: "#EC4899",
-    fontSize: 16,
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   modalTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "700",
   },
 
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    margin: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginHorizontal: 16,
+    marginBottom: 20,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#2a2a2a",
-  },
-
-  searchIcon: {
-    marginRight: 10,
+    borderColor: "rgba(255,255,255,0.15)",
+    gap: 12,
   },
 
   searchInput: {
     flex: 1,
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
   },
 
-  cityList: {
+  content: {
     flex: 1,
   },
 
-  yourLocationItem: {
-    backgroundColor: "#1a1a1a",
+  // Current Location Card (blue accent like reference)
+  currentLocationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: "#4285F4",
+    borderWidth: 0,
   },
 
-  yourLocationIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#4285F4",
+  currentLocationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(66,133,244,0.3)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
 
-  yourLocationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  currentLocationDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: "#fff",
   },
 
-  yourLocationText: {
+  currentLocationText: {
     flex: 1,
-    color: "#4285F4",
+  },
+
+  currentLocationTitle: {
+    color: "#FFFFFF",
     fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+
+  currentLocationSubtitle: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+
+  // Section
+  section: {
+    marginBottom: 32,
+  },
+
+  sectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+    marginHorizontal: 16,
+  },
+
+  // City Grid (Popular Cities – line-art style, lavender icons)
+  cityGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+
+  cityCard: {
+    width: 110,
+    aspectRatio: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    padding: 16,
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  cityIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  cityCardName: {
+    color: "#FFFFFF",
+    fontSize: 14,
     fontWeight: "600",
   },
 
-  divider: {
-    height: 8,
-    backgroundColor: "#0a0a0a",
+  // All Cities List
+  citiesList: {
+    paddingHorizontal: 16,
   },
 
-  cityItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  cityListItem: {
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a2a",
+    borderBottomColor: "rgba(255,255,255,0.1)",
   },
 
-  cityIcon: {
-    marginRight: 12,
-  },
-
-  cityName: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 16,
+  cityListName: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "500",
   },
 
   emptyState: {
@@ -363,14 +480,14 @@ const styles = StyleSheet.create({
   },
 
   emptyText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 8,
   },
 
   emptySubtext: {
-    color: "#666",
+    color: "rgba(255,255,255,0.5)",
     fontSize: 14,
   },
 });

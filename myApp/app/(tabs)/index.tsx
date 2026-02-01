@@ -148,7 +148,7 @@ export default function HomeScreen() {
   /* ---------------- HANDLE CITY SELECTION ---------------- */
   const handleCitySelect = async (city: { name: string; lat: number; lng: number }) => {
     console.log("🏙️ City selected:", city.name);
-    
+
     // If "Your Location" is selected, get GPS coordinates
     if (city.name === "Your Location") {
       try {
@@ -172,14 +172,6 @@ export default function HomeScreen() {
         });
 
         setLocationAddress(addressText);
-
-        if (cameraRef.current) {
-          cameraRef.current.setCamera({
-            centerCoordinate: [pos.coords.longitude, pos.coords.latitude],
-            zoomLevel: 13,
-            animationDuration: 1000,
-          });
-        }
       } catch (error) {
         console.error("❌ Failed to get location:", error);
       }
@@ -195,15 +187,23 @@ export default function HomeScreen() {
     });
 
     setLocationAddress(city.name);
-
-    if (cameraRef.current) {
-      cameraRef.current.setCamera({
-        centerCoordinate: [city.lng, city.lat],
-        zoomLevel: 13,
-        animationDuration: 1000,
-      });
-    }
   };
+
+  /* ---------------- RECENTER MAP WHEN LOCATION CHANGES ---------------- */
+  /* setCamera ref can be unreliable when modal is open; run after a short delay so map is visible */
+  useEffect(() => {
+    if (!location) return;
+    const t = setTimeout(() => {
+      if (cameraRef.current) {
+        cameraRef.current.setCamera({
+          centerCoordinate: [location.lng, location.lat],
+          zoomLevel: 13,
+          animationDuration: 3000,
+        });
+      }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [location?.lat, location?.lng]);
 
   /* ---------------- CLUB CARDS ---------------- */
   useEffect(() => {
@@ -288,12 +288,15 @@ export default function HomeScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
 
-      {/* MAP - NO bottom padding; tab bar floats on top */}
+      {/* MAP - key forces Camera to recenter when location changes (ref setCamera can be unreliable) */}
       <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Dark}>
         <Mapbox.Camera
+          key={`${location.lat}-${location.lng}`}
           ref={cameraRef}
           centerCoordinate={[location.lng, location.lat]}
           zoomLevel={13}
+          animationDuration={3000}
+          animationMode="easeTo"
         />
 
         {/* User Location Marker - Blue Google Maps style */}
@@ -446,7 +449,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Map floating actions - just below search bar; toggle expands/collapses up and down */}
+      {/* Map floating actions */}
       <MapFloatingActions
         top={107 + 55 + 8}
       />
@@ -455,7 +458,7 @@ export default function HomeScreen() {
       <View
         style={[
           styles.cardsContainer,
-          { bottom: insets.bottom + TAB_BAR_HEIGHT + CARD_BAR_GAP },
+          { bottom: insets.bottom + TAB_BAR_HEIGHT + CARD_BAR_GAP - 26 },
         ]}
       >
         {loadingCards ? (
@@ -481,7 +484,7 @@ export default function HomeScreen() {
                   style={[styles.clubCard, { width: CARD_WIDTH }]}
                   onPress={() => router.push(`/club/${club.id}`)}
                 >
-                  {/* Pink glow effects (Vector 241-245) */}
+                  {/* Pink glow effects */}
                   <View style={[styles.cardGlows, { zIndex: 1 }]} pointerEvents="none">
                     <View style={[styles.cardGlow, styles.cardGlow1]} />
                     <View style={[styles.cardGlow, styles.cardGlow2]} />
@@ -490,7 +493,7 @@ export default function HomeScreen() {
                     <View style={[styles.cardGlow, styles.cardGlow5]} />
                   </View>
                   <View style={styles.cardContent}>
-                  {/* Top section - Image + Details */}
+                  {/* Top section */}
                   <View style={[styles.cardTopSection, { zIndex: 2 }]}>
                     <View style={styles.cardImageContainer}>
                       {club.banner_image_url || club.profile_image_url ? (
@@ -536,7 +539,7 @@ export default function HomeScreen() {
                       </View>
                     </View>
                   </View>
-                  {/* Footer - Location + Directions */}
+                  {/* Footer */}
                   <View style={[styles.cardFooter, { zIndex: 2 }]}>
                     <View style={styles.cardLocationBlock}>
                       <View style={styles.cardLocationIcon}>
@@ -703,7 +706,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // Google Maps-style blue user location marker
   userLocationMarker: {
     alignItems: "center",
     justifyContent: "center",
@@ -732,7 +734,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#4285F4",
   },
 
-  // Club Marker Styles (matching screenshot)
   clubMarkerContainer: {
     alignItems: "center",
     zIndex: 1000,
@@ -753,10 +754,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-
-  clubMarkerEmoji: {
-    fontSize: 28,
   },
 
   clubMarkerPlaceholder: {
@@ -832,7 +829,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Bottom Card Styles - full width (bottom set via insets + tab bar height)
   cardsContainer: {
     position: "absolute",
     left: CARD_HORIZONTAL_PADDING,
@@ -863,7 +859,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
-  // Pink glow vectors (241-245)
   cardGlows: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -882,7 +877,6 @@ const styles = StyleSheet.create({
   cardGlow4: { left: -39, top: -60, opacity: 0.2 },
   cardGlow5: { left: 248, top: 23, opacity: 0.15 },
 
-  // Top section - flex layout for responsive width
   cardTopSection: {
     flexDirection: "row",
     paddingHorizontal: 12,
@@ -1013,7 +1007,6 @@ const styles = StyleSheet.create({
     color: "#D0D3D9",
   },
 
-  // Footer
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",

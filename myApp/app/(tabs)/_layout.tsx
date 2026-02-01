@@ -1,16 +1,17 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, Platform, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "@/components/haptic-tab";
 
+const SCREEN_WIDTH = Dimensions.get("window").width;
 const ACTIVE_GRADIENT = ["#DB4494", "#DB138D"] as const;
-const INACTIVE_COLOR = "#E7E7E7";
-const TAB_BAR_HEIGHT = 64;
+const INACTIVE_COLOR = "#6B7280"; // Gray color from image
+const TAB_BAR_HEIGHT = 70;
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 function TabIcon({
   focused,
@@ -19,26 +20,26 @@ function TabIcon({
   focused: boolean;
   name: IconName;
 }) {
-  const size = 24;
-  return (
-    <View style={styles.iconWrapper}>
-      {focused ? (
+  const size = 26;
+  
+  if (focused) {
+    return (
+      <View style={styles.iconContainer}>
         <LinearGradient
           colors={ACTIVE_GRADIENT}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.activeIcon}
+          style={styles.activeIconBg}
         >
-          <MaterialIcons name={name} size={size} color="#fff" />
+          <Ionicons name={name} size={size} color="#FFFFFF" />
         </LinearGradient>
-      ) : (
-        <MaterialIcons
-          name={name}
-          size={size}
-          color={INACTIVE_COLOR}
-          style={{ opacity: 0.45 }}
-        />
-      )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.iconContainer}>
+      <Ionicons name={name} size={size} color={INACTIVE_COLOR} />
     </View>
   );
 }
@@ -55,9 +56,8 @@ export default function TabLayout() {
         tabBarStyle: [
           styles.tabBar,
           {
-            bottom: Platform.OS === "ios" ? insets.bottom + 8 : 12,
-            alignSelf: "center",
-            width: "92%",
+            paddingBottom: 10,
+            bottom:2,
           },
         ],
         tabBarItemStyle: styles.tabItem,
@@ -77,7 +77,7 @@ export default function TabLayout() {
         options={{
           title: "Events",
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name="event" />
+            <TabIcon focused={focused} name="calendar-outline" />
           ),
         }}
       />
@@ -86,7 +86,7 @@ export default function TabLayout() {
         options={{
           title: "Wallet",
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name="account-balance-wallet" />
+            <TabIcon focused={focused} name="wallet-outline" />
           ),
         }}
       />
@@ -95,7 +95,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name="person" />
+            <TabIcon focused={focused} name="person-outline" />
           ),
         }}
       />
@@ -106,20 +106,23 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
+    bottom: 0,
+    left: 16,
+    right: 16,
     height: TAB_BAR_HEIGHT,
-    borderRadius: 20,
-    backgroundColor: "rgba(25, 25, 28, 0.96)",
-    borderWidth: 1,
-    borderColor: "#353535",
+    backgroundColor: "rgba(20, 20, 22, 0.95)",
+    borderRadius: 20, // Rounded corners
+    borderTopWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
     paddingHorizontal: 20,
+    paddingTop: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 15,
   },
 
   tabItem: {
@@ -129,18 +132,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  iconWrapper: {
-    width: 44,
-    height: 44,
+  iconContainer: {
+    width: 50,
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ translateY: -4 }],
   },
 
-  activeIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  activeIconBg: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },

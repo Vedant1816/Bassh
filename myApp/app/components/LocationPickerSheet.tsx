@@ -11,6 +11,7 @@ import {
 import BottomSheet from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox from "@rnmapbox/maps";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 type Props = {
   sheetRef: React.RefObject<BottomSheet | null>;
@@ -79,42 +80,44 @@ export default function LocationPickerSheet({ sheetRef, onSelect }: Props) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
-        <Text style={styles.title}>Change location</Text>
+        <DismissKeyboardView style={styles.container}>
+          <Text style={styles.title}>Change location</Text>
 
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
-          <TextInput
-            placeholder="Search city"
-            placeholderTextColor="#9CA3AF"
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={searchCity}
-            style={styles.input}
-          />
-        </View>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+            <TextInput
+              placeholder="Search city"
+              placeholderTextColor="#9CA3AF"
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={searchCity}
+              style={styles.input}
+            />
+          </View>
 
-        <Pressable
-          style={[styles.button, loading && { opacity: 0.6 }]}
-          onPress={searchCity}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? "Searching..." : "Confirm location"}
-          </Text>
-        </Pressable>
+          <Pressable
+            style={[styles.button, loading && { opacity: 0.6 }]}
+            onPress={searchCity}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Searching..." : "Confirm location"}
+            </Text>
+          </Pressable>
 
-        {/* QUICK PICKS */}
-        <View style={styles.quickRow}>
-          {["Delhi", "Mumbai", "Bengaluru", "Chandigarh"].map((city) => (
-            <Pressable
-              key={city}
-              onPress={() => setQuery(city)}
-              style={styles.quickChip}
-            >
-              <Text style={styles.quickText}>{city}</Text>
-            </Pressable>
-          ))}
-        </View>
+          {/* QUICK PICKS */}
+          <View style={styles.quickRow}>
+            {["Delhi", "Mumbai", "Bengaluru", "Chandigarh"].map((city) => (
+              <Pressable
+                key={city}
+                onPress={() => setQuery(city)}
+                style={styles.quickChip}
+              >
+                <Text style={styles.quickText}>{city}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </DismissKeyboardView>
       </KeyboardAvoidingView>
     </BottomSheet>
   );

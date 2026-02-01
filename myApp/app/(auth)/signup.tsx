@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -65,7 +66,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <DismissKeyboardView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Create account</Text>
 
@@ -97,7 +98,7 @@ export default function SignupScreen() {
 
         {message ? <Text style={styles.error}>{message}</Text> : null}
       </View>
-    </View>
+    </DismissKeyboardView>
   );
 }
 

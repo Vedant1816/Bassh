@@ -5,6 +5,7 @@ import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -49,67 +50,69 @@ export default function VerifyPhoneScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar barStyle="light-content" />
+      <DismissKeyboardView style={styles.container}>
+        <StatusBar barStyle="light-content" />
 
-      <LinearGradient
-        colors={["#8B0045", "#2D0A1F", "#000000"]}
-        locations={[0, 0.4, 1]}
-        style={styles.gradientBackground}
-      />
-
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Welcome to BASH</Text>
-          <Pressable onPress={() => router.replace("/onboarding/avatar")} style={styles.skipButton}>
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Enter OTP</Text>
-          <Text style={styles.subtitle}>
-            Enter the code we sent to {phone}
-          </Text>
-        </View>
-
-        <TextInput
-          style={styles.input}
-          keyboardType="number-pad"
-          maxLength={6}
-          value={otp}
-          onChangeText={setOtp}
-          placeholder="000000"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+        <LinearGradient
+          colors={["#8B0045", "#2D0A1F", "#000000"]}
+          locations={[0, 0.4, 1]}
+          style={styles.gradientBackground}
         />
 
-        {error && <Text style={styles.error}>{error}</Text>}
-      </View>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backIcon}>‹</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>Welcome to BASH</Text>
+            <Pressable onPress={() => router.replace("/onboarding/avatar")} style={styles.skipButton}>
+              <Text style={styles.skipButtonText}>Skip</Text>
+            </Pressable>
+          </View>
 
-      <View style={styles.bottomContainer}>
-        <Pressable
-          onPress={verify}
-          disabled={loading || otp.length !== 6}
-          style={styles.buttonWrapper}
-        >
-          <LinearGradient
-            colors={["#E91E8C", "#DB1A85"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[
-              styles.sendButton,
-              (loading || otp.length !== 6) && styles.buttonDisabled,
-            ]}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Verifying..." : "Verify"}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Enter OTP</Text>
+            <Text style={styles.subtitle}>
+              Enter the code we sent to {phone}
             </Text>
-          </LinearGradient>
-        </Pressable>
-        <View style={styles.homeIndicator} />
-      </View>
+          </View>
+
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            maxLength={6}
+            value={otp}
+            onChangeText={setOtp}
+            placeholder="000000"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+          />
+
+          {error && <Text style={styles.error}>{error}</Text>}
+        </View>
+
+        <View style={styles.bottomContainer}>
+          <Pressable
+            onPress={verify}
+            disabled={loading || otp.length !== 6}
+            style={styles.buttonWrapper}
+          >
+            <LinearGradient
+              colors={["#E91E8C", "#DB1A85"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.sendButton,
+                (loading || otp.length !== 6) && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Verifying..." : "Verify"}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+          <View style={styles.homeIndicator} />
+        </View>
+      </DismissKeyboardView>
     </KeyboardAvoidingView>
   );
 }

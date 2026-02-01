@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import supabasePublic from "@/_services/supabase-public";
 import { redirectStaff } from "../../services/redirect-staff";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 export default function StaffLoginScreen() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function StaffLoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <DismissKeyboardView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Staff Login</Text>
 
@@ -63,7 +64,7 @@ export default function StaffLoginScreen() {
           <Text style={styles.link}>Create staff account</Text>
         </Pressable>
       </View>
-    </View>
+    </DismissKeyboardView>
   );
 }
 

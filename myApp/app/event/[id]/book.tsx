@@ -11,12 +11,21 @@ import {
   TextInput,
   Modal,
   InteractionManager,
+  Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
-import { Colors } from "@/constants/Colors";
+import supabase from "@/_services/supabase-public";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const OTP_GRADIENT = ["#8B0045", "#2D0A1F", "#000000"] as const;
+const OTP_GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
+const OTP_ACCENT = "#E91E8C";
 
 interface TicketSelection {
   pricingId: string;
@@ -69,6 +78,10 @@ export default function EventBookingScreen() {
   const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
+
+  // Wallet state for event booking
+  const [bookingWalletBalance, setBookingWalletBalance] = useState<number>(0);
+  const [bookingWalletLoading, setBookingWalletLoading] = useState(false);
 
   /* ---------------- LOAD EVENT + PRICING + DISCOUNTS ---------------- */
 
@@ -447,6 +460,29 @@ export default function EventBookingScreen() {
 
     setShowParticipantForm(false);
     setShowSummary(true);
+    fetchBookingWalletBalance();
+  };
+
+  const fetchBookingWalletBalance = async () => {
+    try {
+      setBookingWalletLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
+      if (!user) return;
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+
+      const val = Number(customer?.wallet_balance);
+      setBookingWalletBalance(Number.isNaN(val) ? 0 : val);
+    } catch {
+      setBookingWalletBalance(0);
+    } finally {
+      setBookingWalletLoading(false);
+    }
   };
 
   const getDiscountValue = (discount: Discount, currentSubtotal: number): number => {
@@ -473,6 +509,70 @@ export default function EventBookingScreen() {
       setAppliedDiscount(discount);
       setDiscountAmount(value);
       setFinalPrice(subtotal - value);
+    }
+  };
+
+  const handlePayBookingWithWallet = async () => {
+    if (!id || finalPrice <= 0) {
+      Alert.alert("Error", "Invalid booking amount");
+      return;
+    }
+
+    if (bookingWalletBalance < finalPrice) {
+      Alert.alert(
+        "Insufficient Balance",
+        `Wallet has ₹${bookingWalletBalance.toFixed(0)}. Please use card payment or add money to wallet.`
+      );
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      const res = await fetchWithFallback(
+        "/api/payments/event/pay-with-wallet",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_id: id,
+            total_amount: finalPrice,
+            discount_id: appliedDiscount?.id ?? null,
+            discount_amount: discountAmount || 0,
+            participants: participants.map((p) => ({
+              name: p.name,
+              gender: p.gender,
+              age: p.age,
+              email: p.email || "",
+            })),
+          }),
+        })
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setProcessing(false);
+        Alert.alert("Payment Failed", data.error || "Failed to process wallet payment");
+        return;
+      }
+
+      setProcessing(false);
+      setShowSummary(false);
+
+      setBookingWalletBalance(data.wallet_balance ?? bookingWalletBalance - finalPrice);
+
+      const qrCode = data.qr_code || data.qr;
+      const qrParam = qrCode ? encodeURIComponent(qrCode) : "";
+
+      if (qrCode) {
+        router.replace(`/payment/success?qr=${qrParam}&booking_id=${data.booking_id}&amount=${finalPrice}`);
+      } else {
+        router.replace(`/payment/success?booking_id=${data.booking_id}&amount=${finalPrice}`);
+      }
+    } catch (err: any) {
+      setProcessing(false);
+      Alert.alert("Error", err.message || "Something went wrong");
     }
   };
 
@@ -554,7 +654,7 @@ export default function EventBookingScreen() {
           email: "test@example.com",
           contact: "9999999999",
         },
-        theme: { color: Colors.dark.primary },
+        theme: { color: OTP_ACCENT },
       };
 
       setPendingRazorpayOptions({ ...options, bookingData });
@@ -574,7 +674,12 @@ export default function EventBookingScreen() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <ActivityIndicator color={Colors.dark.primary} size="large" />
+        <LinearGradient
+          colors={OTP_GRADIENT}
+          locations={OTP_GRADIENT_LOCATIONS}
+          style={styles.gradientBackground}
+        />
+        <ActivityIndicator color={OTP_ACCENT} size="large" style={styles.loadingSpinner} />
       </View>
     );
   }
@@ -582,10 +687,15 @@ export default function EventBookingScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={OTP_GRADIENT}
+        locations={OTP_GRADIENT_LOCATIONS}
+        style={styles.gradientBackground}
+      />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
+          <Text style={styles.backText}>‹</Text>
         </Pressable>
 
         <Text style={styles.title}>{event?.name}</Text>
@@ -676,8 +786,9 @@ export default function EventBookingScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
+        <DismissKeyboardView style={styles.modalContainer}>
           <StatusBar barStyle="light-content" />
+          <LinearGradient colors={OTP_GRADIENT} locations={OTP_GRADIENT_LOCATIONS} style={styles.modalGradient} />
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setShowParticipantForm(false)}>
               <Text style={styles.modalClose}>Cancel</Text>
@@ -695,7 +806,7 @@ export default function EventBookingScreen() {
               value={participants[currentParticipantIndex]?.name || ""}
               onChangeText={(text) => updateParticipant("name", text)}
               placeholder="Enter name"
-              placeholderTextColor="#666"
+              placeholderTextColor="rgba(255,255,255,0.5)"
             />
 
             <Text style={styles.inputLabel}>Email</Text>
@@ -704,7 +815,7 @@ export default function EventBookingScreen() {
               value={participants[currentParticipantIndex]?.email || ""}
               onChangeText={(text) => updateParticipant("email", text)}
               placeholder="Enter email (optional)"
-              placeholderTextColor="#666"
+              placeholderTextColor="rgba(255,255,255,0.5)"
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -749,7 +860,7 @@ export default function EventBookingScreen() {
                 updateParticipant("age", age);
               }}
               placeholder="Enter age"
-              placeholderTextColor="#666"
+              placeholderTextColor="rgba(255,255,255,0.5)"
               keyboardType="numeric"
             />
 
@@ -763,7 +874,7 @@ export default function EventBookingScreen() {
                 : "Calculate Price"}
             </GradientButton>
           </ScrollView>
-        </View>
+        </DismissKeyboardView>
       </Modal>
 
       {/* SUMMARY MODAL */}
@@ -875,6 +986,7 @@ export default function EventBookingScreen() {
       >
         <View style={styles.modalContainer}>
           <StatusBar barStyle="light-content" />
+          <LinearGradient colors={OTP_GRADIENT} locations={OTP_GRADIENT_LOCATIONS} style={styles.modalGradient} />
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setShowSummary(false)}>
               <Text style={styles.modalClose}>Back</Text>
@@ -915,14 +1027,14 @@ export default function EventBookingScreen() {
 
                   <View style={styles.breakdownRow}>
                     <View>
-                      <Text style={[styles.breakdownLabel, { color: Colors.dark.success }]}>
+                      <Text style={[styles.breakdownLabel, { color: "#4ADE80" }]}>
                         Discount Applied
                       </Text>
                       <Text style={[styles.breakdownLabel, { fontSize: 11, marginTop: 2 }]}>
                         {appliedDiscount.name}
                       </Text>
                     </View>
-                    <Text style={[styles.breakdownAmount, { color: Colors.dark.success }]}>
+                    <Text style={[styles.breakdownAmount, { color: "#4ADE80" }]}>
                       -₹{discountAmount.toFixed(2)}
                     </Text>
                   </View>
@@ -954,49 +1066,126 @@ export default function EventBookingScreen() {
                   return (
                     <Pressable
                       key={discount.id}
-                      style={[styles.discountRow, !isApplicable && styles.discountRowDisabled]}
+                      style={[
+                        styles.offerCard,
+                        isApplied && styles.offerCardApplied,
+                        !isApplicable && styles.offerCardDisabled,
+                      ]}
                       onPress={() => isApplicable && toggleEventDiscount(discount)}
                       disabled={!isApplicable}
                       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
-                      <View style={styles.discountRowLeft}>
-                        <Text style={[styles.discountName, !isApplicable && styles.discountNameDisabled]}>
-                          {discount.name}
-                          {isApplied && " · Applied"}
-                        </Text>
-                        {discount.description && (
-                          <Text style={[styles.discountDesc, !isApplicable && styles.discountDescDisabled]}>
-                            {discount.description}
-                          </Text>
-                        )}
-                        {isApplicable ? (
-                          <Text style={styles.discountSavings}>{getDiscountDisplayValue(discount, subtotal)}</Text>
-                        ) : (
-                          <Text style={styles.discountMin}>Min ₹{discount.min_purchase}</Text>
-                        )}
+                      {/* Diagonal coupon corner - top right */}
+                      <View style={styles.offerCardCorner} pointerEvents="none">
+                        <LinearGradient
+                          colors={["#DB4494", "#DB138D"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.offerCardCornerGradient}
+                        />
                       </View>
-                      <Text style={[styles.discountBadge, !isApplicable && styles.discountBadgeDisabled]}>
-                        {isApplicable ? (isApplied ? "Deselect" : "Select") : (
-                          discount.discount_type === "percentage"
-                            ? `${discount.discount_value}%`
-                            : `₹${discount.discount_value}`
-                        )}
-                      </Text>
+                      {/* Discount icon */}
+                      <View style={styles.offerCardIcon}>
+                        <Ionicons
+                          name="pricetag"
+                          size={20}
+                          color={isApplicable ? "#FF007E" : "#6B6B6B"}
+                          style={{ transform: [{ rotate: "90deg" }] }}
+                        />
+                      </View>
+                      {/* Title + description */}
+                      <View style={styles.offerCardContent}>
+                        <Text
+                          style={[
+                            styles.offerCardTitle,
+                            !isApplicable && styles.offerCardTitleDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {discount.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.offerCardDesc,
+                            !isApplicable && styles.offerCardDescDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {isApplicable
+                            ? getDiscountDisplayValue(discount, subtotal)
+                            : `Min ₹${discount.min_purchase}`}
+                        </Text>
+                      </View>
+                      {/* Applied / APPLY button */}
+                      <View
+                        style={[
+                          styles.offerCardBtn,
+                          isApplied && styles.offerCardBtnApplied,
+                          !isApplicable && styles.offerCardBtnDisabled,
+                        ]}
+                      >
+                        <Text style={styles.offerCardBtnText}>
+                          {isApplied ? "Applied" : "APPLY"}
+                        </Text>
+                      </View>
                     </Pressable>
                   );
                 })}
               </View>
             )}
 
-            <GradientButton
-              style={styles.checkoutBtn}
-              textStyle={styles.checkoutBtnText}
-              onPress={handleCheckout}
-              disabled={processing}
-              loading={processing}
-            >
-              Checkout
-            </GradientButton>
+            {/* Wallet balance display */}
+            {finalPrice > 0 && (
+              <View style={styles.walletBalanceRow}>
+                <Ionicons name="wallet-outline" size={18} color="#9ca3af" />
+                <Text style={styles.walletBalanceText}>
+                  Wallet: ₹{bookingWalletLoading ? "..." : bookingWalletBalance.toFixed(0)}
+                </Text>
+              </View>
+            )}
+
+            {/* Payment buttons */}
+            <View style={styles.bookingPaymentButtons}>
+              {bookingWalletBalance >= finalPrice ? (
+                <View style={styles.paymentOptionsRow}>
+                  <GradientButton
+                    variant="green"
+                    style={StyleSheet.flatten([styles.payOptionButton, processing && styles.paymentButtonDisabled])}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handlePayBookingWithWallet}
+                    disabled={processing}
+                    loading={processing}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="wallet-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Wallet</Text>
+                    </View>
+                  </GradientButton>
+                  <GradientButton
+                    style={StyleSheet.flatten([styles.payOptionButton, processing && styles.paymentButtonDisabled])}
+                    textStyle={styles.payOptionButtonText}
+                    onPress={handleCheckout}
+                    disabled={processing}
+                    loading={processing}
+                  >
+                    <View style={styles.payOptionButtonContent}>
+                      <Ionicons name="card-outline" size={20} color="#fff" />
+                      <Text style={styles.payOptionButtonText}>Card</Text>
+                    </View>
+                  </GradientButton>
+                </View>
+              ) : (
+                <GradientButton
+                  style={StyleSheet.flatten([styles.fullPayButton, processing && styles.paymentButtonDisabled])}
+                  textStyle={styles.fullPayButtonText}
+                  onPress={handleCheckout}
+                  disabled={processing}
+                  loading={processing}
+                >
+                  Checkout with Card
+                </GradientButton>
+              )}
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -1004,29 +1193,37 @@ export default function EventBookingScreen() {
   );
 }
 
-/* ---------------- STYLES ---------------- */
+/* ---------------- STYLES (OTP theme) ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: "#000000" },
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
+  },
+  loadingSpinner: { flex: 1 },
   scrollView: { padding: 20, paddingTop: 60 },
   backBtn: { marginBottom: 12 },
-  backText: { color: Colors.dark.text, fontSize: 22 },
-  title: { color: Colors.dark.text, fontSize: 22, fontWeight: "700" },
-  subtitle: { color: Colors.dark.textSecondary, marginBottom: 16 },
+  backText: { color: "#FFFFFF", fontSize: 32, fontWeight: "300", marginLeft: -4 },
+  title: { color: "#FFFFFF", fontSize: 22, fontWeight: "700" },
+  subtitle: { color: "rgba(255,255,255,0.6)", marginBottom: 16, fontSize: 15 },
   discountLine: {
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: "rgba(255,255,255,0.15)",
   },
   discountLineText: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 13,
   },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
-  sectionTitle: { color: Colors.dark.text, fontSize: 16, fontWeight: "600" },
-  availabilityText: { color: Colors.dark.textSecondary, fontSize: 13 },
+  sectionTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  availabilityText: { color: "rgba(255,255,255,0.6)", fontSize: 13 },
   ticketCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 10,
     padding: 14,
     marginBottom: 10,
@@ -1034,42 +1231,49 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255,255,255,0.15)",
   },
-  ticketTitle: { color: Colors.dark.text, fontSize: 15 },
-  ticketPrice: { color: Colors.dark.text, marginTop: 4, fontSize: 15, fontWeight: "600" },
-  ticketSubPrice: { color: Colors.dark.textSecondary, marginTop: 2, fontSize: 12 },
+  ticketTitle: { color: "#FFFFFF", fontSize: 15 },
+  ticketPrice: { color: "#FFFFFF", marginTop: 4, fontSize: 15, fontWeight: "600" },
+  ticketSubPrice: { color: "rgba(255,255,255,0.6)", marginTop: 2, fontSize: 12 },
   quantityControls: { flexDirection: "row", alignItems: "center", gap: 14 },
   quantityBtn: {
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
-  quantityBtnText: { fontSize: 18, fontWeight: "600", color: Colors.dark.text },
-  quantityText: { color: Colors.dark.text, fontSize: 16 },
+  quantityBtnText: { fontSize: 18, fontWeight: "600", color: "#FFFFFF" },
+  quantityText: { color: "#FFFFFF", fontSize: 16 },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     padding: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(0,0,0,0.85)",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: "rgba(255,255,255,0.15)",
   },
-  footerTickets: { color: Colors.dark.textSecondary, fontSize: 13 },
-  footerPrice: { color: Colors.dark.text, fontSize: 20, fontWeight: "600" },
+  footerTickets: { color: "rgba(255,255,255,0.6)", fontSize: 13 },
+  footerPrice: { color: "#FFFFFF", fontSize: 20, fontWeight: "600" },
   proceedBtn: { minWidth: 120 },
-  proceedBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  proceedBtnText: { color: "#FFFFFF", fontWeight: "600", fontSize: 15 },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#000000",
+  },
+  modalGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1078,26 +1282,26 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: "rgba(255,255,255,0.15)",
   },
-  modalClose: { color: Colors.dark.primary, fontSize: 15 },
-  modalTitle: { color: Colors.dark.text, fontSize: 16, fontWeight: "600" },
+  modalClose: { color: OTP_ACCENT, fontSize: 15, fontWeight: "600" },
+  modalTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
   modalContent: { flex: 1, padding: 20 },
   inputLabel: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "500",
     marginTop: 18,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     padding: 14,
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 15,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   genderRow: {
     flexDirection: "row",
@@ -1108,57 +1312,57 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   genderBtnActive: {
-    borderColor: Colors.dark.primary,
-    backgroundColor: Colors.dark.card,
+    borderColor: OTP_ACCENT,
+    backgroundColor: "rgba(233,30,140,0.15)",
   },
   genderBtnText: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
     fontWeight: "500",
   },
   genderBtnTextActive: {
-    color: Colors.dark.primary,
+    color: OTP_ACCENT,
   },
   nextBtn: { marginTop: 28 },
-  nextBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  nextBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
   summarySectionTitle: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
     marginTop: 20,
     marginBottom: 10,
   },
   participantCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   participantName: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
   participantDetails: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
     marginTop: 4,
   },
   priceSummary: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 10,
     padding: 16,
     marginTop: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   breakdownRow: {
     flexDirection: "row",
@@ -1167,31 +1371,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   breakdownLabel: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 13,
   },
   breakdownAmount: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "600",
   },
   breakdownDivider: {
     height: 1,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: "rgba(255,255,255,0.15)",
     marginVertical: 10,
   },
   breakdownTotalLabel: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
   finalPriceText: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 20,
     fontWeight: "700",
   },
   savingsText: {
-    color: Colors.dark.textSecondary,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 13,
     marginTop: 10,
   },
@@ -1200,61 +1404,160 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   discountsSectionTitle: {
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 12,
   },
-  discountRow: {
+  /* Offer card - Frame 1948755892 style */
+  offerCard: {
+    width: "100%",
+    minHeight: 82,
+    borderRadius: 8,
+    backgroundColor: "rgba(30,30,30,0.95)",
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
+    paddingLeft: 10,
+    paddingRight: 12,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    marginBottom: 12,
+    position: "relative",
+    overflow: "visible",
   },
-  discountRowDisabled: {
-    opacity: 0.5,
+  offerCardApplied: {
+    backgroundColor: "rgba(255, 0, 126, 0.32)",
   },
-  discountRowLeft: {
+  offerCardDisabled: {
+    backgroundColor: "rgba(55, 55, 55, 0.85)",
+    opacity: 0.85,
+  },
+  offerCardCorner: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 38,
+    height: 30,
+    borderRadius: 4,
+    overflow: "hidden",
+    transform: [{ rotate: "75deg" }],
+  },
+  offerCardCornerGradient: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.9,
+  },
+  offerCardIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 13,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  offerCardContent: {
     flex: 1,
-    marginRight: 12,
+    justifyContent: "center",
+    minWidth: 0,
   },
-  discountName: {
-    color: Colors.dark.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  discountNameDisabled: {
-    color: Colors.dark.textSecondary,
-  },
-  discountDesc: {
-    color: Colors.dark.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  discountDescDisabled: {
-    color: Colors.dark.textTertiary,
-  },
-  discountSavings: {
-    color: Colors.dark.success,
-    fontSize: 12,
-    marginTop: 4,
+  offerCardTitle: {
+    fontFamily: "System",
     fontWeight: "500",
+    fontSize: 20,
+    lineHeight: 20,
+    color: "#FFFFFF",
+    marginBottom: 6,
   },
-  discountMin: {
-    color: Colors.dark.textTertiary,
-    fontSize: 12,
-    marginTop: 4,
+  offerCardTitleDisabled: {
+    color: "#6B6B6B",
   },
-  discountBadge: {
-    color: Colors.dark.primary,
-    fontSize: 13,
-    fontWeight: "600",
+  offerCardDesc: {
+    fontFamily: "System",
+    fontWeight: "500",
+    fontSize: 16,
+    lineHeight: 18,
+    color: "#A2A2A2",
   },
-  discountBadgeDisabled: {
-    color: Colors.dark.textTertiary,
+  offerCardDescDisabled: {
+    color: "#5A5A5A",
+  },
+  offerCardBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    minWidth: 97,
+    height: 33,
+    borderRadius: 4,
+    backgroundColor: "rgba(80,80,80,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(215,215,215,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  offerCardBtnApplied: {
+    backgroundColor: "#FF007E",
+    borderColor: "rgba(215, 215, 215, 0.45)",
+  },
+  offerCardBtnDisabled: {
+    backgroundColor: "rgba(40, 40, 40, 0.95)",
+    borderColor: "rgba(100, 100, 100, 0.4)",
+  },
+  offerCardBtnText: {
+    fontFamily: "System",
+    fontWeight: "500",
+    fontSize: 16,
+    lineHeight: 18,
+    color: "#FFFFFF",
   },
   checkoutBtn: { marginTop: 24, marginBottom: 16 },
-  checkoutBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  checkoutBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+  walletBalanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  walletBalanceText: {
+    color: "#9ca3af",
+    fontSize: 14,
+  },
+  bookingPaymentButtons: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  paymentOptionsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  payOptionButton: {
+    flex: 1,
+    minHeight: 72,
+    height: 72,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payOptionButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  payOptionButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  fullPayButton: {
+    height: 72,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullPayButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  paymentButtonDisabled: {
+    opacity: 0.6,
+  },
 });

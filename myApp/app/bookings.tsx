@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Image,
   Pressable,
   ActivityIndicator,
   RefreshControl,
@@ -35,6 +34,11 @@ interface Booking {
       address_text: string;
     };
   };
+  // For table bookings (no event)
+  clubs?: {
+    club_name: string;
+    address_text: string;
+  };
 }
 
 export default function BookingsScreen() {
@@ -60,13 +64,7 @@ export default function BookingsScreen() {
       }
 
       const data = await res.json();
-      const confirmedBookings = (data.bookings || []).filter(
-        (booking: Booking) => booking.booking_status === "confirmed"
-      );
-      const sortedBookings = confirmedBookings.sort((a: Booking, b: Booking) => {
-        return new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime();
-      });
-      setBookings(sortedBookings);
+      setBookings(data.bookings || []);
       setError("");
     } catch (err: any) {
       setError(err.message || "Failed to load bookings");
@@ -86,12 +84,13 @@ export default function BookingsScreen() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    const day = date.getDate();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
   };
 
   const formatTime = (timeString: string) => {
@@ -103,107 +102,121 @@ export default function BookingsScreen() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "confirmed":
-        return Colors.dark.success;
-      case "pending":
-        return Colors.dark.warning;
-      case "cancelled":
-        return Colors.dark.error;
-      default:
-        return Colors.dark.textSecondary;
+  const getBookingType = (booking: Booking) => {
+    // Check if it's a table booking (no event_id) or event booking
+    if (!booking.event_id || !booking.events) {
+      return "Table Entry";
     }
+    
+    // For event bookings, determine entry type from participants
+    const participants = booking.participants || [];
+    const males = participants.filter(p => p.gender?.toLowerCase() === "male").length;
+    const females = participants.filter(p => p.gender?.toLowerCase() === "female").length;
+    
+    const couples = Math.min(males, females);
+    const remainingMales = males - couples;
+    const remainingFemales = females - couples;
+    
+    if (couples > 0 && remainingMales === 0 && remainingFemales === 0) {
+      return couples === 1 ? "Couple Entry" : `Couple Entry (${couples})`;
+    }
+    
+    if (remainingMales > 0 && remainingFemales === 0 && couples === 0) {
+      return remainingMales === 1 ? "Male Entry" : `Male Entry (${remainingMales})`;
+    }
+    
+    if (remainingFemales > 0 && remainingMales === 0 && couples === 0) {
+      return remainingFemales === 1 ? "Female Entry" : `Female Entry (${remainingFemales})`;
+    }
+    
+    // Mixed entry
+    return `${participants.length} Guests`;
   };
 
-  const getStatusBgColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "confirmed":
-        return Colors.dark.successBg;
-      case "pending":
-        return Colors.dark.warningBg;
-      case "cancelled":
-        return Colors.dark.errorBg;
-      default:
-        return Colors.dark.surface;
+  const getEventName = (booking: Booking) => {
+    if (booking.events?.name) {
+      return booking.events.name;
     }
+    
+    if (booking.clubs?.club_name) {
+      return booking.clubs.club_name;
+    }
+    
+    return "Event";
   };
 
-  const renderBookingCard = ({ item }: { item: Booking }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.bookingCard,
-        pressed && styles.bookingCardPressed,
-      ]}
-      onPress={() => handleBookingPress(item)}
-    >
-      <View style={styles.cardImageContainer}>
-        {item.events?.banner_image_url ? (
-          <Image
-            source={{ uri: item.events.banner_image_url }}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.cardPlaceholder}>
-            <Ionicons name="musical-notes" size={48} color={Colors.dark.textTertiary} />
-          </View>
-        )}
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusBgColor(item.booking_status) },
-          ]}
-        >
-          <Text
-            style={[styles.statusText, { color: getStatusColor(item.booking_status) }]}
-          >
-            {item.booking_status.toUpperCase()}
-          </Text>
-        </View>
-        {item.entry_status === "entered" && (
-          <View style={styles.entryBadge}>
-            <Text style={styles.entryBadgeText}>✓ Entered</Text>
-          </View>
-        )}
-      </View>
+  const getStatusBadge = (booking: Booking) => {
+    const status = booking.booking_status?.toLowerCase();
+    const entryStatus = booking.entry_status?.toLowerCase();
+    
+    if (entryStatus === "entered") {
+      return { text: "Entered", color: Colors.dark.success };
+    }
+    
+    if (status === "confirmed") {
+      return { text: "Confirmed", color: Colors.dark.success };
+    }
+    
+    if (status === "cancelled") {
+      return { text: "Cancelled", color: Colors.dark.error };
+    }
+    
+    if (status === "pending") {
+      return { text: "Pending", color: Colors.dark.warning };
+    }
+    
+    return { text: status || "Unknown", color: Colors.dark.textSecondary };
+  };
 
-      <View style={styles.cardContent}>
-        <Text style={styles.eventName} numberOfLines={2}>
-          {item.events?.name || "Event"}
-        </Text>
-        <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={14} color={Colors.dark.textSecondary} />
-          <Text style={styles.infoText} numberOfLines={1}>
-            {item.events?.clubs?.club_name || "Venue"}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar-outline" size={14} color={Colors.dark.textSecondary} />
-          <Text style={styles.infoText}>
-            {formatDate(item.events?.event_date)} · {formatTime(item.events?.start_time)}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="people-outline" size={14} color={Colors.dark.textSecondary} />
-          <Text style={styles.infoText}>
-            {item.participants?.length || 0} participant{item.participants?.length !== 1 ? "s" : ""}
-          </Text>
-        </View>
-        <View style={styles.cardDivider} />
-        <View style={styles.cardFooter}>
-          <View>
-            <Text style={styles.amountLabel}>Total Paid</Text>
-            <Text style={styles.amountValue}>₹{item.total_amount}</Text>
-          </View>
-          <View style={styles.bookingDateContainer}>
-            <Text style={styles.bookingDateLabel}>Booked on</Text>
-            <Text style={styles.bookingDateValue}>{formatDate(item.booking_date)}</Text>
+  const renderBookingCard = ({ item }: { item: Booking }) => {
+    const statusBadge = getStatusBadge(item);
+    
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.bookingCard,
+          pressed && styles.bookingCardPressed,
+        ]}
+        onPress={() => handleBookingPress(item)}
+      >
+        {/* Booking Code */}
+        <View style={styles.codeRow}>
+          <Text style={styles.bookingCode}>Booking Code - {item.id.slice(0, 13).toUpperCase()}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: `${statusBadge.color}20` }]}>
+            <Text style={[styles.statusText, { color: statusBadge.color }]}>
+              {statusBadge.text}
+            </Text>
           </View>
         </View>
-      </View>
-    </Pressable>
-  );
+
+        {/* Info Grid */}
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoValue}>{formatDate(item.events?.event_date || item.booking_date)}</Text>
+          </View>
+          
+          <View style={styles.infoItem}>
+            <Text style={styles.infoValue}>{formatTime(item.events?.start_time || item.booking_time)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoValue}>{getBookingType(item)}</Text>
+          </View>
+          
+          <View style={styles.infoItem}>
+            <Text style={styles.infoValue}>{getEventName(item)}</Text>
+          </View>
+        </View>
+
+        {/* View Details */}
+        <View style={styles.viewDetailsContainer}>
+          <Text style={styles.viewDetailsText}>View Details</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   if (loading) {
     return (
@@ -240,11 +253,11 @@ export default function BookingsScreen() {
           <Ionicons name="receipt-outline" size={80} color={Colors.dark.textTertiary} />
           <Text style={styles.emptyTitle}>No Bookings Yet</Text>
           <Text style={styles.emptyText}>
-            Your confirmed bookings will appear here
+            Your bookings will appear here
           </Text>
           <Pressable
             style={styles.exploreButton}
-            onPress={() => router.push("/(tabs)/events")}
+            onPress={() => router.push("/(tabs)/")}
           >
             <Text style={styles.exploreButtonText}>Explore Events</Text>
           </Pressable>
@@ -258,8 +271,12 @@ export default function BookingsScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: "My Bookings",
-          headerTitleStyle: { color: Colors.dark.text, fontWeight: "700" },
+          headerTitle: "Table bookings",
+          headerTitleStyle: { 
+            color: Colors.dark.text, 
+            fontWeight: "700",
+            fontSize: 16,
+          },
           headerStyle: { backgroundColor: Colors.dark.background },
           headerShadowVisible: false,
           headerLeft: () => (
@@ -270,6 +287,9 @@ export default function BookingsScreen() {
         }}
       />
       <View style={styles.container}>
+        {/* All bookings title */}
+        <Text style={styles.sectionTitle}>All bookings</Text>
+
         <FlatList
           data={bookings}
           renderItem={renderBookingCard}
@@ -292,11 +312,11 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#131315",
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#131315",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -305,10 +325,18 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#D1D5DB",
+    paddingHorizontal: 12,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
   listContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 12,
     paddingBottom: 100,
+    gap: 12,
   },
   loadingText: {
     color: Colors.dark.textSecondary,
@@ -320,6 +348,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     marginBottom: 24,
+    marginTop: 16,
   },
   retryButton: {
     backgroundColor: Colors.dark.primary,
@@ -357,111 +386,58 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   bookingCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 20,
-    marginBottom: 20,
-    overflow: "hidden",
+    backgroundColor: "#1E1E20",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "#343434",
+    padding: 16,
   },
   bookingCardPressed: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
-  cardImageContainer: {
-    width: "100%",
-    height: 180,
-    position: "relative",
-  },
-  cardImage: {
-    width: "100%",
-    height: "100%",
-  },
-  cardPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: Colors.dark.card,
-    justifyContent: "center",
+  codeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 16,
+  },
+  bookingCode: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#D1D5DB",
+    flex: 1,
   },
   statusBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 8,
   },
   statusText: {
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    textTransform: "capitalize",
   },
-  entryBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: Colors.dark.successBg,
-  },
-  entryBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: Colors.dark.success,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  eventName: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: Colors.dark.text,
-    marginBottom: 12,
-    lineHeight: 26,
-  },
-  infoRow: {
+  infoGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 8,
+    gap: 16,
+    marginBottom: 10,
   },
-  infoText: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
+  infoItem: {
     flex: 1,
   },
-  cardDivider: {
-    height: 1,
-    backgroundColor: Colors.dark.border,
-    marginVertical: 16,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  amountLabel: {
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-    marginBottom: 4,
-  },
-  amountValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: Colors.dark.primary,
-  },
-  bookingDateContainer: {
-    alignItems: "flex-end",
-  },
-  bookingDateLabel: {
-    fontSize: 11,
-    color: Colors.dark.textTertiary,
-    marginBottom: 2,
-  },
-  bookingDateValue: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
+  infoValue: {
+    fontSize: 14,
     fontWeight: "500",
+    color: "#D1D5DB",
+  },
+  viewDetailsContainer: {
+    marginTop: 6,
+    alignItems: "flex-end",
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

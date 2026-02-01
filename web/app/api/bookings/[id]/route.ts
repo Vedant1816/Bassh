@@ -22,6 +22,7 @@ export const GET = withAuth(async (_req: Request, params: any, user: any) => {
         qr_used,
         qr_used_at,
         total_amount,
+        money_saved,
         participants,
         qr_code,
         created_at,

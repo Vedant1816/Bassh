@@ -4,6 +4,8 @@ import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/Colors";
 
 const GRADIENT_COLORS = [Colors.dark.primaryLight, Colors.dark.primary, Colors.dark.primaryDark] as const;
+const GREEN_GRADIENT = ["#22c55e", "#22c55e", "#1d9e3f"] as const;
+const GRAY_GRADIENT = ["#5c5c5c", "#4a4a4a", "#353535"] as const;
 
 type GradientButtonProps = {
   onPress: () => void;
@@ -12,7 +14,7 @@ type GradientButtonProps = {
   loading?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
-  variant?: "solid" | "ghost";
+  variant?: "solid" | "ghost" | "green" | "gray";
 };
 
 export function GradientButton({
@@ -47,7 +49,7 @@ export function GradientButton({
     >
       {({ pressed }) => (
         <LinearGradient
-          colors={GRADIENT_COLORS}
+          colors={variant === "green" ? GREEN_GRADIENT : variant === "gray" ? GRAY_GRADIENT : GRADIENT_COLORS}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[

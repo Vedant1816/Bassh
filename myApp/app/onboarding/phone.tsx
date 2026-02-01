@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -62,76 +63,78 @@ export default function PhoneScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar barStyle="light-content" />
+      <DismissKeyboardView style={styles.container}>
+        <StatusBar barStyle="light-content" />
 
-      <LinearGradient
-        colors={["#8B0045", "#2D0A1F", "#000000"]}
-        locations={[0, 0.4, 1]}
-        style={styles.gradientBackground}
-      />
+        <LinearGradient
+          colors={["#8B0045", "#2D0A1F", "#000000"]}
+          locations={[0, 0.4, 1]}
+          style={styles.gradientBackground}
+        />
 
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Welcome to BASH</Text>
-          <Pressable onPress={() => router.push("/onboarding/avatar")} style={styles.skipButton}>
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </Pressable>
-        </View>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backIcon}>‹</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>Welcome to BASH</Text>
+            <Pressable onPress={() => router.push("/onboarding/avatar")} style={styles.skipButton}>
+              <Text style={styles.skipButtonText}>Skip</Text>
+            </Pressable>
+          </View>
 
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Verify your phone</Text>
-          <Text style={styles.subtitle}>
-            We'll send you a WhatsApp verification code
-          </Text>
-        </View>
-
-        <View style={styles.row}>
-          <TextInput
-            value={countryCode}
-            onChangeText={setCountryCode}
-            style={styles.country}
-            keyboardType="phone-pad"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-          />
-          <TextInput
-            value={phone}
-            onChangeText={(t) => setPhone(t.replace(/\D/g, ""))}
-            style={styles.phoneInput}
-            keyboardType="phone-pad"
-            maxLength={10}
-            placeholder="Phone number"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-          />
-        </View>
-
-        {error && <Text style={styles.error}>{error}</Text>}
-      </View>
-
-      <View style={styles.bottomContainer}>
-        <Pressable
-          onPress={sendOtp}
-          disabled={loading || phone.length !== 10}
-          style={styles.buttonWrapper}
-        >
-          <LinearGradient
-            colors={["#E91E8C", "#DB1A85"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[
-              styles.sendButton,
-              (loading || phone.length !== 10) && styles.buttonDisabled,
-            ]}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Sending…" : "Send OTP"}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Verify your phone</Text>
+            <Text style={styles.subtitle}>
+              We'll send you a WhatsApp verification code
             </Text>
-          </LinearGradient>
-        </Pressable>
-        <View style={styles.homeIndicator} />
-      </View>
+          </View>
+
+          <View style={styles.row}>
+            <TextInput
+              value={countryCode}
+              onChangeText={setCountryCode}
+              style={styles.country}
+              keyboardType="phone-pad"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+            />
+            <TextInput
+              value={phone}
+              onChangeText={(t) => setPhone(t.replace(/\D/g, ""))}
+              style={styles.phoneInput}
+              keyboardType="phone-pad"
+              maxLength={10}
+              placeholder="Phone number"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+            />
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+        </View>
+
+        <View style={styles.bottomContainer}>
+          <Pressable
+            onPress={sendOtp}
+            disabled={loading || phone.length !== 10}
+            style={styles.buttonWrapper}
+          >
+            <LinearGradient
+              colors={["#E91E8C", "#DB1A85"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.sendButton,
+                (loading || phone.length !== 10) && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Sending…" : "Send OTP"}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+          <View style={styles.homeIndicator} />
+        </View>
+      </DismissKeyboardView>
     </KeyboardAvoidingView>
   );
 }
