@@ -26,8 +26,8 @@ export default function Sidebar() {
       {/* NAV (NOT SCROLLABLE) */}
       <nav className="px-4 space-y-1 text-sm">
         <NavItem label="Overview" href="/dashboard"/>
-        <NavItem label="Menu Management" />
-        <NavItem label="Discounts & Offers" />
+        <NavItem label="Menu Management" href="/dashboard/menu"/>
+        <NavItem label="Discounts & Offers" href="/dashboard/discount"/>
         <NavItem label="Event Management" href="/dashboard/events" />
         <NavItem label="Guest List" />
         <NavItem label="Billing & Receipts" />

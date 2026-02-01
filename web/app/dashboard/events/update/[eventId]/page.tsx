@@ -137,6 +137,28 @@ export default function UpdateEventPage() {
   }, [eventId]);
 
   /* ---------------- SAVE (PATCH) ---------------- */
+  const addPricingTier = () => {
+  setPricing((p) => [...p, { label: "", price: 0 }]);
+};
+
+const updatePricing = (
+  index: number,
+  key: keyof PricingTier,
+  value: string
+) => {
+  setPricing((p) =>
+    p.map((tier, i) =>
+      i === index
+        ? { ...tier, [key]: key === "price" ? Number(value) : value }
+        : tier
+    )
+  );
+};
+
+const removePricing = (index: number) => {
+  setPricing((p) => p.filter((_, i) => i !== index));
+};
+
 
   const handleSaveChanges = async () => {
     try {
@@ -256,6 +278,55 @@ export default function UpdateEventPage() {
             onChange={(v:string) => setForm(f => ({ ...f, max_attendees: Number(v) }))}
           />
         </div>
+        {/* PRICING */}
+<div className="space-y-4">
+  <div className="flex justify-between items-center">
+    <h3 className="font-medium">Ticket Pricing</h3>
+    <button
+      onClick={addPricingTier}
+      className="px-4 py-1.5 rounded-full border border-pink-500 text-pink-500 text-sm hover:bg-pink-500/10"
+    >
+      Add Pricing Tier
+    </button>
+  </div>
+
+  {pricing.map((tier, index) => (
+    <div
+      key={index}
+      className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end"
+    >
+      <Input
+        label="Time"
+        placeholder="e.g. Before 11 PM"
+        value={tier.label}
+        onChange={(v: string) =>
+          updatePricing(index, "label", v)
+        }
+      />
+
+      <div className="flex gap-3">
+        <Input
+          label="Price"
+          placeholder="₹ 0.00"
+          value={String(tier.price)}
+          onChange={(v: string) =>
+            updatePricing(index, "price", v)
+          }
+        />
+
+        {pricing.length > 1 && (
+          <button
+            onClick={() => removePricing(index)}
+            className="text-sm text-red-400 hover:text-red-500"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  ))}
+</div>
+
 
         {/* BANNER */}
         <div>
