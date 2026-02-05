@@ -31,7 +31,7 @@ export default function Sidebar() {
         <NavItem label="Event Management" href="/dashboard/events" />
         <NavItem label="Guest List" />
         <NavItem label="Billing & Receipts" />
-        <NavItem label="Settings" />
+        <NavItem label="Settings" href="/dashboard/settings"/>
       </nav>
 
       {/* PUSH LOGOUT TO BOTTOM */}
