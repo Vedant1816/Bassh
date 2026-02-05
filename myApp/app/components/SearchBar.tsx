@@ -1,8 +1,14 @@
 import { useEffect, useRef } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { fetchWithFallback } from "@/_services/api-config";
+
+const PADDING = 18;
+const ICON_SIZE = 19;
+const ICON_GAP = 12;
+/** Right padding matches left (padding + icon + gap) so input has equal side space */
+const PADDING_RIGHT = PADDING + ICON_SIZE + ICON_GAP;
 
 type SearchBarProps = {
   value: string;
@@ -59,7 +65,7 @@ export default function SearchBar({
 
   return (
     <View style={styles.container}>
-      <Ionicons name="search" size={19} color="#9E9E9E" />
+      <Ionicons name="search" size={ICON_SIZE} color="#9E9E9E" />
       <TextInput
         placeholder={placeholder}
         placeholderTextColor="#9E9E9E"
@@ -80,18 +86,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingLeft: PADDING,
+    paddingRight: PADDING_RIGHT,
+    paddingVertical: PADDING,
     minHeight: 55,
     flexDirection: "row",
     alignItems: "center",
-    gap: 21,
+    gap: ICON_GAP,
   },
   input: {
     flex: 1,
     color: "#FFFFFF",
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 20,
     padding: 0,
+    ...(Platform.OS === "android" && {
+      textAlignVertical: "center",
+      includeFontPadding: false,
+    }),
   },
 });

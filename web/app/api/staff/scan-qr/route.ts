@@ -1,9 +1,14 @@
-import { NextRequest } from "next/server";
 import supabaseAdmin from "@/app/services/supabase-admin";
+import { withAuth } from "@/app/services/protected";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+function todayDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export const POST = withAuth(async (req: Request, _ctx: any, user: any) => {
   console.log("📱 [STAFF] QR Scan request received");
 
   try {
@@ -11,6 +16,28 @@ export async function POST(req: NextRequest) {
 
     if (!qr_data) {
       return Response.json({ error: "QR data is required" }, { status: 400 });
+    }
+
+    // Get staff's club_id
+    const { data: staff, error: staffError } = await supabaseAdmin
+      .from("staff")
+      .select("id, club_id")
+      .eq("id", user.id)
+      .single();
+
+    if (staffError || !staff) {
+      console.error("❌ [STAFF] Staff record not found:", staffError);
+      return Response.json(
+        { success: false, error: "Staff profile not found", code: "STAFF_NOT_FOUND" },
+        { status: 403 }
+      );
+    }
+
+    if (!staff.club_id) {
+      return Response.json(
+        { success: false, error: "You are not assigned to a club", code: "STAFF_NO_CLUB" },
+        { status: 403 }
+      );
     }
 
     // Extract booking_id from QR (format: "BOOKING:uuid")
@@ -84,6 +111,31 @@ export async function POST(req: NextRequest) {
 
     // Validation checks
     const validationIssues = [];
+
+    // Check: QR must be for the same club as staff
+    if (booking.club_id !== staff.club_id) {
+      validationIssues.push({
+        type: "WRONG_CLUB",
+        message: "This QR code is for a different venue",
+        severity: "error",
+      });
+    }
+
+    // Check: Booking date must be today
+    const bookingDateStr =
+      typeof booking.booking_date === "string"
+        ? booking.booking_date.slice(0, 10)
+        : booking.booking_date
+          ? new Date(booking.booking_date).toISOString().slice(0, 10)
+          : "";
+    const todayStr = todayDateString();
+    if (bookingDateStr !== todayStr) {
+      validationIssues.push({
+        type: "WRONG_DATE",
+        message: "This QR code is not valid for today",
+        severity: "error",
+      });
+    }
 
     // Check 1: Booking must be confirmed
     if (booking.booking_status !== "confirmed") {
@@ -220,13 +272,13 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("❌ [STAFF] Scan QR error:", err);
     return Response.json(
-      { 
+      {
         success: false,
         error: err.message || "Failed to process QR code",
         code: "SCAN_ERROR",
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
       },
       { status: 500 }
     );
   }
-}
+});

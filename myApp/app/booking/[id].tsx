@@ -262,16 +262,16 @@ export default function BookingDetailScreen() {
   /* ================= REVIEW ================= */
 
   const handleWriteReview = () => {
-    if (!booking) return;
+    if (!booking?.events?.clubs?.id || !booking.events?.id) return;
 
     router.push({
       pathname: "/review",
       params: {
         booking_id: booking.id,
         club_id: booking.events.clubs.id,
-        club_name: booking.events.clubs.club_name,
+        club_name: booking.events.clubs.club_name ?? "",
         event_id: booking.events.id,
-        event_name: booking.events.name,
+        event_name: booking.events.name ?? "",
       },
     });
   };
@@ -614,24 +614,28 @@ export default function BookingDetailScreen() {
           )}
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.sectionLabel, { color: theme.muted }]}>EVENT</Text>
-          <Text style={styles.title}>{booking.events.name}</Text>
+        {booking.events && (
+          <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.sectionLabel, { color: theme.muted }]}>EVENT</Text>
+            <Text style={styles.title}>{booking.events.name ?? "Event"}</Text>
 
-          {booking.events.banner_image_url && (
-            <Image
-              source={{ uri: booking.events.banner_image_url }}
-              style={styles.banner}
-            />
-          )}
+            {booking.events.banner_image_url && (
+              <Image
+                source={{ uri: booking.events.banner_image_url }}
+                style={styles.banner}
+              />
+            )}
 
-          <View style={[styles.eventMeta, { borderTopColor: theme.divider }]}>
-            <Text style={[styles.clubName, { color: theme.muted }]}>{booking.events.clubs.club_name}</Text>
-            <Text style={[styles.eventDateTime, { color: theme.muted }]}>
-              {formatDate(booking.events.event_date)} · {formatTime(booking.events.start_time)}
-            </Text>
+            <View style={[styles.eventMeta, { borderTopColor: theme.divider }]}>
+              <Text style={[styles.clubName, { color: theme.muted }]}>{booking.events.clubs?.club_name ?? ""}</Text>
+              <Text style={[styles.eventDateTime, { color: theme.muted }]}>
+                {booking.events.event_date ? formatDate(booking.events.event_date) : ""}
+                {booking.events.event_date && booking.events.start_time ? " · " : ""}
+                {booking.events.start_time ? formatTime(booking.events.start_time) : ""}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
           <Text style={[styles.sectionLabel, { color: theme.muted }]}>PARTICIPANTS</Text>

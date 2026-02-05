@@ -1,18 +1,7 @@
 import crypto from "crypto";
 import supabaseAdmin from "@/app/services/supabase-admin";
-import twilio from "twilio";
 
-// Initialize Twilio client only if credentials are available
-function getTwilioClient() {
-  const sid = process.env.TWILIO_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!sid || !authToken) {
-    throw new Error("Twilio credentials not configured. Please set TWILIO_SID and TWILIO_AUTH_TOKEN environment variables.");
-  }
-
-  return twilio(sid, authToken);
-}
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -22,44 +11,46 @@ export async function POST(req: Request) {
       return Response.json({ error: "Phone required" }, { status: 400 });
     }
 
-    // 1️⃣ Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = crypto
       .createHash("sha256")
       .update(otp)
       .digest("hex");
 
-    // 2️⃣ Store OTP
+    // Always log OTP to server console (for development)
+    console.log("[OTP] Phone:", phone, "| OTP:", otp);
+
     await supabaseAdmin.from("phone_otps").insert({
       phone,
       otp_hash: otpHash,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000), // 5 min
+      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     });
 
-    // 3️⃣ Send WhatsApp
-    try {
-      const client = getTwilioClient();
-      await client.messages.create({
-        from: "whatsapp:+14155238886", // Twilio sandbox
-        to: `whatsapp:${phone}`,
-        body: `Your BASH verification code is ${otp}. Valid for 5 minutes.`,
-      });
-    } catch (twilioError: any) {
-      console.error("Twilio error:", twilioError);
-      // Still return success if OTP was stored (user can verify manually)
-      // Or return error if you want to fail the request
-      return Response.json(
-        { 
-          error: twilioError.message || "Failed to send WhatsApp message. Please check Twilio configuration.",
-          otp: process.env.NODE_ENV === "development" ? otp : undefined // Only return OTP in dev mode
+    const apiKey = process.env.FAST2SMS_API_KEY;
+    if (apiKey) {
+      const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+        method: "POST",
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json",
         },
-        { status: 500 }
-      );
+        body: JSON.stringify({
+          route: "otp",
+          variables_values: otp,
+          numbers: phone.replace("+91", ""),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { return?: boolean; message?: string };
+      if (!res.ok || data.return === false) {
+        console.warn("[OTP] Fast2SMS failed (use console OTP):", data.message);
+      }
+    } else {
+      console.warn("[OTP] No FAST2SMS_API_KEY — use OTP from console above");
     }
 
     return Response.json({ ok: true });
   } catch (err: any) {
-    console.error("Send WhatsApp OTP error:", err);
+    console.error("Send OTP error:", err);
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }

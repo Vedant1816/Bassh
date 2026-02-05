@@ -22,7 +22,7 @@ This document contains the complete schema for all database tables in the Bassh 
 
 ## users
 
-Base user table that links to Supabase Auth.
+Base user table that links to Supabase Auth. Users are created automatically when they sign up via Supabase Auth (email or phone authentication).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -53,11 +53,11 @@ Customer profile information for regular users.
 | `name` | Text | Optional | Full name (legacy field) |
 | `gender` | Enum | Optional | Gender: `'male'`, `'female'`, `'other'`, `'prefer_not_to_say'` |
 | `dob` | Date | Optional | Date of birth |
-| `phone_number` | Text | Optional | Phone number |
+| `phone_number` | Text | Optional | Phone number (saved only after successful OTP verification) |
 | `instagram` | Text | Optional | Instagram handle |
 | `twitter` | Text | Optional | Twitter handle |
 | `social_handle` | Text | Optional | Social media handle (legacy field) |
-| `avatar_url` | Text | Optional | URL to customer avatar image |
+| `avatar_url` | Text | Optional | URL to customer avatar image (displayed in profile screen) |
 | `onboarding_completed` | Boolean | Optional | Whether onboarding is completed |
 | `wallet_balance` | Numeric | NOT NULL, Default 0 | Current wallet balance in INR |
 | `created_at` | Timestamp | | Record creation timestamp |
@@ -66,6 +66,10 @@ Customer profile information for regular users.
 **Relationships:**
 - One-to-one with `users` (via `id`)
 - One-to-many with `bookings` (via `user_id`)
+
+**Notes:**
+- `avatar_url` is displayed in the profile screen (`/app/(tabs)/profile.tsx`) in the "Update your name" card
+- If `avatar_url` is not set, a default person icon is displayed as fallback
 
 ---
 
@@ -76,19 +80,52 @@ Club/venue information.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | Primary Key | Club ID |
-| `club_name` | Text | | Name of the club |
-| `address_text` | Text | | Physical address of the club |
-| `latitude` | Decimal | | Latitude coordinate |
-| `longitude` | Decimal | | Longitude coordinate |
-| `guest_count` | Integer | Optional | Maximum guest capacity |
-| `description` | Text | Optional | Club description |
-| `club_token` | Text | Optional | Unique token for staff to join club |
-| `created_at` | Timestamp | | Record creation timestamp |
-| `updated_at` | Timestamp | | Record last update timestamp |
+| `club_name` | Text | NOT NULL | Name of the club |
+| `club_email` | Text | NOT NULL | Club contact email |
+| `address_text` | Text | Optional | Physical address of the club |
+| `latitude` | Double Precision | Optional | Latitude coordinate |
+| `longitude` | Double Precision | Optional | Longitude coordinate |
+| `guest_count` | Integer | Optional, Default: 0 | Current or maximum guest capacity |
+| `rating` | Numeric | Optional, Default: 0 | Club rating |
+| `club_token` | Text | NOT NULL | Unique token for staff to join club |
+| `prices` | JSONB | NOT NULL, Default: `'{}'` | Day-based pricing (see below) |
+| `opening_hours` | JSONB | NOT NULL, Default: `'[]'` | Opening hours schedule |
+| `gallery` | JSONB | NOT NULL, Default: `'[]'` | Gallery image URLs |
+| `club_desc` | Text | Optional | Club description |
+| `club_logo` | Text | Optional | URL/path to club logo |
+| `profile_image_url` | Text | Optional | URL to club profile image |
+| `banner_image_url` | Text | Optional | URL to club banner image |
+| `cover_photo` | Text | Optional | URL to club cover photo |
+| `insta_link` | Text | Optional | Instagram profile link |
+| `facebook_link` | Text | Optional | Facebook page link |
+| `twitter_link` | Text | Optional | Twitter profile link |
+| `phone_number` | Text | Optional | Contact phone number |
+| `contact_email` | Text | Optional | Public contact email |
+| `notes` | Text | Optional | Internal notes |
+| `created_at` | Timestamp with TZ | Default: now() | Record creation timestamp |
+
+**Prices Structure (JSONB):**
+The `prices` column stores day-based pricing where keys are day numbers (1=Monday, 2=Tuesday, ..., 7=Sunday):
+```json
+{
+  "1": {"male": 2000, "female": 1500, "couple": 3000},
+  "2": {"male": 2000, "female": 1500, "couple": 3000},
+  "3": {"male": 2200, "female": 1600, "couple": 3200},
+  "4": {"male": 2500, "female": 1800, "couple": 3500},
+  "5": {"male": 3000, "female": 2000, "couple": 4500},
+  "6": {"male": 3500, "female": 2500, "couple": 5000},
+  "7": {"male": 2800, "female": 1800, "couple": 4000}
+}
+```
 
 **Relationships:**
 - One-to-many with `events` (via `club_id`)
 - One-to-many with `staff` (via `club_id`)
+
+**Notes:**
+- The `prices` field is returned as a JSON string from RPC functions and must be parsed using `JSON.parse()` in the API layer
+- The ClubCard component displays the male price for the current day from the `prices` object
+- Multiple image fields exist for different purposes: `profile_image_url`, `banner_image_url`, `cover_photo`, and `club_logo`
 
 ---
 
@@ -323,7 +360,9 @@ create table public.reviews (
 
 ## phone_otps
 
-Phone number OTP verification records.
+**⚠️ DEPRECATED:** This table is no longer used. Phone authentication now uses Supabase Auth's built-in phone OTP system.
+
+Phone number OTP verification records (legacy).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -337,8 +376,10 @@ Phone number OTP verification records.
 | `updated_at` | Timestamp | | Record last update timestamp |
 
 **Notes:**
-- OTPs expire after 5 minutes
-- Used for WhatsApp OTP verification flow
+- ⚠️ **This table is deprecated and no longer used**
+- Phone authentication now uses Supabase Auth's `signInWithOtp()` and `verifyOtp()` methods
+- OTPs are managed internally by Supabase Auth
+- Phone numbers are saved to `customers.phone_number` only after successful OTP verification via `/api/auth/verify-whatsapp-otp`
 
 ---
 
@@ -356,6 +397,20 @@ Supabase Storage bucket for event-related images.
 **Path Format:**
 - Event banners: `events/{event_id}/banner.{ext}`
 - DJ images: `events/{event_id}/dj.{ext}`
+
+### avatars (if applicable)
+
+Supabase Storage bucket for user avatar images.
+
+**Usage:**
+- Stores customer avatar images
+- Public access for displaying avatars in the app
+- Used in profile screen and other user-facing components
+
+**Path Format:**
+- User avatars: `avatars/{user_id}.{ext}` or `avatars/{user_id}/{filename}.{ext}`
+
+**Note:** Avatar URLs can also be external URLs (e.g., from social media profiles or third-party image hosting services).
 
 ---
 
@@ -393,6 +448,18 @@ Supabase Storage bucket for event-related images.
 
 ---
 
+## Authentication Flow
+
+### Phone Authentication (Supabase Auth)
+
+1. **Send OTP**: User enters phone number → `supabase.auth.signInWithOtp({ phone })` sends SMS OTP via Supabase (configured with Vigilance/Twilio)
+2. **Verify OTP**: User enters OTP → `supabase.auth.verifyOtp({ phone, token, type: 'sms' })` verifies and signs user in
+3. **Save Phone**: After successful verification → `/api/auth/verify-whatsapp-otp` saves phone number to `customers.phone_number`
+
+**Note:** Phone number is only saved to the `customers` table after successful OTP verification. If verification fails, the phone number is not saved.
+
+---
+
 ## Notes
 
 - All tables use UUID for primary keys
@@ -400,3 +467,4 @@ Supabase Storage bucket for event-related images.
 - Foreign key relationships enforce referential integrity
 - JSONB fields allow flexible schema for complex data (e.g., participants array)
 - Some fields are denormalized for performance (e.g., `club_name` in `staff` table)
+- Phone authentication uses Supabase Auth's built-in OTP system (no custom `phone_otps` table needed)

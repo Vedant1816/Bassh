@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
@@ -29,7 +30,6 @@ const CURTAIN_HEIGHT_RATIO = 1;
 /* Same gradient as onboarding/otp.tsx */
 const GRADIENT_COLORS = ["#8B0045", "#2D0A1F", "#000000"] as const;
 const GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
-const BUTTON_GRADIENT = ["#E91E8C", "#DB1A85"] as const;
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -137,6 +137,11 @@ export default function AuthScreen() {
     outputRange: [0, 72],
   });
 
+  const loginOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
   const curtainTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-curtainHeight, 0],
@@ -152,9 +157,13 @@ export default function AuthScreen() {
         >
           {/* LOGIN (BACKGROUND) – same theme as otp */}
           <Animated.View
+            pointerEvents={isSignupOpen ? "none" : "auto"}
             style={[
               styles.formContainer,
-              { transform: [{ translateY: loginTranslateY }] },
+              {
+                transform: [{ translateY: loginTranslateY }],
+                opacity: loginOpacity,
+              },
             ]}
           >
             <LinearGradient
@@ -217,19 +226,13 @@ export default function AuthScreen() {
               </Pressable>
             </ScrollView>
             <View style={styles.bottomContainer}>
-              <Pressable
+              <ThemedButton
                 onPress={handleLogin}
-                style={styles.buttonWrapper}
+                style={styles.sendButton}
+                textStyle={styles.buttonText}
               >
-                <LinearGradient
-                  colors={[...BUTTON_GRADIENT]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.sendButton}
-                >
-                  <Text style={styles.buttonText}>Sign in</Text>
-                </LinearGradient>
-              </Pressable>
+                Sign in
+              </ThemedButton>
               <View style={styles.homeIndicator} />
             </View>
           </Animated.View>
@@ -313,25 +316,15 @@ export default function AuthScreen() {
                 </Pressable>
               </ScrollView>
               <View style={styles.bottomContainer}>
-                <Pressable
+                <ThemedButton
                   onPress={handleSignup}
                   disabled={signupLoading}
-                  style={styles.buttonWrapper}
+                  loading={signupLoading}
+                  style={styles.sendButton}
+                  textStyle={styles.buttonText}
                 >
-                  <LinearGradient
-                    colors={[...BUTTON_GRADIENT]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.sendButton,
-                      signupLoading && styles.buttonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.buttonText}>
-                      {signupLoading ? "Creating…" : "Sign up"}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
+                  {signupLoading ? "Creating…" : "Sign up"}
+                </ThemedButton>
                 <View style={styles.homeIndicator} />
               </View>
             </View>
@@ -369,11 +362,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     marginBottom: 32,
-    gap: 12,
+    width: "100%",
   },
   backButton: {
+    position: "absolute",
+    left: 16,
     width: 32,
     height: 32,
   },
@@ -381,20 +377,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
+    textAlign: "center",
   },
   titleSection: {
     marginBottom: 32,
+    alignItems: "center",
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
     color: "#FFFFFF",
     marginBottom: 12,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 20,
     color: "rgba(255, 255, 255, 0.6)",
+    textAlign: "center",
   },
   inputsWrap: {
     gap: 14,

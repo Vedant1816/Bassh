@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, StatusBar, Dimensions } from "react-native";
+import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, StatusBar, Dimensions, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Colors } from "@/constants/Colors";
 import MumbaiIcon from "@/app/components/Mumbai.Icon";
 import DelhiIcon from "@/app/components/Delhi.Icon";
 import BengaluruIcon from "@/app/components/Bengluru.Icon";
@@ -15,6 +16,10 @@ interface LocationHeaderProps {
   title: string;
   address: string;
   onLocationChange?: (city: { name: string; lat: number; lng: number }) => void;
+  /** 'default' = transparent, 'circle' = dark circular bg behind icon */
+  variant?: "default" | "circle";
+  /** If true (default), tapping opens city picker. If false, location is display-only */
+  changeable?: boolean;
 }
 
 // Popular Indian cities with coordinates
@@ -53,7 +58,7 @@ const POPULAR_CITIES: { name: string; icon: IconName; lat: number; lng: number }
 ];
 const POPULAR_CITY_ICON_COLOR = "#B8A9C9";
 
-export default function LocationHeader({ title, address, onLocationChange }: LocationHeaderProps) {
+export default function LocationHeader({ title, address, onLocationChange, variant = "default", changeable = true }: LocationHeaderProps) {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -67,28 +72,36 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
     setSearchQuery("");
   };
 
+  const handlePress = () => {
+    if (changeable) {
+      setShowCityPicker(true);
+    }
+  };
+
   return (
     <>
       {/* Main container: 178x40 */}
       <View style={styles.container}>
         <Pressable
-          style={styles.iconButton}
-          onPress={() => setShowCityPicker(true)}
+          style={[styles.iconButton, variant === "circle" && styles.iconButtonCircle]}
+          onPress={handlePress}
         >
-          <View style={styles.iconCircle}>
-            <View style={styles.mapPinWrapper}>
-              <Ionicons name="location" size={24} color="#FFFFFF" />
-            </View>
-          </View>
+          <Image
+            source={require("@/assets/images/location-pin-button.png")}
+            style={styles.locationPinImage}
+            resizeMode="contain"
+          />
         </Pressable>
 
         <Pressable
           style={styles.textBlock}
-          onPress={() => setShowCityPicker(true)}
+          onPress={handlePress}
         >
           <View style={styles.titleRow}>
             <Text style={styles.title}>{title}</Text>
-            <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={styles.arrowDown} />
+            {changeable && (
+              <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={styles.arrowDown} />
+            )}
           </View>
           <Text style={styles.address} numberOfLines={1}>
             {address || "Select location"}
@@ -112,7 +125,7 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
           />
           {/* Header */}
           <View style={styles.modalHeader}>
-            <Pressable 
+            <Pressable
               style={styles.backButton}
               onPress={() => setShowCityPicker(false)}
             >
@@ -140,10 +153,10 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
             <Pressable
               style={styles.currentLocationCard}
               onPress={() => {
-                onLocationChange?.({ 
-                  name: "Your Location", 
-                  lat: 0, 
-                  lng: 0 
+                onLocationChange?.({
+                  name: "Your Location",
+                  lat: 0,
+                  lng: 0
                 });
                 setShowCityPicker(false);
                 setSearchQuery("");
@@ -205,7 +218,7 @@ export default function LocationHeader({ title, address, onLocationChange }: Loc
                     <Text style={styles.cityListName}>{city.name}</Text>
                   </Pressable>
                 ))}
-                
+
                 {filteredCities.length === 0 && (
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyText}>No cities found</Text>
@@ -236,26 +249,16 @@ const styles = StyleSheet.create({
     height: 40,
   },
 
-  iconCircle: {
-    position: "absolute",
-    width: 40,
-    height: 40,
-    left: 0,
-    top: 0,
+  iconButtonCircle: {
+    backgroundColor: Colors.dark.surface,
     borderRadius: 20,
-    backgroundColor: "#FF007E",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
 
-  mapPinWrapper: {
-    position: "absolute",
-    width: 24,
-    height: 24,
-    left: 8,
-    top: 9,
-    justifyContent: "center",
-    alignItems: "center",
+  locationPinImage: {
+    width: 40,
+    height: 40,
   },
 
   textBlock: {
@@ -306,6 +309,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
+
 
   gradientBackground: {
     position: "absolute",

@@ -13,28 +13,50 @@ import {
   KeyboardAvoidingView,
   Platform,
   InteractionManager,
+  Image,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/Colors";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Colors,
+  PrimaryGradient,
+  PrimaryGradientStart,
+  PrimaryGradientEnd,
+} from "@/constants/Colors";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import supabase from "@/_services/supabase-public";
-import { GradientButton } from "@/components/ui/GradientButton";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { PayBillModal } from "@/app/club/components/PayBillModal";
+import type { Discount } from "@/app/club/components/PayBillModal";
 
-interface Transaction {
+const WALLET_GRADIENT = ["#8B0045", "#2D0A1F", "#000000"] as const;
+const WALLET_GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
+
+/** Booking from /api/bookings/my-bookings – event or club (table) entry */
+interface MyBooking {
   id: string;
-  amount: number;
-  status: string;
-  type: string;
-  description: string;
-  is_credit: boolean;
-  is_debit: boolean;
-  club_name: string | null;
-  event_name: string | null;
-  created_at: string;
+  event_id: string | null;
+  club_id: string | null;
+  booking_date: string | null;
+  booking_time: string | null;
+  entry_status?: string;
+  events?: {
+    name: string;
+    event_date: string;
+    start_time: string;
+    banner_image_url: string | null;
+    club_id?: string;
+    clubs: { club_name: string; address_text: string } | null;
+  } | null;
+  clubs?: { id?: string; club_name: string; address_text: string } | null;
 }
+
+const ONGOING_CARD_WIDTH = 160;
+const ONGOING_CARD_GAP = 12;
 
 const formatCurrency = (amount: string) => {
   const cleaned = amount.replace(/[^\d.]/g, "");
@@ -47,14 +69,85 @@ const formatCurrency = (amount: string) => {
 
 export default function WalletScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number>(0);
   const [loadingBalance, setLoadingBalance] = useState(true);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loadingTransactions, setLoadingTransactions] = useState(true);
 
   const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
   const [addAmount, setAddAmount] = useState("");
   const [processingPayment, setProcessingPayment] = useState(false);
+
+  const [ongoingBookings, setOngoingBookings] = useState<MyBooking[]>([]);
+  const [loadingOngoing, setLoadingOngoing] = useState(false);
+
+  const [payBillVisible, setPayBillVisible] = useState(false);
+  const [payBillClubId, setPayBillClubId] = useState<string | null>(null);
+  const [payBillClub, setPayBillClub] = useState<{ club_name?: string; address_text?: string; banner_image_url?: string } | null>(null);
+  const [payBillDiscounts, setPayBillDiscounts] = useState<Discount[]>([]);
+
+  const fetchOngoingBookings = useCallback(async () => {
+    setLoadingOngoing(true);
+    try {
+      const res = await fetchWithFallback(
+        "/api/bookings/my-bookings",
+        await withAuthHeaders({ method: "GET" })
+      );
+      if (!res.ok) {
+        setOngoingBookings([]);
+        return;
+      }
+      const data = await res.json();
+      const rawBookings = data.bookings || [];
+      // Normalize: Supabase may return relations as object or array; ensure clubs/events are objects
+      const bookings = rawBookings.map((b: any) => ({
+        ...b,
+        events: Array.isArray(b.events) ? b.events[0] ?? null : b.events,
+        clubs: Array.isArray(b.clubs) ? b.clubs[0] ?? null : b.clubs,
+      })) as MyBooking[];
+      const now = new Date();
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const ongoing = bookings.filter((b) => {
+        if ((b.entry_status ?? "").toLowerCase() !== "entered") return false;
+        if (b.event_id && b.events) {
+          const ev = b.events;
+          if (!ev.event_date || !ev.start_time) return false;
+          const eventDate = new Date(ev.event_date);
+          eventDate.setHours(0, 0, 0, 0);
+          if (eventDate.getTime() !== today.getTime()) return false;
+          const [sh, sm] = ev.start_time.split(":").map(Number);
+          const startMins = (sh ?? 0) * 60 + (sm ?? 0);
+          const endMins = startMins + 12 * 60;
+          return currentMins >= startMins && currentMins <= endMins;
+        }
+        // Club entry: no event_id; ongoing = booking_date 6 PM → 6 PM + 12h (overnight to 6 AM next day)
+        if (!b.event_id && b.club_id && b.booking_date) {
+          const bookingDate = new Date(b.booking_date);
+          bookingDate.setHours(0, 0, 0, 0);
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const isBookingToday = bookingDate.getTime() === today.getTime();
+          const isBookingYesterday = bookingDate.getTime() === yesterday.getTime();
+          const startMins = 18 * 60; // 6 PM
+          const endMinsNextDay = 6 * 60; // 6 AM
+          if (isBookingToday) {
+            return currentMins >= startMins; // 6 PM–midnight today
+          }
+          if (isBookingYesterday) {
+            return currentMins < endMinsNextDay; // midnight–6 AM today (after booking_date)
+          }
+          return false;
+        }
+        return false;
+      });
+      setOngoingBookings(ongoing);
+    } catch {
+      setOngoingBookings([]);
+    } finally {
+      setLoadingOngoing(false);
+    }
+  }, []);
 
   const fetchBalance = useCallback(async () => {
     try {
@@ -83,33 +176,51 @@ export default function WalletScreen() {
     }
   }, []);
 
-  const fetchTransactions = useCallback(async () => {
-    try {
-      setLoadingTransactions(true);
-      const res = await fetchWithFallback(
-        "/api/transactions",
-        await withAuthHeaders({ method: "GET" })
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setTransactions(data.transactions || []);
-      } else {
-        setTransactions([]);
-      }
-    } catch (err) {
-      console.error("Error fetching transactions:", err);
-      setTransactions([]);
-    } finally {
-      setLoadingTransactions(false);
-    }
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       fetchBalance();
-      fetchTransactions();
-    }, [fetchBalance, fetchTransactions])
+      fetchOngoingBookings();
+    }, [fetchBalance, fetchOngoingBookings])
   );
+
+  const formatEventDateShort = (dateString: string) => {
+    const d = new Date(dateString);
+    const day = d.getDate();
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  const formatTimeRange = (timeString: string) => {
+    if (!timeString) return "16:00 - 20:00";
+    const [h, m] = timeString.split(":");
+    const hour = parseInt(h, 10);
+    const endHour = (hour + 4) % 24;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(hour)}:${m || "00"} - ${pad(endHour)}:00`;
+  };
+
+  const openPayBill = async (clubId: string) => {
+    try {
+      const res = await fetchWithFallback(
+        `/api/clubs/${clubId}`,
+        await withAuthHeaders({ method: "GET" })
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setPayBillClubId(clubId);
+      setPayBillClub({
+        club_name: data.club?.club_name,
+        address_text: data.club?.address_text,
+        banner_image_url: data.club?.banner_image_url,
+      });
+      setPayBillDiscounts(data.discounts ?? []);
+      setPayBillVisible(true);
+    } catch {
+      setPayBillVisible(false);
+    }
+  };
 
   const handleAddMoney = () => {
     setAddAmount("");
@@ -279,8 +390,13 @@ export default function WalletScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={WALLET_GRADIENT}
+        locations={WALLET_GRADIENT_LOCATIONS}
+        style={styles.gradientBg}
+      />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Wallet</Text>
         <Text style={styles.headerSubtitle}>Manage your balance</Text>
       </View>
@@ -291,90 +407,116 @@ export default function WalletScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
-          {loadingBalance ? (
-            <ActivityIndicator color="#fff" size="small" style={{ marginVertical: 16 }} />
-          ) : (
-            <Text style={styles.balanceAmount}>₹{balance.toFixed(0)}</Text>
-          )}
-          <Pressable style={styles.addMoneyButton} onPress={handleAddMoney}>
-            <Ionicons name="add" size={22} color="#fff" />
-            <Text style={styles.addMoneyText}>Add Money</Text>
-          </Pressable>
+          <LinearGradient
+            colors={PrimaryGradient}
+            start={PrimaryGradientStart}
+            end={PrimaryGradientEnd}
+            style={styles.balanceCardGradient}
+          >
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            {loadingBalance ? (
+              <ActivityIndicator color={Colors.dark.text} size="small" style={{ marginVertical: 16 }} />
+            ) : (
+              <Text style={styles.balanceAmount}>₹{balance.toFixed(0)}</Text>
+            )}
+            <Pressable style={styles.addMoneyButton} onPress={handleAddMoney}>
+              <Ionicons name="add" size={22} color={Colors.dark.text} />
+              <Text style={styles.addMoneyText}>Add Money</Text>
+            </Pressable>
+          </LinearGradient>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsRow}>
-            <Pressable style={styles.actionCard} onPress={() => router.push("/bookings")}>
-              <View style={styles.actionIconWrap}>
-                <Ionicons name="receipt-outline" size={24} color={Colors.dark.primary} />
-              </View>
-              <Text style={styles.actionLabel}>My Bookings</Text>
-            </Pressable>
-            <Pressable style={styles.actionCard} onPress={() => router.push("/transactions")}>
-              <View style={styles.actionIconWrap}>
-                <Ionicons name="swap-horizontal" size={24} color={Colors.dark.primary} />
-              </View>
-              <Text style={styles.actionLabel}>Transactions</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          {loadingTransactions ? (
-            <View style={styles.emptyState}>
+          <Text style={styles.sectionTitle}>Ongoing events</Text>
+          {loadingOngoing ? (
+            <View style={styles.ongoingLoading}>
               <ActivityIndicator color={Colors.dark.primary} size="small" />
-              <Text style={styles.emptyText}>Loading...</Text>
+              <Text style={styles.ongoingLoadingText}>Loading...</Text>
             </View>
-          ) : transactions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="wallet-outline" size={48} color={Colors.dark.textTertiary} />
-              <Text style={styles.emptyTitle}>No transactions yet</Text>
-              <Text style={styles.emptyText}>Your transaction history will appear here</Text>
+          ) : ongoingBookings.length === 0 ? (
+            <View style={styles.ongoingEmpty}>
+              <Ionicons name="calendar-outline" size={40} color={Colors.dark.textTertiary} />
+              <Text style={styles.ongoingEmptyText}>No ongoing events</Text>
+              <Text style={styles.ongoingEmptySubtext}>Events happening today will appear here</Text>
             </View>
           ) : (
-            <View style={styles.transactionList}>
-              {transactions.map((tx) => (
-                <View key={tx.id} style={styles.transactionCard}>
-                  <View style={styles.transactionLeft}>
-                    <View
-                      style={[
-                        styles.transactionIconWrap,
-                        tx.is_credit ? styles.transactionIconCredit : styles.transactionIconDebit,
-                      ]}
-                    >
-                      <Ionicons
-                        name={tx.is_credit ? "arrow-down" : "arrow-up"}
-                        size={18}
-                        color={tx.is_credit ? Colors.dark.success : "#EF4444"}
-                      />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.ongoingScrollContent}
+              style={styles.ongoingScroll}
+            >
+              {ongoingBookings.map((b) => {
+                if (b.event_id && b.events) {
+                  const ev = b.events;
+                  const clubId = ev.club_id ?? null;
+                  return (
+                    <View key={b.id} style={[styles.ongoingCard, { marginRight: ONGOING_CARD_GAP }]}>
+                      <Pressable onPress={() => router.push(`/event/${b.event_id}`)}>
+                        <View style={styles.ongoingCardImageWrap}>
+                          {ev.banner_image_url ? (
+                            <Image
+                              source={{ uri: ev.banner_image_url }}
+                              style={styles.ongoingCardImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.ongoingCardPlaceholder}>
+                              <Ionicons name="musical-notes-outline" size={32} color={Colors.dark.textTertiary} />
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.ongoingCardBody}>
+                          <Text style={styles.ongoingCardTitle} numberOfLines={1}>
+                            {ev.name || "Event"}
+                          </Text>
+                          <Text style={styles.ongoingCardDateTime}>
+                            {formatEventDateShort(ev.event_date)} · {formatTimeRange(ev.start_time)}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      {clubId ? (
+                        <Pressable
+                          style={styles.ongoingPayBillBtn}
+                          onPress={() => openPayBill(clubId)}
+                        >
+                          <Text style={styles.ongoingPayBillBtnText}>Pay Bill</Text>
+                        </Pressable>
+                      ) : null}
                     </View>
-                    <View>
-                      <Text style={styles.transactionDesc} numberOfLines={1}>
-                        {tx.description}
-                      </Text>
-                      <Text style={styles.transactionDate}>
-                        {new Date(tx.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </Text>
+                  );
+                }
+                if (!b.event_id && b.club_id) {
+                  const club = b.clubs;
+                  return (
+                    <View key={b.id} style={[styles.ongoingCard, { marginRight: ONGOING_CARD_GAP }]}>
+                      <Pressable onPress={() => router.push(`/club/${b.club_id}`)}>
+                        <View style={styles.ongoingCardImageWrap}>
+                          <View style={styles.ongoingCardPlaceholder}>
+                            <Ionicons name="business-outline" size={32} color={Colors.dark.textTertiary} />
+                          </View>
+                        </View>
+                        <View style={styles.ongoingCardBody}>
+                          <Text style={styles.ongoingCardTitle} numberOfLines={1}>
+                            {club?.club_name || "Club"}
+                          </Text>
+                          <Text style={styles.ongoingCardDateTime}>
+                            Club entry · {b.booking_date ? formatEventDateShort(b.booking_date) : ""}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        style={styles.ongoingPayBillBtn}
+                        onPress={() => openPayBill(b.club_id!)}
+                      >
+                        <Text style={styles.ongoingPayBillBtnText}>Pay Bill</Text>
+                      </Pressable>
                     </View>
-                  </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      tx.is_credit ? styles.transactionAmountCredit : styles.transactionAmountDebit,
-                    ]}
-                  >
-                    {tx.is_credit ? "+" : "-"}₹{tx.amount.toFixed(0)}
-                  </Text>
-                </View>
-              ))}
-            </View>
+                  );
+                }
+                return null;
+              })}
+            </ScrollView>
           )}
         </View>
       </ScrollView>
@@ -390,10 +532,15 @@ export default function WalletScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <DismissKeyboardView style={styles.modalContainer}>
+            <LinearGradient
+              colors={WALLET_GRADIENT}
+              locations={WALLET_GRADIENT_LOCATIONS}
+              style={StyleSheet.absoluteFill}
+            />
             <StatusBar barStyle="light-content" />
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setShowAddMoneyModal(false)} style={styles.backBtn}>
-                <Text style={styles.backBtnText}>←</Text>
+                <Ionicons name="chevron-back" size={28} color={Colors.dark.text} />
               </Pressable>
               <View style={styles.modalHeaderContent}>
                 <Text style={styles.modalTitle}>Add Money to Wallet</Text>
@@ -411,7 +558,7 @@ export default function WalletScreen() {
                   value={addAmount}
                   onChangeText={handleAmountChange}
                   placeholder="0.00"
-                  placeholderTextColor="#666"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   keyboardType="decimal-pad"
                   autoFocus
                 />
@@ -419,7 +566,7 @@ export default function WalletScreen() {
             </View>
 
             <View style={styles.proceedWrap}>
-              <GradientButton
+              <ThemedButton
                 style={{
                   ...styles.proceedBtn,
                   ...((!addAmount || parseFloat(addAmount) <= 0) ? styles.proceedBtnDisabled : {}),
@@ -430,11 +577,24 @@ export default function WalletScreen() {
                 loading={processingPayment}
               >
                 Proceed to Pay
-              </GradientButton>
+              </ThemedButton>
             </View>
           </DismissKeyboardView>
         </KeyboardAvoidingView>
       </Modal>
+
+      <PayBillModal
+        visible={payBillVisible}
+        onClose={() => {
+          setPayBillVisible(false);
+          setPayBillClubId(null);
+          setPayBillClub(null);
+          setPayBillDiscounts([]);
+        }}
+        clubId={payBillClubId ?? ""}
+        club={payBillClub}
+        discounts={payBillDiscounts}
+      />
     </View>
   );
 }
@@ -444,13 +604,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.dark.background,
   },
+  gradientBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
+  },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 20,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
     color: Colors.dark.text,
     marginBottom: 4,
@@ -465,20 +631,29 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   balanceCard: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 20,
     marginBottom: 24,
+    overflow: "hidden",
+    shadowColor: Colors.dark.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  balanceCardGradient: {
+    padding: 24,
+    borderRadius: 20,
   },
   balanceLabel: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
+    color: Colors.dark.textPrimary,
+    opacity: 0.9,
     marginBottom: 8,
   },
   balanceAmount: {
     fontSize: 36,
     fontWeight: "800",
-    color: "#fff",
+    color: Colors.dark.text,
     marginBottom: 20,
   },
   addMoneyButton: {
@@ -492,35 +667,106 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addMoneyText: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "600",
   },
   section: { marginBottom: 24 },
+  ongoingScroll: { marginHorizontal: -20 },
+  ongoingScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  ongoingLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 24,
+    backgroundColor: Colors.dark.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  ongoingLoadingText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+  },
+  ongoingEmpty: {
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    backgroundColor: Colors.dark.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  ongoingEmptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.text,
+    marginTop: 12,
+  },
+  ongoingEmptySubtext: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    marginTop: 4,
+  },
+  ongoingCard: {
+    width: ONGOING_CARD_WIDTH,
+    backgroundColor: Colors.dark.card,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  ongoingCardImageWrap: {
+    width: ONGOING_CARD_WIDTH,
+    height: 100,
+    overflow: "hidden",
+  },
+  ongoingCardImage: { width: "100%", height: "100%" },
+  ongoingCardPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: Colors.dark.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ongoingCardBody: { padding: 10 },
+  ongoingCardTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 4,
+  },
+  ongoingCardDateTime: {
+    fontSize: 11,
+    color: Colors.dark.textSecondary,
+  },
+  ongoingPayBillBtn: {
+    marginHorizontal: 10,
+    marginBottom: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.dark.primary,
+    alignItems: "center",
+  },
+  ongoingPayBillBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.dark.text,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: Colors.dark.text,
     marginBottom: 16,
   },
-  actionsRow: { flexDirection: "row", gap: 12 },
-  actionCard: {
-    flex: 1,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  actionIconWrap: { marginBottom: 12 },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.dark.text,
-  },
   emptyState: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.dark.card,
     borderRadius: 16,
     padding: 40,
     alignItems: "center",
@@ -540,7 +786,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: Colors.dark.background,
   },
   modalHeader: {
     flexDirection: "row",
@@ -550,15 +796,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backBtn: { padding: 4 },
-  backBtnText: { color: "#fff", fontSize: 24 },
+  backBtnText: { color: Colors.dark.text, fontSize: 24 },
   modalHeaderContent: { flex: 1, marginLeft: 12 },
   modalTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.dark.text,
+    fontSize: 18,
+    fontWeight: "700",
   },
   modalSubtitle: {
-    color: "#999",
+    color: Colors.dark.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -567,7 +813,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   amountLabel: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 16,
@@ -575,22 +821,22 @@ const styles = StyleSheet.create({
   amountInputWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: Colors.dark.primary,
+    borderWidth: 1,
+    borderColor: Colors.dark.primary500,
   },
   rupeeSymbol: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 48,
     fontWeight: "300",
     marginRight: 8,
   },
   amountInput: {
     flex: 1,
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 48,
     fontWeight: "300",
   },
@@ -608,42 +854,8 @@ const styles = StyleSheet.create({
   },
   proceedBtnDisabled: { opacity: 0.5 },
   proceedBtnText: {
-    color: "#fff",
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "600",
   },
-  transactionList: { gap: 12 },
-  transactionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  transactionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  transactionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  transactionIconCredit: { backgroundColor: Colors.dark.successBg },
-  transactionIconDebit: { backgroundColor: "rgba(239, 68, 68, 0.2)" },
-  transactionDesc: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.dark.text,
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-    marginTop: 2,
-  },
-  transactionAmount: { fontSize: 16, fontWeight: "700" },
-  transactionAmountCredit: { color: Colors.dark.success },
-  transactionAmountDebit: { color: "#EF4444" },
 });

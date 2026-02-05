@@ -11,6 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
@@ -52,7 +53,7 @@ export default function PhoneScreen() {
         params: { phone: fullPhone },
       });
     } catch (e: any) {
-      setError(e.message || "Failed to send OTP");
+      setError(e.message || "Failed to send OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -73,11 +74,9 @@ export default function PhoneScreen() {
         />
 
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <Text style={styles.backIcon}>‹</Text>
-            </Pressable>
-            <Text style={styles.headerTitle}>Welcome to BASH</Text>
+          <OnboardingTopBar stepIndex={2} totalSteps={5} onBack={() => router.back()} />
+          <View style={styles.skipRow}>
+            <View style={styles.headerSpacer} />
             <Pressable onPress={() => router.push("/onboarding/avatar")} style={styles.skipButton}>
               <Text style={styles.skipButtonText}>Skip</Text>
             </Pressable>
@@ -86,7 +85,7 @@ export default function PhoneScreen() {
           <View style={styles.titleSection}>
             <Text style={styles.title}>Verify your phone</Text>
             <Text style={styles.subtitle}>
-              We'll send you a WhatsApp verification code
+              We'll send you an SMS verification code
             </Text>
           </View>
 
@@ -156,31 +155,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
   },
-  header: {
+  skipRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 32,
-    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 8,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backIcon: {
-    fontSize: 32,
-    color: "#FFFFFF",
-    fontWeight: "300",
-    marginLeft: -4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
   skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
   titleSection: {

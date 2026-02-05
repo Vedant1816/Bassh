@@ -1,6 +1,7 @@
 import { View, Text, TextInput, Pressable, StyleSheet, StatusBar, Dimensions, KeyboardAvoidingView, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
@@ -60,11 +61,9 @@ export default function VerifyPhoneScreen() {
         />
 
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <Text style={styles.backIcon}>‹</Text>
-            </Pressable>
-            <Text style={styles.headerTitle}>Welcome to BASH</Text>
+          <OnboardingTopBar stepIndex={2} totalSteps={5} onBack={() => router.back()} />
+          <View style={styles.skipRow}>
+            <View style={styles.headerSpacer} />
             <Pressable onPress={() => router.replace("/onboarding/avatar")} style={styles.skipButton}>
               <Text style={styles.skipButtonText}>Skip</Text>
             </Pressable>
@@ -134,31 +133,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
   },
-  header: {
+  skipRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 32,
-    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 8,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backIcon: {
-    fontSize: 32,
-    color: "#FFFFFF",
-    fontWeight: "300",
-    marginLeft: -4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
   skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
   titleSection: {
