@@ -1,6 +1,12 @@
 import { Platform } from "react-native";
 
 /**
+ * Fallback API URL (ngrok tunnel)
+ * Used when primary API URL is unreachable
+ */
+export const FALLBACK_API_URL = "https://irrefutably-nondiscordant-ethan.ngrok-free.dev";
+
+/**
  * Get the API base URL for the current platform
  * - iOS Simulator: localhost works
  * - Android Emulator: Use 10.0.2.2 (special alias for host machine)
@@ -23,6 +29,67 @@ export function getApiBaseUrl(): string | null {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+/**
+ * Try to fetch from primary URL, fallback to ngrok URL if it fails
+ */
+export async function fetchWithFallback(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const primaryUrl = API_BASE_URL;
+  
+  console.log("🌐 [API] Request path:", path);
+  console.log("🌐 [API] Primary URL:", primaryUrl || "NOT SET");
+  console.log("🌐 [API] Fallback URL:", FALLBACK_API_URL);
+  
+  if (!primaryUrl) {
+    // If no primary URL, use fallback directly
+    const fullUrl = `${FALLBACK_API_URL}${path}`;
+    console.log(`🔄 [API] No primary URL configured, using fallback: ${fullUrl}`);
+    return fetch(fullUrl, init);
+  }
+
+  try {
+    // Create timeout controller for React Native compatibility
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    // Try primary URL first
+    const fullUrl = `${primaryUrl}${path}`;
+    console.log(`🌐 [API] Attempting request to: ${fullUrl}`);
+    
+    const response = await fetch(fullUrl, {
+      ...init,
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    console.log(`✅ [API] Primary API response: ${response.status} ${response.statusText}`);
+    
+    // If successful, return response
+    if (response.ok || response.status < 500) {
+      console.log(`✅ [API] Using primary API response`);
+      return response;
+    }
+    
+    // If server error, try fallback
+    console.warn(`⚠️ [API] Primary API returned ${response.status}, trying fallback...`);
+  } catch (error: any) {
+    // Network error or timeout - try fallback
+    if (error.name === 'AbortError') {
+      console.warn(`⚠️ [API] Primary API timeout after 5s, trying fallback...`);
+    } else {
+      console.warn(`⚠️ [API] Primary API unreachable (${error.message}), trying fallback...`);
+    }
+  }
+
+  // Try fallback URL
+  const fallbackUrl = `${FALLBACK_API_URL}${path}`;
+  console.log(`🔄 [API] Using fallback API: ${fallbackUrl}`);
+  return fetch(fallbackUrl, init);
+}
 
 /**
  * Check if API URL is configured for physical devices

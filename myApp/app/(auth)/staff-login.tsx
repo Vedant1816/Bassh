@@ -2,7 +2,8 @@ import { useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import supabasePublic from "@/_services/supabase-public";
-import { redirectToRoleHome } from "@/_services/user-role";
+import { redirectStaff } from "../../services/redirect-staff";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 export default function StaffLoginScreen() {
   const router = useRouter();
@@ -11,139 +12,59 @@ export default function StaffLoginScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const validateForm = (): string | null => {
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail) {
-      return "Email is required";
-    }
-
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      return "Please enter a valid email address";
-    }
-
-    if (!trimmedPassword) {
-      return "Password is required";
-    }
-
-    return null;
-  };
-
-  const handleStaffLogin = async () => {
-    // Validate form before submission
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
+  const handleLogin = async () => {
     setLoading(true);
     setError("");
 
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+    const { error } = await supabasePublic.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
 
-    try {
-      const { data, error } = await supabasePublic.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: trimmedPassword,
-      });
-
-      if (error) {
-        console.error("Staff login error:", error);
-        setError(error.message || "Login failed. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Verify session was created
-      const { data: sessionData, error: sessionError } = await supabasePublic.auth.getSession();
-      
-      if (sessionError || !sessionData.session) {
-        console.error("Session error:", sessionError);
-        setError("Failed to create session. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Log the access token
-      const token = sessionData.session.access_token;
-      console.log("🔑 Staff Access Token:", token);
-      console.log("Staff login successful, redirecting based on role...");
-      await redirectToRoleHome(router);
-    } catch (err: any) {
-      console.error("Unexpected staff login error:", err);
-      setError(err.message || "An unexpected error occurred. Please try again.");
+    if (error) {
+      setError(error.message);
       setLoading(false);
+      return;
     }
+
+    await redirectStaff(router);
   };
 
   return (
-    <View style={styles.container}>
+    <DismissKeyboardView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Staff Login</Text>
-        <Text style={styles.subtitle}>Sign in to staff portal</Text>
 
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Staff Email"
-            placeholderTextColor="#6B7280"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+        <TextInput
+          placeholder="Email"
+          placeholderTextColor="#6B7280"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+        />
 
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            style={styles.input}
-            autoCapitalize="none"
-          />
+        <TextInput
+          placeholder="Password"
+          placeholderTextColor="#6B7280"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+        />
 
-          <Pressable
-            onPress={handleStaffLogin}
-            disabled={loading || !email.trim() || !password.trim()}
-            style={[styles.button, (loading || !email.trim() || !password.trim()) && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Signing in..." : "Login as Staff"}
-            </Text>
-          </Pressable>
-
-          {error && (
-            <Text style={styles.error}>
-              {error}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Don't have an account?{" "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.push("/staff-signup")}
-            >
-              Staff Signup
-            </Text>
+        <Pressable onPress={handleLogin} style={styles.button}>
+          <Text style={styles.buttonText}>
+            {loading ? "Signing in..." : "Login"}
           </Text>
-          <Text style={styles.footerText}>
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.back()}
-            >
-              ← Back
-            </Text>
-          </Text>
-        </View>
+        </Pressable>
+
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        <Pressable onPress={() => router.push("/staff-signup")}>
+          <Text style={styles.link}>Create staff account</Text>
+        </Pressable>
       </View>
-    </View>
+    </DismissKeyboardView>
   );
 }
 
@@ -151,66 +72,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000000",
-    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    padding: 20,
   },
   card: {
-    width: "100%",
-    maxWidth: 400,
+    backgroundColor: "#111111",
     borderRadius: 16,
+    padding: 24,
     borderWidth: 1,
     borderColor: "rgba(236, 72, 153, 0.3)",
-    backgroundColor: "#000000",
-    padding: 32,
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 40,
-    elevation: 10,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    textAlign: "center",
     color: "#EC4899",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
+    marginBottom: 24,
     textAlign: "center",
-    color: "#9CA3AF",
-    marginBottom: 32,
-  },
-  form: {
-    gap: 16,
   },
   input: {
-    width: "100%",
+    backgroundColor: "#1a1a1a",
     borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
     color: "#FFFFFF",
     fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#333333",
   },
   button: {
-    width: "100%",
+    backgroundColor: "#EC4899",
     borderRadius: 8,
-    backgroundColor: "#DB2777",
-    paddingVertical: 12,
+    padding: 16,
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    marginTop: 8,
   },
   buttonText: {
     color: "#FFFFFF",
@@ -218,22 +112,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   error: {
-    textAlign: "center",
+    color: "#EF4444",
     fontSize: 14,
-    color: "#F87171",
-    marginTop: 8,
-  },
-  footer: {
-    marginTop: 24,
-    gap: 8,
-  },
-  footerText: {
+    marginTop: 12,
     textAlign: "center",
-    fontSize: 14,
-    color: "#6B7280",
   },
-  footerLink: {
+  link: {
     color: "#EC4899",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 16,
     textDecorationLine: "underline",
   },
 });
