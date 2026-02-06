@@ -24,6 +24,7 @@ import SearchBar from "@/app/components/SearchBar";
 import MapFloatingActions from "@/app/components/MapFloatingActions";
 import FilterEventsModal from "@/app/components/FilterEventsModal";
 import { NotificationsModal } from "@/app/components/Notifications";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import type { FilterState } from "@/app/components/FilterEventsModal";
 import { LinearGradient } from "expo-linear-gradient";
 import ClubCard, { type ClubCardData } from "@/app/components/ClubCard";
@@ -77,10 +78,34 @@ export default function HomeScreen() {
   const [loadingCards, setLoadingCards] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<
-    { type: "club" | "event"; id: string; name: string; subtitle?: string; date?: string; club_id?: string }[]
+    { type: "club" | "event"; id: string; name: string; subtitle?: string; date?: string; club_id?: string; image?: string }[]
   >([]);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  /* ---------------- FETCH UNREAD NOTIFICATION COUNT ---------------- */
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await fetchWithFallback(
+        "/api/notifications/send-all?limit=1",
+        await withAuthHeaders({ method: "GET" })
+      );
+      const json = await res.json();
+      if (res.ok) {
+        setUnreadNotificationCount(json.unreadCount || 0);
+      }
+    } catch (err) {
+      console.error("❌ Failed to fetch unread count", err);
+    }
+  };
+
+  // Fetch unread count on mount and after auth check
+  useEffect(() => {
+    if (authChecked) {
+      fetchUnreadCount();
+    }
+  }, [authChecked]);
 
   /* ---------------- AUTH ---------------- */
   useEffect(() => {
@@ -336,267 +361,289 @@ export default function HomeScreen() {
   /* ---------------- UI ---------------- */
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
+      <DismissKeyboardView style={{ flex: 1 }}>
+        <StatusBar style="light" />
 
-      {/* MAP - key forces Camera to recenter when location changes (ref setCamera can be unreliable) */}
-      <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Dark}>
-        <Mapbox.Camera
-          key={`${location.lat}-${location.lng}`}
-          ref={cameraRef}
-          centerCoordinate={[location.lng, location.lat]}
-          zoomLevel={13}
-          animationDuration={3000}
-          animationMode="easeTo"
-        />
-
-        {/* User Location Marker - Blue Google Maps style */}
-        {location.source === "gps" && (
-          <Mapbox.PointAnnotation
-            id="user-location"
-            coordinate={[location.lng, location.lat]}
-          >
-            <View style={styles.userLocationMarker}>
-              <View style={styles.userLocationOuter}>
-                <View style={styles.userLocationInner} />
-              </View>
-            </View>
-          </Mapbox.PointAnnotation>
-        )}
-
-        {/* Show selected city marker if manual selection */}
-        {location.source === "manual" && (
-          <Mapbox.PointAnnotation
-            id="selected-city"
-            coordinate={[location.lng, location.lat]}
-          >
-            <LinearGradient
-              colors={PrimaryGradient}
-              start={PrimaryGradientStart}
-              end={PrimaryGradientEnd}
-              style={styles.cityPin}
-            >
-              <View style={styles.cityPinInner}>
-                <Ionicons name="location" size={22} color={Colors.dark.text} />
-              </View>
-            </LinearGradient>
-          </Mapbox.PointAnnotation>
-        )}
-
-        {/* HEATMAP — red (hot) → orange → yellow → green (cool); layerIndex 0 so it draws below roads and club markers */}
-        <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
-          <Mapbox.HeatmapLayer
-            id="heatmap-layer"
-            layerIndex={0}
-            style={{
-              heatmapRadius: 100,
-              heatmapWeight: 1,
-              heatmapIntensity: 2,
-              heatmapOpacity: 0.85,
-              heatmapColor: [
-                "interpolate",
-                ["linear"],
-                ["heatmap-density"],
-                0,
-                "rgba(34,197,94,0)",
-                0.2,
-                "rgba(74,222,128,0.55)",
-                0.4,
-                "rgba(234,179,8,0.7)",
-                0.6,
-                "rgba(249,115,22,0.82)",
-                0.8,
-                "rgba(239,68,68,0.9)",
-                1,
-                "rgba(185,28,28,1)",
-              ] as any,
-            }}
+        {/* MAP - key forces Camera to recenter when location changes (ref setCamera can be unreliable) */}
+        <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Dark}>
+          <Mapbox.Camera
+            key={`${location.lat}-${location.lng}`}
+            ref={cameraRef}
+            centerCoordinate={[location.lng, location.lat]}
+            zoomLevel={13}
+            animationDuration={3000}
+            animationMode="easeTo"
           />
-        </Mapbox.ShapeSource>
 
-        {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
-        {clubs.map((club, index) => (
-          <Mapbox.MarkerView
-            key={club.id}
-            id={club.id}
-            coordinate={[club.longitude, club.latitude]}
-            anchor={{ x: 0.5, y: 0.5 }}
-            allowOverlap={true}
-            allowOverlapWithPuck={true}
-          >
-            <Pressable
-              style={[styles.clubMarkerContainer, { zIndex: 10000 + index, elevation: 10000 + index }]}
-              onPress={() => {
-                console.log("📍 Club tapped:", club.club_name);
-                router.push(`/club/${club.id}`);
+          {/* User Location Marker - Blue Google Maps style */}
+          {location.source === "gps" && (
+            <Mapbox.PointAnnotation
+              id="user-location"
+              coordinate={[location.lng, location.lat]}
+            >
+              <View style={styles.userLocationMarker}>
+                <View style={styles.userLocationOuter}>
+                  <View style={styles.userLocationInner} />
+                </View>
+              </View>
+            </Mapbox.PointAnnotation>
+          )}
+
+          {/* Show selected city marker if manual selection */}
+          {location.source === "manual" && (
+            <Mapbox.PointAnnotation
+              id="selected-city"
+              coordinate={[location.lng, location.lat]}
+            >
+              <LinearGradient
+                colors={PrimaryGradient}
+                start={PrimaryGradientStart}
+                end={PrimaryGradientEnd}
+                style={styles.cityPin}
+              >
+                <View style={styles.cityPinInner}>
+                  <Ionicons name="location" size={22} color={Colors.dark.text} />
+                </View>
+              </LinearGradient>
+            </Mapbox.PointAnnotation>
+          )}
+
+          {/* HEATMAP — red (hot) → orange → yellow → green (cool); layerIndex 0 so it draws below roads and club markers */}
+          <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
+            <Mapbox.HeatmapLayer
+              id="heatmap-layer"
+              layerIndex={0}
+              style={{
+                heatmapRadius: 100,
+                heatmapWeight: 1,
+                heatmapIntensity: 2,
+                heatmapOpacity: 0.85,
+                heatmapColor: [
+                  "interpolate",
+                  ["linear"],
+                  ["heatmap-density"],
+                  0,
+                  "rgba(34,197,94,0)",
+                  0.2,
+                  "rgba(74,222,128,0.55)",
+                  0.4,
+                  "rgba(234,179,8,0.7)",
+                  0.6,
+                  "rgba(249,115,22,0.82)",
+                  0.8,
+                  "rgba(239,68,68,0.9)",
+                  1,
+                  "rgba(185,28,28,1)",
+                ] as any,
               }}
-            >
-              {/* Main circular image */}
-              <View style={club.club_logo ? styles.clubMarkerCircleWithImage : styles.clubMarkerCircle}>
-                {club.club_logo ? (
-                  <Image
-                    source={{ uri: club.club_logo }}
-                    style={styles.clubMarkerImageReal}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={PrimaryGradient}
-                    start={PrimaryGradientStart}
-                    end={PrimaryGradientEnd}
-                    style={styles.clubMarkerPlaceholder}
-                  >
-                    <Text style={styles.clubMarkerPlaceholderText}>
-                      {club.club_name?.[0]?.toUpperCase() || "C"}
-                    </Text>
-                  </LinearGradient>
-                )}
-              </View>
-              {/* Rating badge below */}
-              <View style={styles.clubMarkerBadge}>
-                <Ionicons name="star" size={12} color="#EAB308" />
-                <Text style={styles.clubMarkerRating}>
-                  {(club.rating ?? 4.0).toFixed(1)}
-                </Text>
-              </View>
-            </Pressable>
-          </Mapbox.MarkerView>
-        ))}
-      </Mapbox.MapView>
+            />
+          </Mapbox.ShapeSource>
 
-      {/* HEADER */}
-      <View style={styles.headerContainer}>
-        {/* Location header: 178x40 at left 10, top 59 */}
-        <View style={styles.locationHeaderWrapper}>
-          <LocationHeader
-            title="Home"
-            address={locationAddress}
-            onLocationChange={handleCitySelect}
+          {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
+          {clubs.map((club, index) => (
+            <Mapbox.MarkerView
+              key={club.id}
+              id={club.id}
+              coordinate={[club.longitude, club.latitude]}
+              anchor={{ x: 0.5, y: 0.5 }}
+              allowOverlap={true}
+              allowOverlapWithPuck={true}
+            >
+              <Pressable
+                style={[styles.clubMarkerContainer, { zIndex: 10000 + index, elevation: 10000 + index }]}
+                onPress={() => {
+                  console.log("📍 Club tapped:", club.club_name);
+                  router.push(`/club/${club.id}`);
+                }}
+              >
+                {/* Main circular image */}
+                <View style={club.club_logo ? styles.clubMarkerCircleWithImage : styles.clubMarkerCircle}>
+                  {club.club_logo ? (
+                    <Image
+                      source={{ uri: club.club_logo }}
+                      style={styles.clubMarkerImageReal}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <LinearGradient
+                      colors={PrimaryGradient}
+                      start={PrimaryGradientStart}
+                      end={PrimaryGradientEnd}
+                      style={styles.clubMarkerPlaceholder}
+                    >
+                      <Text style={styles.clubMarkerPlaceholderText}>
+                        {club.club_name?.[0]?.toUpperCase() || "C"}
+                      </Text>
+                    </LinearGradient>
+                  )}
+                </View>
+                {/* Rating badge below */}
+                <View style={styles.clubMarkerBadge}>
+                  <Ionicons name="star" size={12} color="#EAB308" />
+                  <Text style={styles.clubMarkerRating}>
+                    {(club.rating ?? 4.0).toFixed(1)}
+                  </Text>
+                </View>
+              </Pressable>
+            </Mapbox.MarkerView>
+          ))}
+        </Mapbox.MapView>
+
+        {/* HEADER */}
+        <View style={styles.headerContainer}>
+          {/* Location header: 178x40 at left 10, top 59 */}
+          <View style={styles.locationHeaderWrapper}>
+            <LocationHeader
+              title="Home"
+              address={locationAddress}
+              onLocationChange={handleCitySelect}
+            />
+          </View>
+          <Pressable
+            style={styles.headerChatButton}
+            onPress={() => setNotificationModalVisible(true)}
+          >
+            <Image
+              source={require("@/assets/images/chat-bubble-icon.png")}
+              style={styles.headerChatIcon}
+              resizeMode="contain"
+            />
+            {unreadNotificationCount > 0 && (
+              <View style={styles.notificationBadge} />
+            )}
+          </Pressable>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onResults={setSearchResults}
           />
+
+          {searchResults.length > 0 && (
+            <View style={styles.searchResultsContainer}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                style={styles.searchResultsScroll}
+                nestedScrollEnabled
+              >
+                {searchResults.map((item) => (
+                  <Pressable
+                    key={`${item.type}-${item.id}`}
+                    style={styles.searchResultRow}
+                    onPress={() => {
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      if (item.type === "club") {
+                        router.push(`/club/${item.id}`);
+                      } else {
+                        router.push(`/event/${item.id}`);
+                      }
+                    }}
+                  >
+                    <View style={styles.searchResultImageWrapper}>
+                      {item.image ? (
+                        <Image source={{ uri: item.image }} style={styles.searchResultImage} />
+                      ) : (
+                        <View style={styles.searchResultPlaceholder}>
+                          <Ionicons
+                            name={item.type === "club" ? "business" : "musical-notes"}
+                            size={20}
+                            color={Colors.dark.textSecondary}
+                          />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.searchResultContent}>
+                      <Text style={styles.searchResultName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {(item.subtitle || item.date) && (
+                        <Text style={styles.searchResultSubtitle} numberOfLines={1}>
+                          {item.type === "club"
+                            ? item.subtitle
+                            : item.date
+                              ? new Date(item.date).toLocaleDateString()
+                              : ""}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.searchResultType}>
+                      {item.type === "club" ? "Venue" : "Event"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
-        <Pressable
-          style={styles.headerChatButton}
-          onPress={() => setNotificationModalVisible(true)}
-        >
-          <Image
-            source={require("@/assets/images/chat-bubble-icon.png")}
-            style={styles.headerChatIcon}
-            resizeMode="contain"
-          />
-        </Pressable>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onResults={setSearchResults}
+
+        {/* Map floating actions */}
+        <MapFloatingActions
+          top={107 + 55 + 8}
+          onRecenterToUserLocation={handleRecenterToUserLocation}
+          actions={[
+            { id: "people", icon: "people-outline", onPress: () => { } },
+            { id: "filter", icon: "options-outline", onPress: () => setFilterModalVisible(true) },
+            { id: "location", icon: "locate-outline", onPress: () => { } },
+          ]}
         />
 
-        {searchResults.length > 0 && (
-          <View style={styles.searchResultsContainer}>
+        {/* Filter events modal - opens from map filter button */}
+        <FilterEventsModal
+          visible={filterModalVisible}
+          onClose={() => setFilterModalVisible(false)}
+          onFindNow={(filters: FilterState) => {
+            setFilterModalVisible(false);
+            // TODO: apply filters to clubs/events (e.g. refetch with query params)
+          }}
+        />
+
+        {/* BOTTOM CARD - positioned at bottom, just above tab bar */}
+        <View
+          style={[
+            styles.cardsContainer,
+            { bottom: insets.bottom + TAB_BAR_HEIGHT + CARD_BAR_GAP - 42 },
+          ]}
+        >
+          {loadingCards ? (
+            <View style={styles.loadingCards}>
+              <ActivityIndicator color={Colors.dark.primary} />
+              <Text style={styles.loadingCardsText}>Loading clubs...</Text>
+            </View>
+          ) : clubs.length === 0 ? (
+            <View style={styles.emptyCards}>
+              <Text style={styles.emptyCardsText}>No clubs found</Text>
+              <Text style={styles.emptyCardsSubtext}>Try a different city</Text>
+            </View>
+          ) : (
             <ScrollView
-              keyboardShouldPersistTaps="handled"
-              style={styles.searchResultsScroll}
-              nestedScrollEnabled
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ width: CARD_WIDTH * clubs.length }}
             >
-              {searchResults.map((item) => (
-                <Pressable
-                  key={`${item.type}-${item.id}`}
-                  style={styles.searchResultRow}
-                  onPress={() => {
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    if (item.type === "club") {
-                      router.push(`/club/${item.id}`);
-                    } else {
-                      router.push(`/event/${item.id}`);
-                    }
-                  }}
-                >
-                  <View style={styles.searchResultContent}>
-                    <Text style={styles.searchResultName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    {(item.subtitle || item.date) && (
-                      <Text style={styles.searchResultSubtitle} numberOfLines={1}>
-                        {item.type === "club"
-                          ? item.subtitle
-                          : item.date
-                            ? new Date(item.date).toLocaleDateString()
-                            : ""}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={styles.searchResultType}>
-                    {item.type === "club" ? "Venue" : "Event"}
-                  </Text>
-                </Pressable>
+              {clubs.map((club) => (
+                <ClubCard
+                  key={club.id}
+                  club={club}
+                  width={CARD_WIDTH}
+                  onPress={() => router.push(`/club/${club.id}`)}
+                  onNavigate={() => openDirections(club)}
+                />
               ))}
             </ScrollView>
-          </View>
-        )}
-      </View>
+          )}
+        </View>
 
-      {/* Map floating actions */}
-      <MapFloatingActions
-        top={107 + 55 + 8}
-        onRecenterToUserLocation={handleRecenterToUserLocation}
-        actions={[
-          { id: "people", icon: "people-outline", onPress: () => { } },
-          { id: "filter", icon: "options-outline", onPress: () => setFilterModalVisible(true) },
-          { id: "location", icon: "locate-outline", onPress: () => { } },
-        ]}
-      />
-
-      {/* Filter events modal - opens from map filter button */}
-      <FilterEventsModal
-        visible={filterModalVisible}
-        onClose={() => setFilterModalVisible(false)}
-        onFindNow={(filters: FilterState) => {
-          setFilterModalVisible(false);
-          // TODO: apply filters to clubs/events (e.g. refetch with query params)
-        }}
-      />
-
-      {/* BOTTOM CARD - positioned at bottom, just above tab bar */}
-      <View
-        style={[
-          styles.cardsContainer,
-          { bottom: insets.bottom + TAB_BAR_HEIGHT + CARD_BAR_GAP - 42 },
-        ]}
-      >
-        {loadingCards ? (
-          <View style={styles.loadingCards}>
-            <ActivityIndicator color={Colors.dark.primary} />
-            <Text style={styles.loadingCardsText}>Loading clubs...</Text>
-          </View>
-        ) : clubs.length === 0 ? (
-          <View style={styles.emptyCards}>
-            <Text style={styles.emptyCardsText}>No clubs found</Text>
-            <Text style={styles.emptyCardsSubtext}>Try a different city</Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ width: CARD_WIDTH * clubs.length }}
-          >
-            {clubs.map((club) => (
-              <ClubCard
-                key={club.id}
-                club={club}
-                width={CARD_WIDTH}
-                onPress={() => router.push(`/club/${club.id}`)}
-                onNavigate={() => openDirections(club)}
-              />
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* NOTIFICATIONS MODAL */}
-      <NotificationsModal
-        visible={notificationModalVisible}
-        onClose={() => setNotificationModalVisible(false)}
-      />
+        {/* NOTIFICATIONS MODAL */}
+        <NotificationsModal
+          visible={notificationModalVisible}
+          onClose={() => {
+            setNotificationModalVisible(false);
+            // Refresh unread count after closing modal (user may have read notifications)
+            fetchUnreadCount();
+          }}
+        />
+      </DismissKeyboardView>
     </GestureHandlerRootView >
   );
 }
@@ -671,7 +718,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
-    gap: 10,
+    gap: 12,
+  },
+
+  searchResultImageWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: Colors.dark.surface,
+  },
+
+  searchResultImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+
+  searchResultPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
 
   searchResultContent: {
@@ -866,5 +935,17 @@ const styles = StyleSheet.create({
     left: CARD_HORIZONTAL_PADDING,
     right: CARD_HORIZONTAL_PADDING,
     height: 150,
+  },
+
+  notificationBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#FF3B30",
+    borderWidth: 1.5,
+    borderColor: Colors.dark.background,
   },
 });

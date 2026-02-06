@@ -428,6 +428,60 @@ export function BookEntryModal({
     }
   };
 
+  /* ---------------- NOTIFICATION LOGIC ---------------- */
+  const sendBookingConfirmationNotification = async (bookingId: string) => {
+    try {
+      console.log("🔔 [NOTIFICATIONS] Sending booking confirmation for:", bookingId);
+      // Send confirmation notification to the current user
+      await fetchWithFallback(
+        "/api/notifications/send",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: `Booking Confirmed! 🎉`,
+            message: `Your booking at ${club?.club_name || "the club"} has been confirmed. See you there!`,
+            type: "booking_confirmation",
+            metadata: {
+              booking_id: bookingId,
+            },
+          }),
+        })
+      );
+      console.log("✅ [NOTIFICATIONS] Booking confirmation notification sent");
+    } catch (err) {
+      console.error("❌ [NOTIFICATIONS] Failed to send booking confirmation notification:", err);
+      // Don't block the booking flow if notification fails
+    }
+  };
+
+  const sendNotificationToMatchingUsers = async (participantNames: string[], bookingId?: string) => {
+    try {
+      console.log("🔔 [NOTIFICATIONS] Sending bulk notifications to:", participantNames);
+      // Send notification to all matching participants
+      await fetchWithFallback(
+        "/api/notifications/send-bulk",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usernames: participantNames,
+            title: `You're on the guest list! 🎉`,
+            message: `You've been added to the guest list for ${club?.club_name || "the club"}. See you there!`,
+            type: "booking",
+            metadata: {
+              booking_id: bookingId,
+            },
+          }),
+        })
+      );
+      console.log("✅ [NOTIFICATIONS] Notifications sent to matching participants");
+    } catch (err) {
+      console.error("❌ [NOTIFICATIONS] Failed to send notifications:", err);
+      // Don't block the booking flow if notifications fail
+    }
+  };
+
   const handlePayBookingWithWallet = async () => {
     if (!clubId || finalPrice <= 0) {
       Alert.alert("Error", "Invalid booking amount");
@@ -444,6 +498,7 @@ export function BookEntryModal({
 
     try {
       setProcessing(true);
+      console.log("💸 [PAYMENT] Starting wallet payment...");
 
       const res = await fetchWithFallback(
         "/api/payments/table/pay-with-wallet",
@@ -469,10 +524,16 @@ export function BookEntryModal({
       const data = await res.json();
 
       if (!res.ok) {
+        console.error("❌ [PAYMENT] Wallet payment failed:", data);
         setProcessing(false);
         Alert.alert("Payment Failed", data.error || "Failed to process wallet payment");
         return;
       }
+
+      console.log("✅ [PAYMENT] Wallet payment successful, booking ID:", data.booking_id);
+
+      // Send notifications to matching participants with booking_id
+      await sendNotificationToMatchingUsers(participants.map(p => p.name), data.booking_id);
 
       setProcessing(false);
       setShowSummary(false);
@@ -488,6 +549,7 @@ export function BookEntryModal({
         router.replace(`/payment/success?booking_id=${data.booking_id}&amount=${finalPrice}`);
       }
     } catch (err: any) {
+      console.error("❌ [PAYMENT] Error during wallet payment:", err);
       setProcessing(false);
       Alert.alert("Error", err.message || "Something went wrong");
     }
@@ -739,6 +801,9 @@ export function BookEntryModal({
                         );
                         return;
                       }
+
+                      console.log("✅ [PAYMENT] Razorpay payment verified, sending notifications...");
+                      await sendNotificationToMatchingUsers(participants.map(p => p.name), currentBookingId);
 
                       const qrCode = verified.qr || verified.qr_code;
                       setProcessing(false);
@@ -1312,7 +1377,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12,
   },
-  
+
   // Coupon Card Styles - Matching PayBillModal Design
   couponCard: {
     width: "100%",

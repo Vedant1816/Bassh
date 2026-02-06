@@ -26,7 +26,7 @@ import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Design colors matching the PNG
-const PRIMARY_GRADIENT = ["#8B0045", "#5C0030", "#2D0A1F"] as const;
+const PRIMARY_GRADIENT = ["#DB4494", "#DB138D", "#000000"] as const;
 const ACCENT_PINK = "#E91E8C";
 const DARK_CARD = "#2D2D2D";
 const LIGHT_TEXT = "#B0B0B0";
@@ -91,8 +91,10 @@ export default function EventBookingScreen() {
   const [bookingWalletBalance, setBookingWalletBalance] = useState<number>(0);
   const [bookingWalletLoading, setBookingWalletLoading] = useState(false);
 
-  // Payment method
+  // Payment method (matching BookEntryModal)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"wallet" | "upi">("upi");
+  const [selectedUpi, setSelectedUpi] = useState<string>("google");
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
   // Coupon modal
   const [showCouponModal, setShowCouponModal] = useState(false);
@@ -549,6 +551,16 @@ export default function EventBookingScreen() {
       setProcessing(false);
       const errorMsg = err.message || "Something went wrong. Please try again.";
       router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&event_id=${id}`);
+    }
+  };
+
+  const getPaymentMethodDisplayName = () => {
+    if (selectedPaymentMethod === "wallet") return "Wallet";
+    switch (selectedUpi) {
+      case "google": return "Google Pay UPI";
+      case "paytm": return "Paytm UPI";
+      case "phonepe": return "PhonePe UPI";
+      default: return "UPI";
     }
   };
 
@@ -1088,60 +1100,123 @@ export default function EventBookingScreen() {
               </Text>
             </View>
 
-            <View style={{ height: 120 }} />
+            <View style={{ height: 140 }} />
           </ScrollView>
 
-          {/* Payment Footer */}
-          <View style={styles.paymentFooter}>
-            <View style={styles.paymentMethodSection}>
+          {/* Payment Method Selection Bottom Sheet (inline, matching BookEntryModal) */}
+          {showPaymentMethodModal && (
+            <View style={styles.paymentMethodOverlay}>
               <Pressable
-                style={styles.paymentMethodBtn}
-                onPress={() => {
-                  Alert.alert(
-                    "Select Payment Method",
-                    "",
-                    [
-                      {
-                        text: "Wallet",
-                        onPress: () => setSelectedPaymentMethod("wallet"),
-                      },
-                      {
-                        text: "UPI",
-                        onPress: () => setSelectedPaymentMethod("upi"),
-                      },
-                      {
-                        text: "Cancel",
-                        style: "cancel",
-                      },
-                    ]
-                  );
-                }}
-              >
+                style={styles.paymentMethodBackdrop}
+                onPress={() => setShowPaymentMethodModal(false)}
+              />
+              <View style={styles.paymentMethodSheet}>
+                <View style={styles.paymentMethodHandle} />
+                <Text style={styles.paymentMethodSheetTitle}>Select Payment Method</Text>
+
+                {/* Wallet Option */}
+                <Pressable
+                  style={[
+                    styles.paymentMethodRow,
+                    selectedPaymentMethod === "wallet" && styles.paymentMethodRowSelected,
+                    !canPayWithWallet && styles.paymentMethodRowDisabled,
+                  ]}
+                  onPress={() => {
+                    if (canPayWithWallet) setSelectedPaymentMethod("wallet");
+                  }}
+                  disabled={!canPayWithWallet}
+                >
+                  <View style={styles.paymentMethodLeft}>
+                    <View style={styles.paymentMethodIconCircle}>
+                      <Ionicons name="wallet-outline" size={22} color="#FFFFFF" />
+                    </View>
+                    <View>
+                      <Text style={[styles.paymentMethodLabel, !canPayWithWallet && styles.paymentMethodLabelDisabled]}>
+                        Wallet
+                      </Text>
+                      <Text style={styles.paymentMethodBalance}>
+                        Balance: ₹{bookingWalletLoading ? "..." : bookingWalletBalance.toFixed(0)}
+                        {!canPayWithWallet && " (Insufficient)"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.radioOuter, selectedPaymentMethod === "wallet" && styles.radioOuterSelected]}>
+                    {selectedPaymentMethod === "wallet" && <View style={styles.radioInner} />}
+                  </View>
+                </Pressable>
+
+                {/* UPI Section */}
+                <Text style={styles.paymentMethodSectionTitle}>UPI</Text>
+                {[
+                  { id: "google", label: "Google Pay", icon: "logo-google" as const },
+                  { id: "paytm", label: "Paytm", icon: "wallet-outline" as const },
+                  { id: "phonepe", label: "PhonePe", icon: "wallet-outline" as const },
+                ].map((item) => (
+                  <Pressable
+                    key={item.id}
+                    style={[
+                      styles.paymentMethodRow,
+                      selectedPaymentMethod === "upi" && selectedUpi === item.id && styles.paymentMethodRowSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedPaymentMethod("upi");
+                      setSelectedUpi(item.id);
+                    }}
+                  >
+                    <View style={styles.paymentMethodLeft}>
+                      <View style={styles.paymentMethodIconCircle}>
+                        <Ionicons name={item.icon} size={20} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.paymentMethodLabel}>{item.label}</Text>
+                    </View>
+                    <View style={[styles.radioOuter, selectedPaymentMethod === "upi" && selectedUpi === item.id && styles.radioOuterSelected]}>
+                      {selectedPaymentMethod === "upi" && selectedUpi === item.id && <View style={styles.radioInner} />}
+                    </View>
+                  </Pressable>
+                ))}
+
+                <Pressable
+                  style={styles.confirmPaymentMethodButton}
+                  onPress={() => setShowPaymentMethodModal(false)}
+                >
+                  <Text style={styles.confirmPaymentMethodButtonText}>Confirm</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Footer - Matching BookEntryModal */}
+          <View style={styles.payFooter}>
+            <Pressable style={styles.payUsingSection} onPress={() => setShowPaymentMethodModal(true)}>
+              <View style={styles.paymentMethodIcon}>
                 <Ionicons
                   name={selectedPaymentMethod === "wallet" ? "wallet-outline" : "logo-google"}
                   size={16}
                   color="#FFFFFF"
                 />
-                <Text style={styles.paymentMethodText}>
-                  {selectedPaymentMethod === "wallet" ? "Wallet" : "UPI"}
-                </Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.payNowSection}>
-              <View>
-                <Text style={styles.payNowLabel}>Total Price</Text>
-                <Text style={styles.payNowAmount}>Rs.{finalPrice}</Text>
               </View>
-              <Pressable
-                style={[styles.payNowBtn, processing && styles.payNowBtnDisabled]}
-                onPress={handlePayNow}
-                disabled={processing}
-              >
-                <Text style={styles.payNowBtnText}>
-                  {processing ? "Processing..." : "Proceed"}
-                </Text>
-              </Pressable>
+              <View>
+                <Text style={styles.payUsingLabel}>Pay using</Text>
+                <Text style={styles.payUsingMethod}>{getPaymentMethodDisplayName()}</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.payNowCard}>
+              <View style={styles.payNowCardContent}>
+                <View style={styles.totalAmountSection}>
+                  <Text style={styles.totalAmountValue}>Rs.{finalPrice.toLocaleString("en-IN")}</Text>
+                  <Text style={styles.totalLabel}>Total</Text>
+                </View>
+                <Pressable
+                  style={[styles.payNowButton, processing && styles.payNowButtonDisabled]}
+                  onPress={handlePayNow}
+                  disabled={processing}
+                >
+                  <Text style={styles.payNowButtonText}>
+                    {processing ? "Processing..." : "Pay now"}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -1735,57 +1810,194 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: LIGHT_TEXT,
   },
-  paymentFooter: {
-    padding: 20,
-    paddingBottom: 40,
-    backgroundColor: "#000000",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+
+  // Payment method popup + footer (matching BookEntryModal)
+  paymentMethodOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "flex-end",
+    zIndex: 1000,
   },
-  paymentMethodSection: {
-    marginBottom: 16,
+  paymentMethodBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
-  paymentMethodBtn: {
+  paymentMethodSheet: {
+    backgroundColor: "#1A1A1A",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 34,
+    maxHeight: SCREEN_HEIGHT * 0.7,
+  },
+  paymentMethodHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  paymentMethodSheetTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 20,
+  },
+  paymentMethodSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  paymentMethodRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
+    justifyContent: "space-between",
+    backgroundColor: "rgba(45, 45, 45, 0.8)",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
   },
-  paymentMethodText: {
-    fontSize: 14,
+  paymentMethodRowSelected: {
+    borderWidth: 1,
+    borderColor: ACCENT_PINK,
+    backgroundColor: "rgba(233, 30, 140, 0.1)",
+  },
+  paymentMethodRowDisabled: {
+    opacity: 0.5,
+  },
+  paymentMethodLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paymentMethodIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paymentMethodLabel: {
+    fontSize: 16,
     fontWeight: "500",
     color: "#FFFFFF",
   },
-  payNowSection: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  paymentMethodLabelDisabled: {
+    color: "rgba(255, 255, 255, 0.5)",
   },
-  payNowLabel: {
+  paymentMethodBalance: {
     fontSize: 12,
-    color: LIGHT_TEXT,
-    marginBottom: 4,
+    color: "rgba(255, 255, 255, 0.5)",
+    marginTop: 2,
   },
-  payNowAmount: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#FFFFFF",
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  payNowBtn: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+  radioOuterSelected: {
+    borderColor: ACCENT_PINK,
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: ACCENT_PINK,
+  },
+  confirmPaymentMethodButton: {
+    backgroundColor: ACCENT_PINK,
     borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 20,
   },
-  payNowBtnDisabled: {
-    opacity: 0.6,
-  },
-  payNowBtnText: {
+  confirmPaymentMethodButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  payFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 34,
+    backgroundColor: "#000000",
+  },
+  payUsingSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  paymentMethodIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payUsingLabel: {
+    fontSize: 10,
+    color: "rgba(255, 255, 255, 0.6)",
+  },
+  payUsingMethod: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  payNowCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginLeft: 12,
+  },
+  payNowCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  totalAmountSection: {
+    alignItems: "center",
+  },
+  totalAmountValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#000000",
+  },
+  totalLabel: {
+    fontSize: 11,
+    color: "rgba(0, 0, 0, 0.6)",
+  },
+  payNowButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  payNowButtonDisabled: {
+    opacity: 0.6,
+  },
+  payNowButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
     color: "#000000",
   },
 

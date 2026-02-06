@@ -34,6 +34,123 @@ export const GET = withAuth(
         );
       }
 
+      // Enrich booking notifications with booking data
+      const enrichedNotifications = await Promise.all(
+        (notifications || []).map(async (notification: any) => {
+          // Check if it's a booking notification with booking_id in metadata
+          if (
+            (notification.type === "booking" || notification.type === "booking_confirmation") &&
+            notification.metadata?.booking_id
+          ) {
+            try {
+              // First, fetch the basic booking to determine type
+              const { data: basicBooking } = await supabaseAdmin
+                .from("bookings")
+                .select(`
+                  id,
+                  event_id,
+                  club_id,
+                  qr_code,
+                  booking_status,
+                  booking_date,
+                  booking_time,
+                  total_amount,
+                  participants,
+                  created_at
+                `)
+                .eq("id", notification.metadata.booking_id)
+                .single();
+
+              if (!basicBooking) {
+                return notification;
+              }
+
+              // Determine booking type based on event_id and club_id
+              const booking_type = basicBooking.event_id
+                ? "event"
+                : (basicBooking.club_id ? "club" : "unknown");
+
+              if (booking_type === "event" && basicBooking.event_id) {
+                // EVENT BOOKING: Fetch event + club from event
+                const { data: eventData } = await supabaseAdmin
+                  .from("events")
+                  .select(`
+                    id,
+                    name,
+                    event_date,
+                    start_time,
+                    clubs!events_club_id_fkey (
+                      id,
+                      club_name,
+                      address_text
+                    )
+                  `)
+                  .eq("id", basicBooking.event_id)
+                  .single();
+
+                if (eventData) {
+                  const club = eventData.clubs as any;
+                  return {
+                    ...notification,
+                    booking: {
+                      id: basicBooking.id,
+                      qr_code: basicBooking.qr_code,
+                      booking_type: "event",
+                      event_name: eventData.name || notification.metadata?.event_name || "Event",
+                      event_date: eventData.event_date || "",
+                      event_time: eventData.start_time || "",
+                      venue_name: club?.club_name || "",
+                      venue_address: club?.address_text || "",
+                      ticket_type: "General",
+                      ticket_count: Array.isArray(basicBooking.participants) ? basicBooking.participants.length : 1,
+                      total_price: basicBooking.total_amount || 0,
+                      status: basicBooking.booking_status || "confirmed",
+                      confirmation_code: basicBooking.id?.substring(0, 8)?.toUpperCase() || "",
+                    },
+                  };
+                }
+              } else if (booking_type === "club" && basicBooking.club_id) {
+                // CLUB BOOKING: Fetch club directly
+                const { data: clubData } = await supabaseAdmin
+                  .from("clubs")
+                  .select(`
+                    id,
+                    club_name,
+                    address_text
+                  `)
+                  .eq("id", basicBooking.club_id)
+                  .single();
+
+                if (clubData) {
+                  return {
+                    ...notification,
+                    booking: {
+                      id: basicBooking.id,
+                      qr_code: basicBooking.qr_code,
+                      booking_type: "club",
+                      event_name: clubData.club_name || "Club Entry", // Use club name as event_name for backward compat
+                      club_name: clubData.club_name || "",
+                      event_date: basicBooking.booking_date || "",
+                      event_time: basicBooking.booking_time || "",
+                      venue_name: clubData.club_name || "",
+                      venue_address: clubData.address_text || "",
+                      ticket_type: "Entry Pass",
+                      ticket_count: Array.isArray(basicBooking.participants) ? basicBooking.participants.length : 1,
+                      total_price: basicBooking.total_amount || 0,
+                      status: basicBooking.booking_status || "confirmed",
+                      confirmation_code: basicBooking.id?.substring(0, 8)?.toUpperCase() || "",
+                    },
+                  };
+                }
+              }
+            } catch (err) {
+              console.error("❌ [NOTIFICATIONS] Failed to enrich booking:", err);
+            }
+          }
+          return notification;
+        })
+      );
+
       // Get unread count
       const { count: unreadCount } = await supabaseAdmin
         .from("notifications")
@@ -43,7 +160,7 @@ export const GET = withAuth(
 
       return Response.json({
         success: true,
-        notifications: notifications || [],
+        notifications: enrichedNotifications,
         total: count || 0,
         unreadCount: unreadCount || 0,
         limit,

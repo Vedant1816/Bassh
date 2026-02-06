@@ -125,6 +125,31 @@ const YOUR_EVENT_CARD_WIDTH = 175;
 const YOUR_EVENT_CARD_HEIGHT = 260;
 const YOUR_EVENT_CARD_GAP = 12;
 
+/** Bookmark data from /api/bookmarks/fetch */
+interface SavedEventBookmark {
+  id: string;
+  bookmark_type: string;
+  created_at: string;
+  event: {
+    id: string;
+    name: string;
+    event_date: string;
+    start_time: string;
+    banner_image_url: string | null;
+    club: {
+      id: string;
+      club_name: string;
+      address_text: string;
+    } | null;
+  } | null;
+  club: {
+    id: string;
+    club_name: string;
+    address_text: string;
+    cover_photo: string | null;
+  } | null;
+}
+
 export default function EventsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -144,6 +169,8 @@ export default function EventsScreen() {
   const [payBillClubId, setPayBillClubId] = useState<string | null>(null);
   const [payBillClub, setPayBillClub] = useState<ClubInfoForBill | null>(null);
   const [payBillDiscounts, setPayBillDiscounts] = useState<Discount[]>([]);
+  const [savedEvents, setSavedEvents] = useState<SavedEventBookmark[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -188,12 +215,35 @@ export default function EventsScreen() {
     if (
       selectedFilter === "live" ||
       selectedFilter === "past" ||
-      selectedFilter === "saved" ||
       selectedFilter === "going"
     ) {
       fetchMyBookings();
     }
   }, [selectedFilter, fetchMyBookings]);
+
+  /** Fetch saved events from bookmarks API */
+  const fetchSavedEvents = useCallback(async () => {
+    setLoadingSaved(true);
+    try {
+      const res = await fetchWithFallback(
+        "/api/bookmarks/fetch?bookmark_type=event",
+        await withAuthHeaders({ method: "GET" })
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setSavedEvents((data.bookmarks || []) as SavedEventBookmark[]);
+    } catch {
+      setSavedEvents([]);
+    } finally {
+      setLoadingSaved(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedFilter === "saved") {
+      fetchSavedEvents();
+    }
+  }, [selectedFilter, fetchSavedEvents]);
 
   const handleLocationChange = useCallback(async (city: { name: string; lat: number; lng: number }) => {
     if (city.name === "Your Location") {
@@ -233,10 +283,12 @@ export default function EventsScreen() {
     if (
       selectedFilter === "live" ||
       selectedFilter === "past" ||
-      selectedFilter === "saved" ||
       selectedFilter === "going"
     ) {
       fetchMyBookings();
+    }
+    if (selectedFilter === "saved") {
+      fetchSavedEvents();
     }
   };
 
@@ -344,6 +396,41 @@ export default function EventsScreen() {
         <View style={styles.yourEventCardBody}>
           <Text style={styles.yourEventCardTitle} numberOfLines={1}>
             {ev.name || "Random Party Name"}
+          </Text>
+          <Text style={styles.yourEventCardDateTime}>
+            {formatEventDateShort(ev.event_date)} {formatTimeRange(ev.start_time)}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  /** Compact saved event card for "Your saved events" strip */
+  const renderSavedEventCard = (bookmark: SavedEventBookmark) => {
+    const ev = bookmark.event;
+    if (!ev) return null;
+    return (
+      <Pressable
+        key={bookmark.id}
+        style={[styles.yourEventCard, { marginRight: YOUR_EVENT_CARD_GAP }]}
+        onPress={() => router.push(`/event/${ev.id}`)}
+      >
+        <View style={styles.yourEventCardImageWrap}>
+          {ev.banner_image_url ? (
+            <Image
+              source={{ uri: ev.banner_image_url }}
+              style={styles.yourEventCardImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.yourEventCardPlaceholder}>
+              <Ionicons name="musical-notes-outline" size={36} color="rgba(255,255,255,0.4)" />
+            </View>
+          )}
+        </View>
+        <View style={styles.yourEventCardBody}>
+          <Text style={styles.yourEventCardTitle} numberOfLines={1}>
+            {ev.name || "Event"}
           </Text>
           <Text style={styles.yourEventCardDateTime}>
             {formatEventDateShort(ev.event_date)} {formatTimeRange(ev.start_time)}
@@ -724,7 +811,29 @@ export default function EventsScreen() {
                 contentContainerStyle={styles.yourEventsScrollContent}
                 style={styles.yourEventsScroll}
               >
-                {loadingBookings ? (
+                {selectedFilter === "saved" ? (
+                  loadingSaved ? (
+                    <View style={styles.yourEventsLoading}>
+                      <ActivityIndicator size="small" color={BTN_PINK} />
+                    </View>
+                  ) : savedEvents.length === 0 ? (
+                    <View style={[styles.yourEventCard, { marginRight: YOUR_EVENT_CARD_GAP }]}>
+                      <View style={styles.yourEventCardImageWrap}>
+                        <View style={styles.yourEventCardPlaceholder}>
+                          <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.3)" />
+                        </View>
+                      </View>
+                      <View style={styles.yourEventCardBody}>
+                        <Text style={styles.yourEventCardTitle}>No saved events</Text>
+                        <Text style={styles.yourEventCardDateTime}>
+                          Save events to see them here
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    savedEvents.filter((b) => b.event).map((b) => renderSavedEventCard(b))
+                  )
+                ) : loadingBookings ? (
                   <View style={styles.yourEventsLoading}>
                     <ActivityIndicator size="small" color={BTN_PINK} />
                   </View>
@@ -753,20 +862,16 @@ export default function EventsScreen() {
                           <Text style={styles.yourEventCardTitle}>
                             {selectedFilter === "past"
                               ? "No past booked events"
-                              : selectedFilter === "saved"
-                                ? "No saved events"
-                                : selectedFilter === "going"
-                                  ? "No ongoing events"
-                                  : "No booked events"}
+                              : selectedFilter === "going"
+                                ? "No ongoing events"
+                                : "No booked events"}
                           </Text>
                           <Text style={styles.yourEventCardDateTime}>
                             {selectedFilter === "past"
                               ? "Events you attended will appear here"
-                              : selectedFilter === "saved"
-                                ? "Save events to see them here"
-                                : selectedFilter === "going"
-                                  ? "Events happening today will appear here"
-                                  : "Book an event to see it here"}
+                              : selectedFilter === "going"
+                                ? "Events happening today will appear here"
+                                : "Book an event to see it here"}
                           </Text>
                         </View>
                       </View>
@@ -802,6 +907,90 @@ export default function EventsScreen() {
               )
             );
           })()
+        ) : selectedFilter === "saved" ? (
+          (() => {
+            const savedEventsList = savedEvents.filter((b) => b.event);
+            return savedEventsList.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>No saved events</Text>
+              </View>
+            ) : (
+              savedEventsList.map((bookmark) => {
+                const ev = bookmark.event!;
+                return (
+                  <View key={bookmark.id} style={styles.cardWrapper}>
+                    <Pressable style={styles.card} onPress={() => router.push(`/event/${ev.id}`)}>
+                      <View style={styles.cardImageWrap}>
+                        {ev.banner_image_url ? (
+                          <Image source={{ uri: ev.banner_image_url }} style={styles.cardImage} resizeMode="cover" />
+                        ) : (
+                          <View style={styles.cardImagePlaceholder}>
+                            <Ionicons name="musical-notes-outline" size={48} color="rgba(255,255,255,0.4)" />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.cardBody}>
+                        <View style={styles.cardTitleRow}>
+                          <Text style={styles.cardEventName} numberOfLines={1}>
+                            {ev.name}
+                          </Text>
+                          <View style={styles.shareRatingRow}>
+                            <BookmarkButton
+                              eventId={ev.id}
+                              bookmarkType="event"
+                              size={22}
+                              initialBookmarked={true}
+                              onToggle={() => fetchSavedEvents()}
+                            />
+                            <View style={styles.shareIconWrap}>
+                              <Image
+                                source={require("@/assets/images/share-icon.png")}
+                                style={styles.shareIconImage}
+                                resizeMode="contain"
+                              />
+                            </View>
+                            <Ionicons name="star" size={16} color={RATING_STAR} />
+                            <Text style={styles.ratingText}>4.6</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.venueName}>{ev.club?.club_name || "Venue TBA"}</Text>
+                        <Text style={styles.venueAddress} numberOfLines={1}>
+                          {ev.club?.address_text || "Address TBA"}
+                        </Text>
+                        <Text style={styles.dateTimeText}>
+                          {formatDateTimePipe(ev.event_date, ev.start_time)}
+                        </Text>
+                        <View style={styles.attendeesRow}>
+                          <View style={styles.avatarGroup}>
+                            {AVATARS.map((src, i) => (
+                              <Image
+                                key={i}
+                                source={src}
+                                style={[styles.avatarImg, i > 0 && { marginLeft: -8 }]}
+                                resizeMode="cover"
+                              />
+                            ))}
+                          </View>
+                          <View style={styles.attendeesBadge}>
+                            <Text style={styles.attendeesCount}>120</Text>
+                          </View>
+                        </View>
+                        <Pressable
+                          style={styles.bookTicketsBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            goToBook(ev.id);
+                          }}
+                        >
+                          <Text style={styles.bookTicketsText}>BOOK Tickets</Text>
+                        </Pressable>
+                      </View>
+                    </Pressable>
+                  </View>
+                );
+              })
+            );
+          })()
         ) : (
           (() => {
             const today = new Date();
@@ -813,17 +1002,13 @@ export default function EventsScreen() {
                   d.setHours(0, 0, 0, 0);
                   return d < today;
                 })
-                : selectedFilter === "saved"
-                  ? []
-                  : events;
+                : events;
             return displayEvents.length === 0 ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyText}>
                   {selectedFilter === "past"
                     ? "No past events"
-                    : selectedFilter === "saved"
-                      ? "No events"
-                      : "No events found"}
+                    : "No events found"}
                 </Text>
               </View>
             ) : (

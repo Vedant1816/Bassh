@@ -122,6 +122,14 @@ export const PrimaryGradient = [Colors.dark.primary, Colors.dark.primaryDark] as
 export const PrimaryGradientStart = { x: 0, y: 0 } as const;
 export const PrimaryGradientEnd = { x: 1, y: 1 } as const;
 
+/** Header gradient: used for screen backgrounds (events.tsx pattern) */
+export const HeaderGradient = ["#8B0045", "#2D0A1F", "#000000"] as const;
+export const HeaderGradientLocations = [0, 0.4, 1] as const;
+
+/** Header overlay gradient: used for floating headers over content (event/[id].tsx pattern) */
+export const HeaderOverlayGradient = ["rgba(139, 0, 69, 0.95)", "rgba(80, 0, 40, 0.6)", "transparent"] as const;
+export const HeaderOverlayGradientLocations = [0, 0.5, 1] as const;
+
 /** Squircle border radius for 40x40 primary pill (Rectangle 1257) */
 export const PrimaryPillBorderRadius = 10;
 

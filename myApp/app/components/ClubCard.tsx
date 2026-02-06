@@ -169,6 +169,7 @@ export default function ClubCard({
               </View>
 
               <View style={styles.avatarBlock}>
+                <Text style={styles.joining}>Joining</Text>
                 <View style={styles.avatarRow}>
                   {club.avatar_urls?.[0] ? (
                     <Image
@@ -200,7 +201,6 @@ export default function ClubCard({
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.joining}>Joining</Text>
               </View>
             </View>
           </View>
@@ -323,8 +323,8 @@ const styles = StyleSheet.create({
   details: {
     position: "absolute",
     left: 90,
+    right: 0,
     top: 0,
-    width: 210,
     height: 68,
     justifyContent: "space-between",
   },
@@ -348,8 +348,8 @@ const styles = StyleSheet.create({
 
   priceRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    position: "relative",
   },
 
   priceBlock: {
@@ -372,7 +372,9 @@ const styles = StyleSheet.create({
   avatarBlock: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+    position: "absolute",
+    right: 0,
   },
 
   avatarRow: {

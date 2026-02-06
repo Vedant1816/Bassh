@@ -35,10 +35,8 @@ export async function GET(req: NextRequest) {
         events:event_id (
           id,
           name,
-          event_name,
           event_date,
           start_time,
-          end_time,
           banner_image_url,
           clubs:club_id (
             id,
@@ -50,7 +48,7 @@ export async function GET(req: NextRequest) {
           id,
           club_name,
           address_text,
-          banner_image_url,
+          cover_photo,
           latitude,
           longitude,
           rating
@@ -75,14 +73,13 @@ export async function GET(req: NextRequest) {
       created_at: b.created_at,
       event: b.events
         ? {
-            id: b.events.id,
-            name: b.events.name || b.events.event_name,
-            event_date: b.events.event_date,
-            start_time: b.events.start_time,
-            end_time: b.events.end_time,
-            banner_image_url: b.events.banner_image_url,
-            club: b.events.clubs,
-          }
+          id: b.events.id,
+          name: b.events.name || b.events.event_name,
+          event_date: b.events.event_date,
+          start_time: b.events.start_time,
+          banner_image_url: b.events.banner_image_url,
+          club: b.events.clubs,
+        }
         : null,
       club: b.clubs ?? null,
     }));

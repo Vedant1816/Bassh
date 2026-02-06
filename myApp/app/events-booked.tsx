@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -34,14 +34,13 @@ interface Booking {
       address_text: string;
     };
   };
-  // For table bookings (no event)
   clubs?: {
     club_name: string;
     address_text: string;
   };
 }
 
-export default function BookingsScreen() {
+export default function EventsBookedScreen() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +78,11 @@ export default function BookingsScreen() {
     fetchBookings();
   };
 
+  const eventBookings = useMemo(
+    () => bookings.filter((b) => b.event_id && b.events),
+    [bookings]
+  );
+
   const handleBookingPress = (booking: Booking) => {
     router.push(`/booking/${booking.id}`);
   };
@@ -103,74 +107,52 @@ export default function BookingsScreen() {
   };
 
   const getBookingType = (booking: Booking) => {
-    // Check if it's a table booking (no event_id) or event booking
-    if (!booking.event_id || !booking.events) {
-      return "Table Entry";
-    }
-    
-    // For event bookings, determine entry type from participants
     const participants = booking.participants || [];
-    const males = participants.filter(p => p.gender?.toLowerCase() === "male").length;
-    const females = participants.filter(p => p.gender?.toLowerCase() === "female").length;
-    
+    const males = participants.filter((p) => p.gender?.toLowerCase() === "male").length;
+    const females = participants.filter((p) => p.gender?.toLowerCase() === "female").length;
+
     const couples = Math.min(males, females);
     const remainingMales = males - couples;
     const remainingFemales = females - couples;
-    
+
     if (couples > 0 && remainingMales === 0 && remainingFemales === 0) {
       return couples === 1 ? "Couple Entry" : `Couple Entry (${couples})`;
     }
-    
     if (remainingMales > 0 && remainingFemales === 0 && couples === 0) {
       return remainingMales === 1 ? "Male Entry" : `Male Entry (${remainingMales})`;
     }
-    
     if (remainingFemales > 0 && remainingMales === 0 && couples === 0) {
       return remainingFemales === 1 ? "Female Entry" : `Female Entry (${remainingFemales})`;
     }
-    
-    // Mixed entry
     return `${participants.length} Guests`;
   };
 
   const getEventName = (booking: Booking) => {
-    if (booking.events?.name) {
-      return booking.events.name;
-    }
-    
-    if (booking.clubs?.club_name) {
-      return booking.clubs.club_name;
-    }
-    
-    return "Event";
+    return booking.events?.name || "Event";
   };
 
   const getStatusBadge = (booking: Booking) => {
     const status = booking.booking_status?.toLowerCase();
     const entryStatus = booking.entry_status?.toLowerCase();
-    
+
     if (entryStatus === "entered") {
       return { text: "Entered", color: Colors.dark.success };
     }
-    
     if (status === "confirmed") {
       return { text: "Confirmed", color: Colors.dark.success };
     }
-    
     if (status === "cancelled") {
       return { text: "Cancelled", color: Colors.dark.error };
     }
-    
     if (status === "pending") {
       return { text: "Pending", color: Colors.dark.warning };
     }
-    
     return { text: status || "Unknown", color: Colors.dark.textSecondary };
   };
 
   const renderBookingCard = ({ item }: { item: Booking }) => {
     const statusBadge = getStatusBadge(item);
-    
+
     return (
       <Pressable
         style={({ pressed }) => [
@@ -179,7 +161,6 @@ export default function BookingsScreen() {
         ]}
         onPress={() => handleBookingPress(item)}
       >
-        {/* Booking Code */}
         <View style={styles.codeRow}>
           <Text style={styles.bookingCode}>Booking Code - {item.id.slice(0, 13).toUpperCase()}</Text>
           <View style={[styles.statusBadge, { backgroundColor: `${statusBadge.color}20` }]}>
@@ -189,12 +170,10 @@ export default function BookingsScreen() {
           </View>
         </View>
 
-        {/* Info Grid */}
         <View style={styles.infoGrid}>
           <View style={styles.infoItem}>
             <Text style={styles.infoValue}>{formatDate(item.events?.event_date || item.booking_date)}</Text>
           </View>
-          
           <View style={styles.infoItem}>
             <Text style={styles.infoValue}>{formatTime(item.events?.start_time || item.booking_time)}</Text>
           </View>
@@ -204,13 +183,11 @@ export default function BookingsScreen() {
           <View style={styles.infoItem}>
             <Text style={styles.infoValue}>{getBookingType(item)}</Text>
           </View>
-          
           <View style={styles.infoItem}>
             <Text style={styles.infoValue}>{getEventName(item)}</Text>
           </View>
         </View>
 
-        {/* View Details */}
         <View style={styles.viewDetailsContainer}>
           <Text style={styles.viewDetailsText}>View Details</Text>
         </View>
@@ -224,7 +201,7 @@ export default function BookingsScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={Colors.dark.primary} />
-          <Text style={styles.loadingText}>Loading bookings...</Text>
+          <Text style={styles.loadingText}>Loading event bookings...</Text>
         </View>
       </>
     );
@@ -245,19 +222,17 @@ export default function BookingsScreen() {
     );
   }
 
-  if (bookings.length === 0) {
+  if (eventBookings.length === 0) {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.centerContainer}>
           <Ionicons name="receipt-outline" size={80} color={Colors.dark.textTertiary} />
-          <Text style={styles.emptyTitle}>No Bookings Yet</Text>
-          <Text style={styles.emptyText}>
-            Your bookings will appear here
-          </Text>
+          <Text style={styles.emptyTitle}>No Event Bookings Yet</Text>
+          <Text style={styles.emptyText}>Your event bookings will appear here</Text>
           <Pressable
             style={styles.exploreButton}
-            onPress={() => router.push("/(tabs)")}
+            onPress={() => router.push("/(tabs)/events")}
           >
             <Text style={styles.exploreButtonText}>Explore Events</Text>
           </Pressable>
@@ -271,9 +246,9 @@ export default function BookingsScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: "Table bookings",
-          headerTitleStyle: { 
-            color: Colors.dark.text, 
+          headerTitle: "Event bookings",
+          headerTitleStyle: {
+            color: Colors.dark.text,
             fontWeight: "700",
             fontSize: 16,
           },
@@ -287,11 +262,10 @@ export default function BookingsScreen() {
         }}
       />
       <View style={styles.container}>
-        {/* All bookings title */}
-        <Text style={styles.sectionTitle}>All bookings</Text>
+        <Text style={styles.sectionTitle}>Event bookings</Text>
 
         <FlatList
-          data={bookings}
+          data={eventBookings}
           renderItem={renderBookingCard}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}

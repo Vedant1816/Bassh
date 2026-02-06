@@ -8,13 +8,33 @@ import {
     Pressable,
     Modal,
     RefreshControl,
+    StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { Colors } from "@/constants/Colors";
 import { fetchWithFallback } from "@/_services/api-config";
 import { withAuthHeaders } from "@/_services/auth-fetch";
+import { BookingQRModal } from "./BookingQRModal";
+
+type BookingData = {
+    id: string;
+    qr_code: string;
+    booking_type?: "event" | "club" | "unknown";
+    event_name: string;
+    club_name?: string;
+    event_date: string;
+    event_time: string;
+    venue_name: string;
+    venue_address: string;
+    ticket_type: string;
+    ticket_count: number;
+    total_price: number;
+    status: string;
+    confirmation_code: string;
+};
 
 type NotificationItem = {
     id: string;
@@ -28,6 +48,8 @@ type NotificationItem = {
         event_id?: string;
         event_name?: string;
     };
+    // Enriched booking data from backend
+    booking?: BookingData;
 };
 
 type NotificationsModalProps = {
@@ -42,6 +64,10 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     const [refreshing, setRefreshing] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    // QR Modal state
+    const [qrModalVisible, setQrModalVisible] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState<BookingData | null>(null);
+
     const fetchNotifications = useCallback(async () => {
         try {
             const res = await fetchWithFallback(
@@ -50,7 +76,11 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
             );
             const json = await res.json();
             if (res.ok) {
-                setNotifications(json.notifications || []);
+                const sortedNotifications = (json.notifications || []).sort(
+                    (a: NotificationItem, b: NotificationItem) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+                setNotifications(sortedNotifications);
                 setUnreadCount(json.unreadCount || 0);
             }
         } catch (err) {
@@ -92,6 +122,30 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         }
     };
 
+    const handleNotificationPress = (item: NotificationItem) => {
+        console.log("📱 [NOTIFICATIONS] Press detected!");
+        console.log("📱 [NOTIFICATIONS] Item:", JSON.stringify(item, null, 2));
+        console.log("📱 [NOTIFICATIONS] Type:", item.type);
+        console.log("📱 [NOTIFICATIONS] Has booking:", !!item.booking);
+        console.log("📱 [NOTIFICATIONS] Metadata:", item.metadata);
+
+        // Check if it's a booking notification with booking data
+        if ((item.type === "booking" || item.type === "booking_confirmation") && item.booking) {
+            console.log("📱 [NOTIFICATIONS] Opening QR modal for booking:", item.booking.id);
+            setSelectedBooking(item.booking);
+            // Close notification modal first, then open QR modal after animation completes
+            onClose();
+            setTimeout(() => {
+                console.log("📱 [NOTIFICATIONS] Setting qrModalVisible to true after delay");
+                setQrModalVisible(true);
+            }, 400);
+        } else {
+            console.log("📱 [NOTIFICATIONS] Not a booking notification or no booking data attached");
+            console.log("📱 [NOTIFICATIONS] Expected type: 'booking' or 'booking_confirmation', got:", item.type);
+            console.log("📱 [NOTIFICATIONS] Booking data:", item.booking);
+        }
+    };
+
     const formatTime = (dateString: string) => {
         const date = new Date(dateString);
         const now = new Date();
@@ -121,94 +175,149 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         }
     };
 
-    const renderNotification = ({ item }: { item: NotificationItem }) => (
-        <Pressable
-            style={[
-                styles.notificationCard,
-                !item.is_read && styles.notificationUnread,
-            ]}
-        >
-            <View style={styles.notificationIconContainer}>
-                <Ionicons
-                    name={getNotificationIcon(item.type)}
-                    size={22}
-                    color={Colors.dark.primary}
-                />
-            </View>
-            <View style={styles.notificationContent}>
-                <View style={styles.notificationHeader}>
-                    <Text style={styles.notificationTitle} numberOfLines={1}>
-                        {item.title}
-                    </Text>
-                    <Text style={styles.notificationTime}>
-                        {formatTime(item.created_at)}
-                    </Text>
-                </View>
-                <Text style={styles.notificationMessage} numberOfLines={2}>
-                    {item.message}
-                </Text>
-            </View>
-            {!item.is_read && <View style={styles.unreadDot} />}
-        </Pressable>
-    );
+    const renderNotification = ({ item }: { item: NotificationItem }) => {
+        const isBookingNotification =
+            (item.type === "booking" || item.type === "booking_confirmation") && item.booking;
 
-    return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            presentationStyle="pageSheet"
-            onRequestClose={onClose}
-        >
-            <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
-                {/* Header */}
-                <View style={styles.modalHeader}>
-                    <Pressable onPress={onClose} style={styles.closeButton}>
-                        <Ionicons name="close" size={24} color={Colors.dark.text} />
-                    </Pressable>
-                    <Text style={styles.modalTitle}>Notifications</Text>
-                    {unreadCount > 0 && (
-                        <Pressable onPress={markAllAsRead} style={styles.markReadButton}>
-                            <Text style={styles.markReadText}>Mark all read</Text>
-                        </Pressable>
-                    )}
+        return (
+            <Pressable
+                style={({ pressed }) => [
+                    styles.notificationCard,
+                    !item.is_read && styles.notificationUnread,
+                    isBookingNotification && styles.notificationBooking,
+                    pressed && styles.notificationPressed,
+                ]}
+                onPress={() => handleNotificationPress(item)}
+            >
+                <View style={[
+                    styles.notificationIconContainer,
+                    isBookingNotification && styles.notificationIconBooking,
+                ]}>
+                    <Ionicons
+                        name={getNotificationIcon(item.type)}
+                        size={20}
+                        color={isBookingNotification ? "#00D26A" : Colors.dark.primary}
+                    />
                 </View>
-
-                {/* Content */}
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={Colors.dark.primary} />
-                        <Text style={styles.loadingText}>Loading notifications...</Text>
-                    </View>
-                ) : notifications.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Ionicons
-                            name="notifications-off-outline"
-                            size={64}
-                            color={Colors.dark.textSecondary}
-                        />
-                        <Text style={styles.emptyTitle}>No notifications</Text>
-                        <Text style={styles.emptySubtitle}>
-                            You're all caught up! Check back later.
+                <View style={styles.notificationContent}>
+                    <View style={styles.notificationHeader}>
+                        <Text style={styles.notificationTitle} numberOfLines={1}>
+                            {item.title}
+                        </Text>
+                        <Text style={styles.notificationTime}>
+                            {formatTime(item.created_at)}
                         </Text>
                     </View>
-                ) : (
-                    <FlatList
-                        data={notifications}
-                        keyExtractor={(item) => item.id}
-                        renderItem={renderNotification}
-                        contentContainerStyle={styles.listContainer}
-                        showsVerticalScrollIndicator={false}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={handleRefresh}
-                                tintColor={Colors.dark.primary}
+                    <Text style={styles.notificationMessage} numberOfLines={2}>
+                        {item.message}
+                    </Text>
+                    {isBookingNotification && (
+                        <View style={styles.viewTicketBadge}>
+                            <Ionicons name="qr-code-outline" size={12} color="#00D26A" />
+                            <Text style={styles.viewTicketText}>
+                                {item.booking?.booking_type === "club"
+                                    ? "Tap to view entry pass"
+                                    : "Tap to view ticket"}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+                {!item.is_read && <View style={[
+                    styles.unreadDot,
+                    isBookingNotification && styles.unreadDotGreen,
+                ]} />}
+                <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color="rgba(255,255,255,0.3)"
+                    style={styles.chevronIcon}
+                />
+            </Pressable>
+        );
+    };
+
+    return (
+        <>
+            <Modal
+                visible={visible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={onClose}
+            >
+                <View style={styles.modalOverlay}>
+                    {/* Tappable backdrop to dismiss */}
+                    <Pressable style={styles.modalBackdrop} onPress={onClose} />
+
+                    {/* Bottom sheet content */}
+                    <View style={styles.modalContainer}>
+                        <LinearGradient
+                            colors={["rgba(139, 0, 69, 0.4)", "rgba(45, 10, 31, 0.6)", Colors.dark.background]}
+                            locations={[0, 0.4, 0.8]}
+                            style={styles.gradientBackground}
+                        />
+
+                        {/* Swipe Indicator - tappable to dismiss */}
+                        <Pressable onPress={onClose} style={styles.swipeIndicatorArea}>
+                            <View style={styles.swipeIndicator} />
+                        </Pressable>
+
+                        {/* Header */}
+                        <View style={styles.headerRow}>
+                            <Text style={styles.screenTitle}>Notifications</Text>
+                            {unreadCount > 0 && (
+                                <Pressable onPress={markAllAsRead} style={styles.markReadButton}>
+                                    <Text style={styles.markReadText}>Mark all read</Text>
+                                </Pressable>
+                            )}
+                        </View>
+
+                        {/* Content */}
+                        {loading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={Colors.dark.primary} />
+                                <Text style={styles.loadingText}>Loading notifications...</Text>
+                            </View>
+                        ) : notifications.length === 0 ? (
+                            <View style={styles.emptyContainer}>
+                                <View style={styles.emptyIconContainer}>
+                                    <Ionicons
+                                        name="notifications-off-outline"
+                                        size={48}
+                                        color={Colors.dark.primary}
+                                    />
+                                </View>
+                                <Text style={styles.emptyTitle}>No notifications yet</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    When you receive notifications, they'll appear here
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={notifications}
+                                keyExtractor={(item) => item.id}
+                                renderItem={renderNotification}
+                                contentContainerStyle={styles.listContainer}
+                                showsVerticalScrollIndicator={false}
+                                refreshControl={
+                                    <RefreshControl
+                                        refreshing={refreshing}
+                                        onRefresh={handleRefresh}
+                                        tintColor={Colors.dark.primary}
+                                    />
+                                }
                             />
-                        }
-                    />
-                )}
-            </View>
-        </Modal>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Booking QR Modal */}
+            <BookingQRModal
+                visible={qrModalVisible}
+                onClose={() => setQrModalVisible(false)}
+                booking={selectedBooking}
+            />
+        </>
     );
 }
 
@@ -222,46 +331,66 @@ export function NotificationBell({ onPress, unreadCount = 0 }: NotificationBellP
     return (
         <Pressable style={styles.bellButton} onPress={onPress}>
             <Ionicons name="notifications-outline" size={22} color={Colors.dark.text} />
-            {unreadCount > 0 && (
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                    </Text>
-                </View>
-            )}
+            {unreadCount > 0 && <View style={styles.badge} />}
         </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    // Modal styles
-    modalContainer: {
+    // Modal overlay
+    modalOverlay: {
         flex: 1,
+        justifyContent: "flex-end",
+        backgroundColor: "transparent",
+    },
+    modalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+    },
+    // Modal container - reduced height
+    modalContainer: {
+        height: "60%",
         backgroundColor: Colors.dark.background,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: "hidden",
     },
-    modalHeader: {
-        flexDirection: "row",
+    gradientBackground: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 200,
+    },
+    swipeIndicatorArea: {
+        paddingVertical: 12,
         alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.dark.border,
     },
-    closeButton: {
+    swipeIndicator: {
+        width: 40,
+        height: 4,
+        backgroundColor: "rgba(255, 255, 255, 0.4)",
+        borderRadius: 2,
+    },
+    backButton: {
         width: 40,
         height: 40,
         alignItems: "center",
         justifyContent: "center",
     },
-    modalTitle: {
-        fontSize: 18,
+    screenTitle: {
+        fontSize: 24,
         fontWeight: "700",
         color: Colors.dark.text,
     },
     markReadButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        alignSelf: "flex-end",
+        marginRight: 16,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        borderRadius: 20,
     },
     markReadText: {
         fontSize: 14,
@@ -285,40 +414,66 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         paddingHorizontal: 40,
-        gap: 12,
+        gap: 16,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: "rgba(219, 68, 148, 0.15)",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 8,
     },
     emptyTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: "600",
         color: Colors.dark.text,
-        marginTop: 8,
     },
     emptySubtitle: {
         fontSize: 14,
         color: Colors.dark.textSecondary,
         textAlign: "center",
+        lineHeight: 20,
+    },
+
+    // Header
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        marginBottom: 16,
     },
 
     // List styles
     listContainer: {
         padding: 16,
-        gap: 12,
+        paddingBottom: 40,
     },
 
     // Notification card
     notificationCard: {
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
         backgroundColor: Colors.dark.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 14,
-        marginBottom: 10,
+        marginBottom: 12,
         borderWidth: 1,
-        borderColor: Colors.dark.border,
+        borderColor: "rgba(255,255,255,0.08)",
+    },
+    notificationPressed: {
+        backgroundColor: "rgba(255,255,255,0.05)",
+        transform: [{ scale: 0.98 }],
     },
     notificationUnread: {
         backgroundColor: "rgba(219, 68, 148, 0.08)",
-        borderColor: Colors.dark.primary,
+        borderColor: "rgba(219, 68, 148, 0.3)",
+    },
+    notificationBooking: {
+        backgroundColor: "rgba(0, 210, 106, 0.06)",
+        borderColor: "rgba(0, 210, 106, 0.3)",
     },
     notificationIconContainer: {
         width: 40,
@@ -328,6 +483,9 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         marginRight: 12,
+    },
+    notificationIconBooking: {
+        backgroundColor: "rgba(0, 210, 106, 0.15)",
     },
     notificationContent: {
         flex: 1,
@@ -354,14 +512,36 @@ const styles = StyleSheet.create({
         color: Colors.dark.textSecondary,
         lineHeight: 20,
     },
+    viewTicketBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        backgroundColor: "rgba(0, 210, 106, 0.1)",
+        borderRadius: 6,
+        alignSelf: "flex-start",
+    },
+    viewTicketText: {
+        fontSize: 11,
+        fontWeight: "600",
+        color: "#00D26A",
+    },
     unreadDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: Colors.dark.primary,
+        backgroundColor: "#FF3B30",
         position: "absolute",
         top: 14,
         right: 14,
+    },
+    unreadDotGreen: {
+        backgroundColor: "#00D26A",
+    },
+    chevronIcon: {
+        marginLeft: 8,
     },
 
     // Bell button
@@ -376,19 +556,16 @@ const styles = StyleSheet.create({
     },
     badge: {
         position: "absolute",
-        top: 2,
-        right: 2,
-        minWidth: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: Colors.dark.primary,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 4,
+        top: 8,
+        right: 10,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#FF3B30",
+        borderWidth: 1,
+        borderColor: Colors.dark.surface,
     },
     badgeText: {
-        fontSize: 10,
-        fontWeight: "700",
-        color: Colors.dark.text,
+        display: "none",
     },
 });

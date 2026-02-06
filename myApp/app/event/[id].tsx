@@ -206,20 +206,22 @@ export default function EventDetailScreen() {
   const remainingGuests = Math.max(0, totalGuests - 3);
 
   const renderGuestItem = ({ item }: { item: Guest }) => {
-    console.log("📱 [FRONTEND] Rendering guest:", item.name);
+    const genderColor = item.gender === "Female" ? "#E91E8C" : item.gender === "Male" ? "#4A90D9" : Colors.dark.primary;
     return (
       <View style={styles.guestItem}>
-        <Image
-          source={{ uri: getAvatarUrl(item.name, item.gender) }}
-          style={styles.guestAvatar}
-        />
+        <View style={[styles.guestAvatarContainer, { borderColor: genderColor }]}>
+          <Image
+            source={{ uri: getAvatarUrl(item.name, item.gender) }}
+            style={styles.guestAvatar}
+          />
+        </View>
         <View style={styles.guestInfo}>
           <Text style={styles.guestName}>{item.name || "Guest"}</Text>
           <View style={styles.guestMeta}>
             {item.gender && (
-              <View style={styles.guestMetaItem}>
-                <Ionicons name={getGenderIcon(item.gender)} size={12} color="rgba(255,255,255,0.5)" />
-                <Text style={styles.guestMetaText}>{item.gender}</Text>
+              <View style={[styles.guestMetaItem, { backgroundColor: `${genderColor}20` }]}>
+                <Ionicons name={getGenderIcon(item.gender)} size={12} color={genderColor} />
+                <Text style={[styles.guestMetaText, { color: genderColor }]}>{item.gender}</Text>
               </View>
             )}
             {item.age && (
@@ -229,6 +231,7 @@ export default function EventDetailScreen() {
             )}
           </View>
         </View>
+        <View style={[styles.guestStatusDot, { backgroundColor: genderColor }]} />
       </View>
     );
   };
@@ -246,7 +249,7 @@ export default function EventDetailScreen() {
         <View style={styles.header}>
           <LocationHeader
             title="Home"
-            address={club?.address_text?.split(",")[0] || "Karol Bagh, New Delhi"}
+            address={club?.address_text || "Karol Bagh, New Delhi"}
             variant="circle"
             changeable={false}
           />
@@ -474,7 +477,10 @@ export default function EventDetailScreen() {
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Guest List</Text>
+              <View>
+                <Text style={styles.modalTitle}>Guest List</Text>
+                <Text style={styles.modalSubtitle}>{totalGuests} guests attending</Text>
+              </View>
               <Pressable
                 style={styles.modalCloseButton}
                 onPress={() => setGuestListModalVisible(false)}
@@ -483,12 +489,21 @@ export default function EventDetailScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.modalSubtitle}>{totalGuests} guests attending</Text>
-
-            {/* Debug text */}
-            <Text style={{ color: 'yellow', fontSize: 12, marginBottom: 8 }}>
-              Debug: {guestList.length} items in list
-            </Text>
+            {/* Gender Legend */}
+            <View style={styles.genderLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#E91E8C" }]} />
+                <Text style={styles.legendText}>Female</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#4A90D9" }]} />
+                <Text style={styles.legendText}>Male</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: Colors.dark.primary }]} />
+                <Text style={styles.legendText}>Other</Text>
+              </View>
+            </View>
 
             {guestList.length > 0 ? (
               <FlatList
@@ -497,13 +512,16 @@ export default function EventDetailScreen() {
                 keyExtractor={(item) => item.id}
                 style={styles.guestListScroll}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.guestListContent}
                 ItemSeparatorComponent={() => <View style={styles.guestSeparator} />}
               />
             ) : (
               <View style={styles.emptyGuestList}>
-                <Ionicons name="people-outline" size={48} color={Colors.dark.textSecondary} />
+                <View style={styles.emptyGuestIconContainer}>
+                  <Ionicons name="people-outline" size={48} color={Colors.dark.primary} />
+                </View>
                 <Text style={styles.emptyGuestText}>No guests yet</Text>
-                <Text style={styles.emptyGuestSubtext}>Be the first to join!</Text>
+                <Text style={styles.emptyGuestSubtext}>Be the first to join this event!</Text>
               </View>
             )}
           </View>
@@ -861,7 +879,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingHorizontal: 16,
-    maxHeight: "70%",
+    maxHeight: "85%",
     minHeight: 300,
   },
   modalHandle: {
@@ -906,9 +924,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   guestAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.dark.background,
   },
   guestInfo: {
@@ -954,5 +972,54 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.6)",
     fontSize: 13,
     marginTop: 4,
+  },
+  guestAvatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    padding: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  guestStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  genderLegend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginBottom: 16,
+    paddingVertical: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 8,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 12,
+  },
+  guestListContent: {
+    paddingBottom: 20,
+  },
+  emptyGuestIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(139, 0, 69, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
   },
 });

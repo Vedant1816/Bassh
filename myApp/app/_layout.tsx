@@ -36,10 +36,11 @@ export default function RootLayout() {
       if (hasBootstrapped.current) return;
       hasBootstrapped.current = true;
 
-      // Check current route using segments array
-      const isOnAuthPage = segments.includes('(auth)') || segments.length === 0;
-      const isOnOnboardingPage = segments.includes('onboarding');
-      const isOnTabsPage = segments.includes('(tabs)');
+      // Check current route using segments array (cast for expo-router segment types)
+      const segs = segments as string[];
+      const isOnAuthPage = segs.includes('(auth)') || segs.length === 0;
+      const isOnOnboardingPage = segs.includes('onboarding');
+      const isOnTabsPage = segs.includes('(tabs)');
 
       // CRITICAL: If user is on onboarding, NEVER redirect away - let them complete it
       if (isOnOnboardingPage) {
