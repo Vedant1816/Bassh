@@ -12,10 +12,10 @@ import Animated, {
 
 const ANIMATION_DURATION = 380;
 const SMOOTH_EASING = Easing.bezier(0.33, 0.01, 0.2, 1);
-const BUTTON_SIZE = 48;
+const BUTTON_SIZE = 40;
 const BUTTON_GAP = 10;
 /** Frame 1948755791: secondary FAB size */
-const SECONDARY_BUTTON_SIZE = 42;
+const SECONDARY_BUTTON_SIZE = 36;
 /** Height of secondary buttons column for up/down animation */
 const SECONDARY_HEIGHT = 3 * SECONDARY_BUTTON_SIZE + 2 * BUTTON_GAP;
 
@@ -39,9 +39,9 @@ type MapFloatingActionsProps = {
 };
 
 const DEFAULT_ACTIONS: MapFloatingActionItem[] = [
-  { id: "people", icon: "people-outline", onPress: () => {} },
-  { id: "filter", icon: "options-outline", onPress: () => {} },
-  { id: "location", icon: "locate-outline", onPress: () => {} },
+  { id: "people", icon: "people-outline", onPress: () => { } },
+  { id: "filter", icon: "options-outline", onPress: () => { } },
+  { id: "location", icon: "locate-outline", onPress: () => { } },
 ];
 
 export default function MapFloatingActions({
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     width: SECONDARY_BUTTON_SIZE,
     height: SECONDARY_BUTTON_SIZE,
-    borderRadius: 39,
+    borderRadius: 18,
     backgroundColor: "#585858",
     borderWidth: 1,
     borderColor: "#7D7D7D",

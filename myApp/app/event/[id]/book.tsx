@@ -26,8 +26,9 @@ import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Design colors matching the PNG
-const PRIMARY_GRADIENT = ["#DB4494", "#DB138D", "#000000"] as const;
-const ACCENT_PINK = "#E91E8C";
+const PRIMARY_GRADIENT = ["#8B0045", "#2D0A1F", "#000000"] as const;
+const PRIMARY_GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
+const ACCENT_PINK = "#DC2B91";
 const DARK_CARD = "#2D2D2D";
 const LIGHT_TEXT = "#B0B0B0";
 
@@ -582,6 +583,7 @@ export default function EventBookingScreen() {
         <StatusBar barStyle="light-content" />
         <LinearGradient
           colors={PRIMARY_GRADIENT}
+          locations={PRIMARY_GRADIENT_LOCATIONS}
           style={styles.gradientBackground}
         />
         <ActivityIndicator color={ACCENT_PINK} size="large" style={styles.loadingSpinner} />
@@ -632,6 +634,7 @@ export default function EventBookingScreen() {
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={PRIMARY_GRADIENT}
+        locations={PRIMARY_GRADIENT_LOCATIONS}
         style={styles.gradientBackground}
       />
 
@@ -1501,7 +1504,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: "rgba(233, 30, 140, 0.15)",
+    backgroundColor: "rgba(220, 43, 145, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1716,7 +1719,7 @@ const styles = StyleSheet.create({
   },
   genderBtnActive: {
     borderColor: ACCENT_PINK,
-    backgroundColor: "rgba(233,30,140,0.15)",
+    backgroundColor: "rgba(220,43,145,0.15)",
   },
   genderBtnText: {
     color: LIGHT_TEXT,
@@ -1867,7 +1870,7 @@ const styles = StyleSheet.create({
   paymentMethodRowSelected: {
     borderWidth: 1,
     borderColor: ACCENT_PINK,
-    backgroundColor: "rgba(233, 30, 140, 0.1)",
+    backgroundColor: "rgba(220, 43, 145, 0.1)",
   },
   paymentMethodRowDisabled: {
     opacity: 0.5,

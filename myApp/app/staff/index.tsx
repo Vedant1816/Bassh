@@ -14,6 +14,9 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { authFetch } from "@/_services/auth-fetch";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -27,6 +30,7 @@ interface StaffStatus {
 
 export default function StaffDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [staffStatus, setStaffStatus] = useState<StaffStatus | null>(null);
@@ -65,12 +69,12 @@ export default function StaffDashboard() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
-          style={styles.gradientBackground}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
         />
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#E91E8C" />
+          <ActivityIndicator size="large" color={Colors.dark.primary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
@@ -82,32 +86,25 @@ export default function StaffDashboard() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
-          style={styles.gradientBackground}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
         />
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingTop: insets.top + 60 }]}>
           <View style={styles.card}>
             <View style={styles.iconCircle}>
-              <Ionicons name="business-outline" size={40} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="business-outline" size={40} color={Colors.dark.text} />
             </View>
             <Text style={styles.title}>No Club Associated</Text>
             <Text style={styles.description}>
               You need to join a club to access staff features
             </Text>
-            <Pressable
-              style={styles.primaryButtonWrapper}
+            <ThemedButton
               onPress={() => router.push("/staff/join-club")}
+              style={styles.mainButton}
             >
-              <LinearGradient
-                colors={["#E91E8C", "#DB1A85"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.buttonText}>Join a Club</Text>
-              </LinearGradient>
-            </Pressable>
+              Join a Club
+            </ThemedButton>
           </View>
         </View>
         <View style={styles.homeIndicator}>
@@ -122,25 +119,25 @@ export default function StaffDashboard() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
-          style={styles.gradientBackground}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
         />
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#E91E8C"
+              tintColor={Colors.dark.primary}
             />
           }
         >
           <View style={styles.content}>
             <View style={styles.card}>
               <View style={styles.iconCircle}>
-                <Ionicons name="time-outline" size={40} color="rgba(255,255,255,0.8)" />
+                <Ionicons name="time-outline" size={40} color={Colors.dark.text} />
               </View>
               <Text style={styles.title}>Verification Pending</Text>
               <Text style={styles.description}>
@@ -148,17 +145,13 @@ export default function StaffDashboard() {
                 under review
               </Text>
 
-              <View style={styles.statusCard}>
+              <View style={styles.statusDisplay}>
                 <View style={styles.statusRow}>
-                  <Text style={styles.statusLabel}>Club:</Text>
+                  <Text style={styles.statusLabel}>Club</Text>
                   <Text style={styles.statusValue}>{staffStatus.club_name}</Text>
                 </View>
-                <View style={styles.statusRow}>
-                  <Text style={styles.statusLabel}>Role:</Text>
-                  <Text style={styles.statusValue}>{staffStatus.post || "Staff"}</Text>
-                </View>
-                <View style={styles.statusRow}>
-                  <Text style={styles.statusLabel}>Status:</Text>
+                <View style={[styles.statusRow, styles.lastRow]}>
+                  <Text style={styles.statusLabel}>Status</Text>
                   <View style={styles.pendingBadge}>
                     <Text style={styles.pendingBadgeText}>Pending</Text>
                   </View>
@@ -166,20 +159,18 @@ export default function StaffDashboard() {
               </View>
 
               <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>What&apos;s Next?</Text>
+                <Text style={styles.infoTitle}>What's Next?</Text>
                 <Text style={styles.infoText}>
-                  Your club manager will review your request. You&apos;ll receive a notification once
-                  approved. Pull down to refresh for updates.
+                  Your club manager will review your request. Pull down to refresh for updates.
                 </Text>
               </View>
 
-              <Pressable style={styles.secondaryButton} onPress={handleRefresh}>
-                <Ionicons name="refresh-outline" size={20} color="#E91E8C" style={{ marginRight: 8 }} />
-                <Text style={styles.secondaryButtonText}>Check Status Again</Text>
+              <Pressable style={styles.refreshLink} onPress={handleRefresh}>
+                <Ionicons name="refresh-outline" size={20} color={Colors.dark.primary} />
+                <Text style={styles.refreshLinkText}>Refresh status</Text>
               </Pressable>
             </View>
           </View>
-          <View style={styles.bottomSpacer} />
         </ScrollView>
         <View style={styles.homeIndicator}>
           <View style={styles.homeIndicatorBar} />
@@ -193,38 +184,26 @@ export default function StaffDashboard() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
-          style={styles.gradientBackground}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
         />
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingTop: insets.top + 60 }]}>
           <View style={styles.card}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="close-circle-outline" size={40} color="rgba(255,255,255,0.8)" />
+            <View style={[styles.iconCircle, styles.rejectedCircle]}>
+              <Ionicons name="close-circle-outline" size={40} color={Colors.dark.error} />
             </View>
             <Text style={styles.title}>Request Rejected</Text>
             <Text style={styles.description}>
               Your request to join <Text style={styles.highlight}>{staffStatus.club_name}</Text> was
               not approved
             </Text>
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                Please contact your club manager for more information or try joining a different club.
-              </Text>
-            </View>
-            <Pressable
-              style={styles.primaryButtonWrapper}
+            <ThemedButton
               onPress={() => router.push("/staff/join-club")}
+              style={styles.mainButton}
             >
-              <LinearGradient
-                colors={["#E91E8C", "#DB1A85"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.buttonText}>Join Different Club</Text>
-              </LinearGradient>
-            </Pressable>
+              Try Different Club
+            </ThemedButton>
           </View>
         </View>
         <View style={styles.homeIndicator}>
@@ -238,54 +217,61 @@ export default function StaffDashboard() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={["#8B0045", "#2D0A1F", "#000000"]}
-        locations={[0, 0.4, 1]}
-        style={styles.gradientBackground}
+        colors={[...HeaderGradient]}
+        locations={[...HeaderGradientLocations]}
+        style={styles.background}
       />
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#E91E8C"
+            tintColor={Colors.dark.primary}
           />
         }
       >
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.welcomeText}>Welcome, Staff Member</Text>
-            <Text style={styles.clubNameText}>{staffStatus.club_name}</Text>
-            <Text style={styles.roleText}>{staffStatus.post}</Text>
+          <View style={styles.mainHeader}>
+            <View>
+              <Text style={styles.welcomeLabel}>Welcome,</Text>
+              <Text style={styles.staffName}>{staffStatus.club_name}</Text>
+            </View>
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.dark.success} />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
           </View>
 
-          <View style={styles.card}>
-            <View style={styles.approvedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color="#22C55E" style={{ marginRight: 6 }} />
-              <Text style={styles.approvedBadgeText}>Verified</Text>
-            </View>
+          <View style={styles.roleCard}>
+            <Text style={styles.roleLabel}>Current Role</Text>
+            <Text style={styles.roleValue}>{staffStatus.post || "Staff Member"}</Text>
+          </View>
 
-            <Text style={styles.sectionTitle}>Staff Actions</Text>
+          <Text style={styles.sectionHeading}>Management Actions</Text>
 
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => router.push("/staff/scan-qr")}
+          <Pressable
+            style={styles.actionCard}
+            onPress={() => router.push("/staff/scan-qr")}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.08)", "rgba(255,255,255,0.03)"]}
+              style={styles.actionGradient}
             >
-              <View style={styles.actionIconWrap}>
-                <Ionicons name="qr-code-outline" size={28} color="rgba(255,255,255,0.8)" />
+              <View style={styles.actionIcon}>
+                <Ionicons name="qr-code-outline" size={28} color={Colors.dark.primary} />
               </View>
-              <View style={styles.actionContent}>
+              <View style={styles.actionTextContent}>
                 <Text style={styles.actionTitle}>Scan QR Code</Text>
-                <Text style={styles.actionDescription}>
-                  Verify customer bookings at entry
+                <Text style={styles.actionDesc}>
+                  Validate guest entry and bookings
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
-            </Pressable>
-          </View>
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+            </LinearGradient>
+          </Pressable>
         </View>
-        <View style={styles.bottomSpacer} />
       </ScrollView>
       <View style={styles.homeIndicator}>
         <View style={styles.homeIndicatorBar} />
@@ -297,18 +283,12 @@ export default function StaffDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
-  gradientBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
+  background: {
+    ...StyleSheet.absoluteFillObject,
   },
   content: {
-    flex: 1,
-    paddingTop: 60,
     paddingHorizontal: 24,
   },
   scrollView: { flex: 1 },
@@ -317,202 +297,221 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 60,
   },
   loadingText: {
-    color: "rgba(255,255,255,0.6)",
+    color: Colors.dark.textSecondary,
     marginTop: 12,
     fontSize: 16,
+    fontWeight: "500",
   },
-  header: {
+  mainHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 24,
   },
-  welcomeText: {
+  welcomeLabel: {
     fontSize: 15,
-    color: "rgba(255, 255, 255, 0.6)",
-    marginBottom: 8,
-  },
-  clubNameText: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.textSecondary,
     marginBottom: 4,
   },
-  roleText: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.6)",
+  staffName: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: Colors.dark.text,
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.3)",
+  },
+  verifiedText: {
+    color: Colors.dark.success,
+    fontSize: 12,
+    fontWeight: "700",
+    marginLeft: 4,
+  },
+  roleCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    marginBottom: 32,
+  },
+  roleLabel: {
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 4,
+    fontWeight: "700",
+  },
+  roleValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.dark.text,
+  },
+  sectionHeading: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 16,
+    paddingLeft: 4,
+  },
+  actionCard: {
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  actionGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+  },
+  actionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "rgba(219, 39, 119, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  actionTextContent: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 2,
+  },
+  actionDesc: {
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
   },
   card: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 32,
+    padding: 32,
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
-    alignSelf: "center",
+    marginBottom: 24,
+  },
+  rejectedCircle: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
   },
   title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontSize: 26,
+    fontWeight: "800",
+    color: Colors.dark.text,
     textAlign: "center",
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 32,
     lineHeight: 24,
   },
   highlight: {
-    color: "#E91E8C",
-    fontWeight: "600",
+    color: Colors.dark.primary,
+    fontWeight: "700",
   },
-  statusCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 12,
+  statusDisplay: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 20,
     padding: 16,
     marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   statusRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
+  },
+  lastRow: {
+    borderBottomWidth: 0,
   },
   statusLabel: {
     fontSize: 14,
-    color: "rgba(255, 255, 255, 0.5)",
-    fontWeight: "500",
+    color: Colors.dark.textSecondary,
+    fontWeight: "600",
   },
   statusValue: {
     fontSize: 14,
-    color: "#FFFFFF",
-    fontWeight: "600",
+    color: Colors.dark.text,
+    fontWeight: "700",
   },
   pendingBadge: {
     backgroundColor: "rgba(251, 191, 36, 0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(251, 191, 36, 0.4)",
   },
   pendingBadgeText: {
     color: "#FBBF24",
     fontSize: 12,
-    fontWeight: "600",
-  },
-  approvedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(34, 197, 94, 0.2)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: "center",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(34, 197, 94, 0.4)",
-  },
-  approvedBadgeText: {
-    color: "#22C55E",
-    fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   infoBox: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 32,
+    width: "100%",
   },
   infoTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 6,
   },
   infoText: {
     fontSize: 14,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
     lineHeight: 22,
   },
-  primaryButtonWrapper: {
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  primaryButton: {
+  mainButton: {
+    width: "100%",
     height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
   },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  secondaryButton: {
+  refreshLink: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 28,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    gap: 8,
   },
-  secondaryButtonText: {
-    color: "#E91E8C",
+  refreshLinkText: {
+    color: Colors.dark.primary,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 16,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-  },
-  actionIconWrap: {
-    marginRight: 16,
-  },
-  actionContent: {
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  actionDescription: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.5)",
-  },
-  bottomSpacer: { height: 80 },
   homeIndicator: {
     position: "absolute",
     bottom: 0,
@@ -526,5 +525,6 @@ const styles = StyleSheet.create({
     height: 5,
     backgroundColor: "#FFFFFF",
     borderRadius: 3,
+    opacity: 0.3,
   },
 });

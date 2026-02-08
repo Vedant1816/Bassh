@@ -22,13 +22,11 @@ import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { redirectStaff } from "../../services/redirect-staff";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 
 const { height: INITIAL_HEIGHT } = Dimensions.get("window");
 const CURTAIN_HEIGHT_RATIO = 1;
-
-const GRADIENT_COLORS = ["#8B0045", "#2D0A1F", "#000000"] as const;
-const GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
-const BUTTON_GRADIENT = ["#E91E8C", "#DB1A85"] as const;
 
 export default function StaffLoginScreen() {
   const router = useRouter();
@@ -48,6 +46,7 @@ export default function StaffLoginScreen() {
 
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [signupError, setSignupError] = useState("");
   const [signupLoading, setSignupLoading] = useState(false);
 
@@ -86,12 +85,16 @@ export default function StaffLoginScreen() {
   };
 
   const handleSignup = async () => {
-    if (!signupEmail?.trim() || !signupPassword) {
-      setSignupError("Email and password required");
+    if (!signupEmail?.trim() || !signupPassword || !signupConfirmPassword) {
+      setSignupError("Please fill in email, password, and confirm password");
       return;
     }
     if (signupPassword.length < 6) {
       setSignupError("Password must be at least 6 characters");
+      return;
+    }
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Password and confirm password do not match");
       return;
     }
     setSignupError("");
@@ -167,8 +170,8 @@ export default function StaffLoginScreen() {
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.gradientBackground, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <ScrollView
@@ -183,18 +186,18 @@ export default function StaffLoginScreen() {
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
                   <Text style={styles.backIcon}>‹</Text>
                 </Pressable>
-                <Text style={styles.headerTitle}>Staff</Text>
+                <Text style={styles.headerTitle}>Staff Portal</Text>
               </View>
               <View style={styles.titleSection}>
-                <Text style={styles.title}>Sign in</Text>
+                <Text style={styles.title}>Welcome back</Text>
                 <Text style={styles.subtitle}>
-                  Enter your staff account email and password
+                  Enter your staff credentials to continue
                 </Text>
               </View>
               <View style={styles.inputsWrap}>
                 <TextInput
                   placeholder="Email"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   style={styles.input}
                   value={loginEmail}
                   onChangeText={setLoginEmail}
@@ -204,7 +207,7 @@ export default function StaffLoginScreen() {
                 />
                 <TextInput
                   placeholder="Password"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   secureTextEntry
                   style={styles.input}
                   value={loginPassword}
@@ -222,31 +225,21 @@ export default function StaffLoginScreen() {
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Text style={styles.linkLabel}>
-                  Don't have an account?{" "}
-                  <Text style={styles.link}>Create staff account</Text>
+                  Need a staff account?{" "}
+                  <Text style={styles.link}>Request access</Text>
                 </Text>
               </Pressable>
             </ScrollView>
             <View style={styles.bottomContainer}>
-              <Pressable
+              <ThemedButton
                 onPress={handleLogin}
+                loading={loginLoading}
                 disabled={loginLoading}
-                style={styles.buttonWrapper}
+                style={styles.sendButton}
+                textStyle={styles.buttonText}
               >
-                <LinearGradient
-                  colors={[...BUTTON_GRADIENT]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[
-                    styles.sendButton,
-                    loginLoading && styles.buttonDisabled,
-                  ]}
-                >
-                  <Text style={styles.buttonText}>
-                    {loginLoading ? "Signing in…" : "Login"}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
+                Sign in
+              </ThemedButton>
               <View style={styles.homeIndicator} />
             </View>
           </Animated.View>
@@ -262,8 +255,8 @@ export default function StaffLoginScreen() {
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.curtainGradient, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <View style={styles.curtainContentWrap}>
@@ -282,18 +275,18 @@ export default function StaffLoginScreen() {
                   >
                     <Text style={styles.backIcon}>‹</Text>
                   </Pressable>
-                  <Text style={styles.headerTitle}>Staff</Text>
+                  <Text style={styles.headerTitle}>Staff Portal</Text>
                 </View>
                 <View style={styles.titleSection}>
                   <Text style={styles.title}>Create account</Text>
                   <Text style={styles.subtitle}>
-                    Register as staff with your email
+                    Register your official staff profile
                   </Text>
                 </View>
                 <View style={styles.inputsWrap}>
                   <TextInput
                     placeholder="Email"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     style={styles.input}
                     value={signupEmail}
                     onChangeText={setSignupEmail}
@@ -303,11 +296,19 @@ export default function StaffLoginScreen() {
                   />
                   <TextInput
                     placeholder="Password (min 6 characters)"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     secureTextEntry
                     style={styles.input}
                     value={signupPassword}
                     onChangeText={setSignupPassword}
+                  />
+                  <TextInput
+                    placeholder="Confirm password"
+                    placeholderTextColor={Colors.dark.textSecondary}
+                    secureTextEntry
+                    style={styles.input}
+                    value={signupConfirmPassword}
+                    onChangeText={setSignupConfirmPassword}
                   />
                 </View>
                 {signupError ? (
@@ -321,31 +322,21 @@ export default function StaffLoginScreen() {
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
                   <Text style={styles.linkLabel}>
-                    Already have an account?{" "}
+                    Already have access?{" "}
                     <Text style={styles.link}>Sign in</Text>
                   </Text>
                 </Pressable>
               </ScrollView>
               <View style={styles.bottomContainer}>
-                <Pressable
+                <ThemedButton
                   onPress={handleSignup}
                   disabled={signupLoading}
-                  style={styles.buttonWrapper}
+                  loading={signupLoading}
+                  style={styles.sendButton}
+                  textStyle={styles.buttonText}
                 >
-                  <LinearGradient
-                    colors={[...BUTTON_GRADIENT]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.sendButton,
-                      signupLoading && styles.buttonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.buttonText}>
-                      {signupLoading ? "Creating…" : "Create Account"}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
+                  {signupLoading ? "Creating…" : "Register"}
+                </ThemedButton>
                 <View style={styles.homeIndicator} />
               </View>
             </View>
@@ -359,7 +350,7 @@ export default function StaffLoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   keyboardView: {
     flex: 1,
@@ -405,58 +396,62 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     textAlign: "center",
   },
   titleSection: {
-    marginBottom: 32,
+    marginBottom: 40,
     alignItems: "center",
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
-    lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    lineHeight: 22,
+    color: Colors.dark.textSecondary,
     textAlign: "center",
   },
   inputsWrap: {
-    gap: 14,
+    gap: 16,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     fontSize: 16,
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
   error: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   curtainError: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   linkWrap: {
     marginTop: 24,
+    alignItems: "center",
   },
   linkLabel: {
     fontSize: 15,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   link: {
-    color: "#E91E8C",
+    color: Colors.dark.primary,
     fontWeight: "600",
   },
   bottomContainer: {
@@ -467,17 +462,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
-  buttonWrapper: {
-    marginBottom: 16,
-  },
   sendButton: {
     height: 56,
     borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   buttonText: {
     fontSize: 17,
@@ -491,6 +478,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 12,
+    opacity: 0.3,
   },
 
   /* Curtain */
@@ -501,6 +489,8 @@ const styles = StyleSheet.create({
     right: 0,
     overflow: "hidden",
     zIndex: 10,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     ...Platform.select({
       ios: {
         shadowColor: "#000",

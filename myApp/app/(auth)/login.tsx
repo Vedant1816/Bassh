@@ -23,13 +23,10 @@ import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
 
 const { height: INITIAL_HEIGHT } = Dimensions.get("window");
 const CURTAIN_HEIGHT_RATIO = 1;
-
-/* Same gradient as onboarding/otp.tsx */
-const GRADIENT_COLORS = ["#8B0045", "#2D0A1F", "#000000"] as const;
-const GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -155,7 +152,7 @@ export default function AuthScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardView}
         >
-          {/* LOGIN (BACKGROUND) – same theme as otp */}
+          {/* LOGIN (BACKGROUND) */}
           <Animated.View
             pointerEvents={isSignupOpen ? "none" : "auto"}
             style={[
@@ -167,8 +164,8 @@ export default function AuthScreen() {
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.gradientBackground, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <ScrollView
@@ -192,7 +189,7 @@ export default function AuthScreen() {
               <View style={styles.inputsWrap}>
                 <TextInput
                   placeholder="Email"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   style={styles.input}
                   value={loginEmail}
                   onChangeText={setLoginEmail}
@@ -202,7 +199,7 @@ export default function AuthScreen() {
                 />
                 <TextInput
                   placeholder="Password"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   secureTextEntry
                   style={styles.input}
                   value={loginPassword}
@@ -237,7 +234,7 @@ export default function AuthScreen() {
             </View>
           </Animated.View>
 
-          {/* SIGNUP CURTAIN – same gradient + UI as otp */}
+          {/* SIGNUP CURTAIN */}
           <Animated.View
             style={[
               styles.curtainPanel,
@@ -248,8 +245,8 @@ export default function AuthScreen() {
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.curtainGradient, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <View style={styles.curtainContentWrap}>
@@ -274,7 +271,7 @@ export default function AuthScreen() {
                 <View style={styles.inputsWrap}>
                   <TextInput
                     placeholder="Email"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     style={styles.input}
                     value={signupEmail}
                     onChangeText={setSignupEmail}
@@ -284,7 +281,7 @@ export default function AuthScreen() {
                   />
                   <TextInput
                     placeholder="Password (min 6 characters)"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     secureTextEntry
                     style={styles.input}
                     value={signupPassword}
@@ -292,7 +289,7 @@ export default function AuthScreen() {
                   />
                   <TextInput
                     placeholder="Confirm password"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     secureTextEntry
                     style={styles.input}
                     value={signupConfirmPassword}
@@ -338,7 +335,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   keyboardView: {
     flex: 1,
@@ -376,58 +373,62 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     textAlign: "center",
   },
   titleSection: {
-    marginBottom: 32,
+    marginBottom: 40,
     alignItems: "center",
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
-    lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    lineHeight: 22,
+    color: Colors.dark.textSecondary,
     textAlign: "center",
   },
   inputsWrap: {
-    gap: 14,
+    gap: 16,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     fontSize: 16,
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
   error: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   curtainError: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   linkWrap: {
     marginTop: 24,
+    alignItems: "center",
   },
   linkLabel: {
     fontSize: 15,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   link: {
-    color: "#E91E8C",
+    color: Colors.dark.primary,
     fontWeight: "600",
   },
   bottomContainer: {
@@ -438,17 +439,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
-  buttonWrapper: {
-    marginBottom: 16,
-  },
   sendButton: {
     height: 56,
     borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   buttonText: {
     fontSize: 17,
@@ -462,6 +455,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 12,
+    opacity: 0.3,
   },
 
   /* Curtain */
@@ -472,6 +466,8 @@ const styles = StyleSheet.create({
     right: 0,
     overflow: "hidden",
     zIndex: 10,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     ...Platform.select({
       ios: {
         shadowColor: "#000",

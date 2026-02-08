@@ -410,34 +410,40 @@ export default function HomeScreen() {
 
           {/* HEATMAP — red (hot) → orange → yellow → green (cool); layerIndex 0 so it draws below roads and club markers */}
           <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
-            <Mapbox.HeatmapLayer
-              id="heatmap-layer"
-              layerIndex={0}
-              style={{
-                heatmapRadius: 100,
-                heatmapWeight: 1,
-                heatmapIntensity: 2,
-                heatmapOpacity: 0.85,
-                heatmapColor: [
-                  "interpolate",
-                  ["linear"],
-                  ["heatmap-density"],
-                  0,
-                  "rgba(34,197,94,0)",
-                  0.2,
-                  "rgba(74,222,128,0.55)",
-                  0.4,
-                  "rgba(234,179,8,0.7)",
-                  0.6,
-                  "rgba(249,115,22,0.82)",
-                  0.8,
-                  "rgba(239,68,68,0.9)",
-                  1,
-                  "rgba(185,28,28,1)",
-                ] as any,
-              }}
-            />
-          </Mapbox.ShapeSource>
+  <Mapbox.HeatmapLayer
+    id="heatmap-layer"
+    layerIndex={0}
+    style={{
+      heatmapRadius: 100,
+      heatmapWeight: 1,
+      heatmapIntensity: 1.2,
+      heatmapOpacity: 0.75,
+      heatmapColor: [
+        "interpolate",
+        ["linear"],
+        ["heatmap-density"],
+        0,
+        "rgba(0, 0, 0, 0)",
+        0.12,
+        "rgba(50, 190, 100, 0.55)",
+        0.24,
+        "rgba(85, 210, 140, 0.65)",
+        0.36,
+        "rgba(180, 235, 35, 0.7)",
+        0.48,
+        "rgba(200, 245, 40, 0.74)",
+        0.6,
+        "rgba(220, 255, 50, 0.78)",
+        0.78,
+        "rgba(255, 140, 140, 0.75)",
+        0.92,
+        "rgba(255, 100, 100, 0.8)",
+        1,
+        "rgba(240, 75, 75, 0.83)",
+      ] as any,
+    }}
+  />
+</Mapbox.ShapeSource>
 
           {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
           {clubs.map((club, index) => (

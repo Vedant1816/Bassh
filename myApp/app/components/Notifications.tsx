@@ -222,17 +222,19 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                         </View>
                     )}
                 </View>
-                {!item.is_read && <View style={[
-                    styles.unreadDot,
-                    isBookingNotification && styles.unreadDotGreen,
-                ]} />}
+                {
+                    !item.is_read && <View style={[
+                        styles.unreadDot,
+                        isBookingNotification && styles.unreadDotGreen,
+                    ]} />
+                }
                 <Ionicons
                     name="chevron-forward"
                     size={16}
                     color="rgba(255,255,255,0.3)"
                     style={styles.chevronIcon}
                 />
-            </Pressable>
+            </Pressable >
         );
     };
 

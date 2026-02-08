@@ -59,6 +59,7 @@ export default function ClubProfile() {
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showCouponsModal, setShowCouponsModal] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -83,6 +84,23 @@ export default function ClubProfile() {
       );
       const data = await res.json();
       setDiscounts(data.discounts || []);
+    })();
+  }, [clubId]);
+
+  // Fetch reviews
+  useEffect(() => {
+    if (!clubId) return;
+    (async () => {
+      try {
+        const res = await fetchWithFallback(
+          `/api/reviews?club_id=${clubId}`,
+          await withAuthHeaders({ method: "GET" })
+        );
+        const data = await res.json();
+        setReviews(data.reviews || []);
+      } catch (err) {
+        console.error("Failed to fetch reviews:", err);
+      }
     })();
   }, [clubId]);
 
@@ -367,8 +385,95 @@ export default function ClubProfile() {
             </Pressable>
           ))}
 
+          <Pressable onPress={() => router.push(`/club/${clubId}/events`)} style={{ alignItems: 'center', marginBottom: 24 }}>
+            <Text style={styles.viewAllHeaderLink}>View all</Text>
+          </Pressable>
+
+          {/* MORE INFORMATION */}
+          <View style={styles.moreInfoContainer}>
+            <Text style={styles.sectionHeading}>More information</Text>
+
+            <View style={styles.hostRow}>
+              <Image
+                source={{ uri: club.logo_url || club.banner_image_url || "https://i.pravatar.cc/150?u=host" }}
+                style={styles.hostAvatar}
+              />
+              <View style={styles.hostInfo}>
+                <Text style={styles.hostName}>{club.club_name}</Text>
+                <Text style={styles.hostRole}>{club.address_text || "Host"}</Text>
+              </View>
+              <View style={styles.hostActions}>
+                <Pressable style={styles.hostActionBtn}>
+                  <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                </Pressable>
+                {club.phone_number && (
+                  <Pressable style={[styles.hostActionBtn, styles.callBtn]} onPress={() => Linking.openURL(`tel:${club.phone_number}`)}>
+                    <Ionicons name="call" size={20} color="#fff" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            <Text style={styles.subHeading}>Rules & what will be there</Text>
+            <View style={styles.rulesContainer}>
+              {club.terms_and_conditions ? (
+                <Text style={styles.rulesText}>{club.terms_and_conditions}</Text>
+              ) : (
+                <>
+                  <Text style={styles.rulesBullet}>• Respect the space & others: Stay out of off-limits areas and be welcoming.</Text>
+                  <Text style={styles.rulesBullet}>• Bring and share: BYOB and contribute to the fun responsibly.</Text>
+                  <Text style={styles.rulesBullet}>• Clean up & stay safe: Tidy as you go and avoid reckless behavior.</Text>
+                  <Text style={styles.rulesBullet}>• Keep it fun: Play games like Charades, Beer Pong, or Trivia.</Text>
+                  <Text style={styles.rulesBullet}>• Engage everyone: Inclusive games like Karaoke or Never Have I Ever work great.</Text>
+                  <Text style={styles.rulesBullet}>• Moderate noise: Keep it enjoyable without disturbing neighbors.</Text>
+                </>
+              )}
+            </View>
+          </View>
+
+          {/* REVIEWS */}
+          <View style={styles.reviewsContainer}>
+            <View style={styles.reviewsHeader}>
+              <Text style={styles.sectionHeading}>Reviews</Text>
+              <Pressable>
+                <Text style={styles.seeAllLink}>See All</Text>
+              </Pressable>
+            </View>
+
+            {reviews.slice(0, 3).map((review) => (
+              <View key={review.id} style={styles.reviewCard}>
+                <Image
+                  source={{ uri: review.user?.avatar_url || "https://i.pravatar.cc/150" }}
+                  style={styles.reviewerAvatar}
+                />
+                <View style={styles.reviewContent}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>
+                      {review.user?.first_name} {review.user?.last_name || ""}
+                      {!review.user?.first_name && !review.user?.last_name && (review.user?.email?.split('@')[0] || "User")}
+                    </Text>
+                    <View style={styles.reviewRating}>
+                      <Ionicons name="star" size={14} color={Colors.dark.rating} />
+                      <Text style={styles.reviewRatingText}>{review.rating}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.reviewComment} numberOfLines={3}>
+                    {review.comment || "No comment provided."}
+                  </Text>
+                  {review.created_at && (
+                    <Text style={styles.reviewDate}>{new Date(review.created_at).toLocaleDateString()}</Text>
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {reviews.length === 0 && (
+              <Text style={styles.noReviewsText}>No reviews yet.</Text>
+            )}
+          </View>
+
           {/* Bottom spacing */}
-          <View style={{ height: 40 }} />
+          <View style={{ height: 100 }} />
         </ScrollView>
       </View>
 
@@ -799,21 +904,179 @@ const styles = StyleSheet.create({
   eventAvatar3: { zIndex: 1, marginLeft: -10 },
 
   eventCountBadge: {
-    width: 28,
-    height: 28,
+    marginLeft: -10,
+    zIndex: 4,
+    backgroundColor: Colors.dark.primaryBadge,
     borderRadius: 14,
-    backgroundColor: "#E91E63",
+    height: 28,
+    width: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 4,
-    marginLeft: -10,
   },
 
   eventCountText: {
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "700",
+  },
+
+  /* More Information Section */
+  moreInfoContainer: {
+    marginBottom: 24,
+  },
+
+  hostRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: HORIZONTAL_PADDING,
+    marginBottom: 24,
+  },
+
+  hostAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+
+  hostInfo: {
+    flex: 1,
+  },
+
+  hostName: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  hostRole: {
+    color: Colors.dark.textSecondary,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  hostActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  hostActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  callBtn: {
+    backgroundColor: Colors.dark.primary, // Pink call button
+  },
+
+  subHeading: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginHorizontal: HORIZONTAL_PADDING,
+    marginBottom: 8,
+  },
+
+  rulesContainer: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+  },
+
+  rulesText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  rulesBullet: {
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+
+  /* Reviews Section */
+  reviewsContainer: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+  },
+
+  reviewsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 0, // already spaced by more info container
+    marginBottom: 16,
+  },
+
+  seeAllLink: {
+    color: Colors.dark.primary400,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  reviewCard: {
+    flexDirection: "row",
+    backgroundColor: "transparent", // Simple list item
+    marginBottom: 20,
+    gap: 12,
+  },
+
+  reviewerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.dark.surface,
+  },
+
+  reviewContent: {
+    flex: 1,
+  },
+
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  reviewerName: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  reviewRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  reviewRatingText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  reviewComment: {
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  reviewDate: {
+    marginTop: 4,
+    color: Colors.dark.textSubtle,
+    fontSize: 12,
+  },
+
+  noReviewsText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

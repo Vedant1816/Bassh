@@ -15,6 +15,9 @@ import { CameraView, Camera } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { authFetch } from "@/_services/auth-fetch";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -55,6 +58,7 @@ interface BookingDetails {
 
 export default function ScanQRScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [booking, setBooking] = useState<BookingDetails | null>(null);
@@ -209,13 +213,13 @@ export default function ScanQRScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#E91E8C" />
-          <Text style={styles.loadingText}>Requesting camera permission...</Text>
+          <ActivityIndicator size="large" color={Colors.dark.primary} />
+          <Text style={styles.loadingText}>Permission required...</Text>
         </View>
       </View>
     );
@@ -226,33 +230,26 @@ export default function ScanQRScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
-          style={styles.gradientBackground}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
         />
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingTop: insets.top + 100 }]}>
           <View style={styles.card}>
             <View style={styles.iconCircle}>
-              <Ionicons name="camera-outline" size={40} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="camera-outline" size={40} color={Colors.dark.text} />
             </View>
-            <Text style={styles.title}>No access to camera</Text>
+            <Text style={styles.title}>Camera Access</Text>
             <Text style={styles.description}>
-              Grant camera permission to scan booking QR codes
+              Bassh needs camera permission to scan booking QR codes
             </Text>
-            <Pressable style={styles.primaryButtonWrapper} onPress={requestCameraPermission}>
-              <LinearGradient
-                colors={["#E91E8C", "#DB1A85"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.buttonText}>Grant Permission</Text>
-              </LinearGradient>
-            </Pressable>
+            <ThemedButton
+              onPress={requestCameraPermission}
+              style={{ width: "100%" }}
+            >
+              Grant Permission
+            </ThemedButton>
           </View>
-        </View>
-        <View style={styles.homeIndicator}>
-          <View style={styles.homeIndicatorBar} />
         </View>
       </View>
     );
@@ -265,54 +262,61 @@ export default function ScanQRScreen() {
       {!booking && !loading && (
         <>
           <LinearGradient
-            colors={["#8B0045", "#2D0A1F", "transparent"]}
-            locations={[0, 0.3, 0.6]}
-            style={styles.gradientTop}
+            colors={[...HeaderGradient]}
+            locations={[...HeaderGradientLocations]}
+            style={styles.background}
           />
-          <View style={styles.header}>
+          <View style={[styles.header, { top: insets.top + 16 }]}>
             <Pressable style={styles.backButton} onPress={() => router.back()}>
               <Text style={styles.backIcon}>‹</Text>
             </Pressable>
-            <Text style={styles.headerTitle}>Scan QR Code</Text>
+            <Text style={styles.headerTitle}>Entry Scanner</Text>
             <View style={styles.headerRight} />
           </View>
 
-          <Text style={styles.scanTitle}>Scan QR Code</Text>
-          <Text style={styles.scanSubtitle}>Position the QR code within the frame</Text>
+          <View style={[styles.scanContent, { paddingTop: insets.top + 80 }]}>
+            <Text style={styles.scanTitle}>Ready to Scan</Text>
+            <Text style={styles.scanSubtitle}>Position the QR code within the frame</Text>
 
-          <View style={styles.cameraContainer}>
-            <CameraView
-              key={cameraKey}
-              style={styles.camera}
-              facing="back"
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            >
-              <View style={styles.overlay}>
-                <View style={styles.scanFrame} />
-              </View>
-            </CameraView>
-          </View>
-
-          {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="warning-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={styles.cameraContainer}>
+              <CameraView
+                key={cameraKey}
+                style={styles.camera}
+                facing="back"
+                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              >
+                <View style={styles.overlay}>
+                  <View style={styles.scanFrame}>
+                    <View style={[styles.corner, styles.cornerTopLeft]} />
+                    <View style={[styles.corner, styles.cornerTopRight]} />
+                    <View style={[styles.corner, styles.cornerBottomLeft]} />
+                    <View style={[styles.corner, styles.cornerBottomRight]} />
+                  </View>
+                </View>
+              </CameraView>
             </View>
-          )}
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="warning" size={20} color="#FFFFFF" style={{ marginRight: 12 }} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+          </View>
         </>
       )}
 
       {loading && (
         <View style={styles.loadingOverlay}>
           <LinearGradient
-            colors={["#8B0045", "#2D0A1F", "#000000"]}
-            locations={[0, 0.4, 1]}
+            colors={[...HeaderGradient]}
+            locations={[...HeaderGradientLocations]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#E91E8C" />
-            <Text style={styles.loadingText}>Validating booking...</Text>
+            <ActivityIndicator size="large" color={Colors.dark.primary} />
+            <Text style={styles.loadingFullText}>Verifying Booking...</Text>
           </View>
         </View>
       )}
@@ -320,89 +324,77 @@ export default function ScanQRScreen() {
       {booking && !loading && (
         <ScrollView style={styles.detailsContainer} contentContainerStyle={styles.detailsContent}>
           <LinearGradient
-            colors={["#8B0045", "#2D0A1F", "#000000"]}
-            locations={[0, 0.2, 0.5]}
-            style={styles.detailsGradient}
+            colors={[...HeaderGradient]}
+            locations={[...HeaderGradientLocations]}
+            style={styles.detailsBackground}
           />
-          <View style={styles.detailsInner}>
+          <View style={[styles.detailsInner, { paddingTop: insets.top + 40 }]}>
             <View style={styles.validBadge}>
-              <Ionicons name="checkmark-circle" size={24} color="#22C55E" style={{ marginRight: 8 }} />
-              <Text style={styles.validBadgeText}>Valid Booking</Text>
+              <Ionicons name="checkmark-circle" size={24} color={Colors.dark.success} style={{ marginRight: 8 }} />
+              <Text style={styles.validBadgeText}>Verified Booking</Text>
             </View>
 
-            {booking.event && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Event</Text>
-                <Text style={styles.infoText}>{booking.event.name}</Text>
-                <Text style={styles.infoSubtext}>
-                  {booking.event.date} at {booking.event.time}
-                </Text>
-                {booking.event.dj_name && (
-                  <Text style={styles.infoSubtext}>DJ: {booking.event.dj_name}</Text>
-                )}
-              </View>
-            )}
-
-            {booking.club && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Venue</Text>
-                <Text style={styles.infoText}>{booking.club.name}</Text>
-                <Text style={styles.infoSubtext}>{booking.club.address}</Text>
-              </View>
-            )}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Booking Details</Text>
-              <Text style={styles.infoText}>Total: ₹{booking.total_amount}</Text>
-              <Text style={styles.infoSubtext}>{booking.participant_count} participant(s)</Text>
-              <Text style={styles.infoSubtext}>Status: {booking.status}</Text>
-            </View>
-
-            {booking.customer && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Booked By</Text>
-                <Text style={styles.infoText}>{booking.customer.name}</Text>
-                <Text style={styles.infoSubtext}>{booking.customer.phone}</Text>
-              </View>
-            )}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Participants</Text>
-              {booking.participants.map((p, index) => (
-                <View key={index} style={styles.participantCard}>
-                  <Text style={styles.participantName}>
-                    {index + 1}. {p.name}
+            <View style={styles.detailsCard}>
+              {booking.event && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Event</Text>
+                  <Text style={styles.mainInfoText}>{booking.event.name}</Text>
+                  <Text style={styles.subInfoText}>
+                    {booking.event.date} • {booking.event.time}
                   </Text>
-                  <Text style={styles.participantInfo}>
-                    {p.gender} • {p.age} years
-                  </Text>
-                  {p.email && (
-                    <Text style={styles.participantInfo}>{p.email}</Text>
-                  )}
                 </View>
-              ))}
+              )}
+
+              {booking.customer && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Customer</Text>
+                  <Text style={styles.mainInfoText}>{booking.customer.name}</Text>
+                  <Text style={styles.subInfoText}>{booking.customer.phone}</Text>
+                </View>
+              )}
+
+              <View style={[styles.section, styles.noBorder]}>
+                <Text style={styles.sectionLabel}>Access Details</Text>
+                <View style={styles.accessRow}>
+                  <View style={styles.accessItem}>
+                    <Text style={styles.accessValue}>{booking.participant_count}</Text>
+                    <Text style={styles.accessLabel}>Guests</Text>
+                  </View>
+                  <View style={styles.accessDivider} />
+                  <View style={styles.accessItem}>
+                    <Text style={styles.accessValue}>₹{booking.total_amount}</Text>
+                    <Text style={styles.accessLabel}>Amount</Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
-            <View style={styles.buttonContainer}>
-              <Pressable
-                style={styles.primaryButtonWrapper}
-                onPress={handleConfirmEntry}
-                disabled={loading}
-              >
-                <LinearGradient
-                  colors={["#E91E8C", "#DB1A85"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.primaryButton}
-                >
-                  <Ionicons name="checkmark" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.buttonText}>Confirm Entry</Text>
-                </LinearGradient>
-              </Pressable>
+            <Text style={styles.participantsHeading}>Guest List</Text>
+            {booking.participants.map((p, index) => (
+              <View key={index} style={styles.participantRow}>
+                <View style={styles.participantIndex}>
+                  <Text style={styles.indexText}>{index + 1}</Text>
+                </View>
+                <View style={styles.participantMain}>
+                  <Text style={styles.pName}>{p.name}</Text>
+                  <Text style={styles.pInfo}>
+                    {p.gender} • {p.age} yrs
+                  </Text>
+                </View>
+                {p.email ? <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.3)" /> : null}
+              </View>
+            ))}
 
-              <Pressable style={styles.secondaryButton} onPress={handleScanAnother}>
-                <Ionicons name="close" size={20} color="#E91E8C" style={{ marginRight: 8 }} />
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
+            <View style={styles.actionArea}>
+              <ThemedButton
+                onPress={handleConfirmEntry}
+                style={styles.confirmButton}
+              >
+                Confirm Entry
+              </ThemedButton>
+
+              <Pressable style={styles.cancelLink} onPress={handleScanAnother}>
+                <Text style={styles.cancelText}>Scan Another</Text>
               </Pressable>
             </View>
 
@@ -417,45 +409,30 @@ export default function ScanQRScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
-  gradientBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
-  },
-  gradientTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    zIndex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    justifyContent: "center",
+  background: {
+    ...StyleSheet.absoluteFillObject,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 60,
+  },
+  loadingText: {
+    color: Colors.dark.textSecondary,
+    marginTop: 12,
+    fontSize: 15,
   },
   header: {
     position: "absolute",
-    top: 60,
     left: 0,
     right: 0,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    zIndex: 2,
-    gap: 12,
+    zIndex: 10,
+    height: 44,
   },
   backButton: {
     width: 32,
@@ -472,157 +449,123 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#FFFFFF",
+    textAlign: "center",
   },
   headerRight: { width: 32 },
-  card: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  scanContent: {
+    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    alignSelf: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  description: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.6)",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  primaryButtonWrapper: { marginTop: 8 },
-  primaryButton: {
-    height: 56,
-    borderRadius: 28,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  homeIndicator: {
-    position: "absolute",
-    bottom: 34,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  homeIndicatorBar: {
-    width: 134,
-    height: 5,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 3,
+    paddingHorizontal: 24,
   },
   scanTitle: {
-    position: "absolute",
-    top: 120,
-    left: 24,
-    right: 24,
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 32,
+    fontWeight: "800",
     color: "#FFFFFF",
-    textAlign: "center",
-    zIndex: 2,
+    marginBottom: 8,
   },
   scanSubtitle: {
-    position: "absolute",
-    top: 158,
-    left: 24,
-    right: 24,
-    fontSize: 15,
-    color: "rgba(255, 255, 255, 0.6)",
+    fontSize: 16,
+    color: Colors.dark.textSecondary,
+    marginBottom: 40,
     textAlign: "center",
-    zIndex: 2,
   },
   cameraContainer: {
-    flex: 1,
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 32,
     overflow: "hidden",
-    borderRadius: 20,
-    margin: 20,
-    marginTop: 200,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#000",
   },
   camera: {
     flex: 1,
   },
   overlay: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
     alignItems: "center",
   },
   scanFrame: {
-    width: 250,
-    height: 250,
-    borderWidth: 3,
-    borderColor: "#E91E8C",
-    borderRadius: 20,
-    backgroundColor: "transparent",
+    width: 240,
+    height: 240,
+    position: "relative",
+  },
+  corner: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderColor: Colors.dark.primary,
+  },
+  cornerTopLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+  },
+  cornerTopRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+  },
+  cornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+  },
+  cornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
   },
   errorContainer: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: Colors.dark.error,
     padding: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.4)",
+    borderRadius: 20,
+    marginTop: 24,
+    width: "100%",
+    shadowColor: Colors.dark.error,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   errorText: {
     flex: 1,
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: "700",
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 10,
+    zIndex: 100,
   },
   loadingContainer: {
     alignItems: "center",
   },
-  loadingText: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 18,
-    marginTop: 16,
+  loadingFullText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 20,
   },
   detailsContainer: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   detailsContent: { flexGrow: 1 },
-  detailsGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.4,
-  },
+  detailsBackground: { ...StyleSheet.absoluteFillObject },
   detailsInner: {
-    paddingTop: 60,
     paddingHorizontal: 24,
-    paddingBottom: 100,
   },
   validBadge: {
     flexDirection: "row",
@@ -632,77 +575,168 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 24,
-    marginBottom: 24,
+    marginBottom: 32,
     borderWidth: 1,
     borderColor: "rgba(34, 197, 94, 0.4)",
   },
   validBadgeText: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#22C55E",
+    fontWeight: "800",
+    color: Colors.dark.success,
+  },
+  detailsCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 32,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    marginBottom: 32,
   },
   section: {
-    marginBottom: 24,
-    paddingBottom: 16,
+    marginBottom: 20,
+    paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.15)",
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
   },
-  sectionTitle: {
+  noBorder: {
+    borderBottomWidth: 0,
+    marginBottom: 0,
+    paddingBottom: 0,
+  },
+  sectionLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "rgba(255, 255, 255, 0.5)",
+    color: Colors.dark.textSecondary,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: 8,
   },
-  infoText: {
-    fontSize: 18,
-    fontWeight: "600",
+  mainInfoText: {
+    fontSize: 22,
+    fontWeight: "800",
     color: "#FFFFFF",
     marginBottom: 4,
   },
-  infoSubtext: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.6)",
+  subInfoText: {
+    fontSize: 15,
+    color: Colors.dark.textSecondary,
+  },
+  accessRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  accessItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  accessValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: Colors.dark.primary,
     marginBottom: 2,
   },
-  participantCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+  accessLabel: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    fontWeight: "700",
+  },
+  accessDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  participantsHeading: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 16,
+    paddingLeft: 4,
+  },
+  participantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  participantIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  indexText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  participantMain: {
+    flex: 1,
+  },
+  pName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  pInfo: {
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+  },
+  actionArea: {
+    marginTop: 32,
+    alignItems: "center",
+  },
+  confirmButton: {
+    width: "100%",
+    height: 60,
+  },
+  cancelLink: {
+    marginTop: 20,
+    padding: 10,
+  },
+  cancelText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 16,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  bottomSpacer: { height: 60 },
+  card: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 32,
+    padding: 32,
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.15)",
   },
-  participantName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  participantInfo: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.6)",
-  },
-  buttonContainer: {
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  secondaryButton: {
-    flexDirection: "row",
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 28,
-    padding: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    marginBottom: 20,
   },
-  secondaryButtonText: {
-    color: "#E91E8C",
-    fontSize: 17,
-    fontWeight: "600",
+  title: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 12,
   },
-  bottomSpacer: { height: 40 },
+  description: {
+    fontSize: 16,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
+    marginBottom: 32,
+    lineHeight: 24,
+  },
 });
