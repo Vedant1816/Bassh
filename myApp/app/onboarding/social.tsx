@@ -2,6 +2,7 @@ import { View, TextInput, Pressable, Text, StyleSheet, KeyboardAvoidingView, Pla
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
@@ -44,11 +45,9 @@ export default function SocialScreen() {
         <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
 
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Welcome to BASH</Text>
+        <OnboardingTopBar stepIndex={5} totalSteps={5} onBack={() => router.back()} />
+        <View style={styles.skipRow}>
+          <View style={styles.headerSpacer} />
           <Pressable
             onPress={async () => {
               try {
@@ -147,10 +146,8 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 0.5,
   },
   scrollContent: { flexGrow: 1, paddingTop: 60, paddingHorizontal: 24, paddingBottom: 120 },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, marginBottom: 32, gap: 12 },
-  backButton: { width: 32, height: 32, justifyContent: "center", alignItems: "center" },
-  backIcon: { fontSize: 32, color: "#FFFFFF", fontWeight: "300", marginLeft: -4 },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
+  skipRow: { flexDirection: "row", alignItems: "center", marginBottom: 20, paddingHorizontal: 8 },
+  headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
   skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
   titleSection: { marginBottom: 32 },

@@ -49,7 +49,11 @@ export default function TransactionsScreen() {
       }
 
       const data = await res.json();
-      setTransactions(data.transactions || []);
+      const all = data.transactions || [];
+      const successful = all.filter(
+        (tx: Transaction) => String(tx.status || "").toLowerCase() === "success"
+      );
+      setTransactions(successful);
       setError("");
     } catch (err: any) {
       setError(err.message || "Failed to load transactions");

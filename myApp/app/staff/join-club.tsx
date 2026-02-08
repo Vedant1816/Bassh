@@ -10,12 +10,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
-import { Colors } from "@/constants/Colors";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function JoinClubScreen() {
   const router = useRouter();
@@ -29,12 +34,10 @@ export default function JoinClubScreen() {
       setError("Please enter a club token");
       return;
     }
-
     if (!post.trim()) {
       setError("Please enter your role/position");
       return;
     }
-
     const normalizedToken = clubToken.trim().toUpperCase();
     if (normalizedToken.length !== 8) {
       setError("Club token must be exactly 8 characters");
@@ -66,24 +69,18 @@ export default function JoinClubScreen() {
       }
 
       Alert.alert(
-        "✅ Request Submitted!",
-        `You've requested to join ${data.data?.club_name} as ${data.data?.post}.\n\nYour request is pending approval from the club manager.`,
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/staff"),
-          },
-        ]
+        "Request Submitted",
+        `You've requested to join ${data.data?.club_name} as ${data.data?.post}. Your request is pending approval from the club manager.`,
+        [{ text: "OK", onPress: () => router.replace("/staff") }]
       );
     } catch (err: any) {
-      setError(err.message || "Network error. Please check your connection and try again.");
+      setError(err.message || "Network error. Please try again.");
       setLoading(false);
     }
   };
 
   const handleTokenChange = (text: string) => {
-    const formatted = text.toUpperCase().slice(0, 8);
-    setClubToken(formatted);
+    setClubToken(text.toUpperCase().slice(0, 8));
     setError("");
   };
 
@@ -93,184 +90,229 @@ export default function JoinClubScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <DismissKeyboardView style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.emoji}>🏢</Text>
-          </View>
-          <Text style={styles.title}>Join Club</Text>
-          <Text style={styles.subtitle}>
-            Enter your club's unique token and your role to request access
-          </Text>
-        </View>
+    <DismissKeyboardView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <StatusBar barStyle="light-content" />
 
-        {/* Form Card */}
-        <View style={styles.card}>
-          {/* Club Token Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>CLUB TOKEN</Text>
-            <Text style={styles.inputHint}>8-character code from your manager</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                placeholder="ABC12345"
-                placeholderTextColor={Colors.dark.textTertiary}
-                value={clubToken}
-                onChangeText={handleTokenChange}
-                style={styles.tokenInput}
-                editable={!loading}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={8}
-              />
-              {clubToken.length === 8 && (
-                <View style={styles.checkmark}>
-                  <Text style={styles.checkmarkText}>✓</Text>
-                </View>
-              )}
-            </View>
-            {clubToken.length > 0 && clubToken.length < 8 && (
-              <Text style={styles.validationHint}>
-                {8 - clubToken.length} more character{clubToken.length !== 7 ? "s" : ""} needed
-              </Text>
-            )}
+        <LinearGradient
+          colors={["#8B0045", "#2D0A1F", "#000000"]}
+          locations={[0, 0.4, 1]}
+          style={styles.gradientBackground}
+        />
+
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backIcon}>‹</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>Join Club</Text>
+            <View style={styles.headerRight} />
           </View>
 
-          {/* Post/Role Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>YOUR ROLE</Text>
-            <Text style={styles.inputHint}>e.g., Bouncer, Manager, Bartender</Text>
-            <TextInput
-              placeholder="Enter your role"
-              placeholderTextColor={Colors.dark.textTertiary}
-              value={post}
-              onChangeText={handlePostChange}
-              style={styles.postInput}
-              editable={!loading}
-              autoCapitalize="words"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-            />
-          </View>
-
-          {/* Submit Button */}
-          <Pressable
-            onPress={handleSubmit}
-            style={({ pressed }) => [
-              styles.submitButton,
-              (loading || clubToken.trim().length !== 8 || !post.trim()) &&
-                styles.buttonDisabled,
-              pressed && styles.buttonPressed,
-            ]}
-            disabled={loading || clubToken.trim().length !== 8 || !post.trim()}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {loading ? (
-              <ActivityIndicator color={Colors.dark.text} />
-            ) : (
-              <>
-                <Text style={styles.submitButtonText}>Submit Request</Text>
-                <Text style={styles.submitButtonArrow}>→</Text>
-              </>
-            )}
-          </Pressable>
-
-          {/* Error Message */}
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorIcon}>⚠️</Text>
-              <Text style={styles.error}>{error}</Text>
+            <View style={styles.titleSection}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="business-outline" size={36} color="rgba(255,255,255,0.8)" />
+              </View>
+              <Text style={styles.title}>Join Club</Text>
+              <Text style={styles.subtitle}>
+                Enter your club&apos;s unique token and your role to request access
+              </Text>
             </View>
-          ) : null}
+
+            <View style={styles.card}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>CLUB TOKEN</Text>
+                <Text style={styles.inputHint}>8-character code from your manager</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    placeholder="ABC12345"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    value={clubToken}
+                    onChangeText={handleTokenChange}
+                    style={styles.tokenInput}
+                    editable={!loading}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={8}
+                  />
+                  {clubToken.length === 8 && (
+                    <View style={styles.checkmark}>
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                {clubToken.length > 0 && clubToken.length < 8 && (
+                  <Text style={styles.validationHint}>
+                    {8 - clubToken.length} more character{clubToken.length !== 7 ? "s" : ""} needed
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>YOUR ROLE</Text>
+                <Text style={styles.inputHint}>e.g., Bouncer, Manager, Bartender</Text>
+                <TextInput
+                  placeholder="Enter your role"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  value={post}
+                  onChangeText={handlePostChange}
+                  style={styles.postInput}
+                  editable={!loading}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                />
+              </View>
+
+              <Pressable
+                onPress={handleSubmit}
+                disabled={loading || clubToken.trim().length !== 8 || !post.trim()}
+                style={styles.buttonWrapper}
+              >
+                <LinearGradient
+                  colors={["#E91E8C", "#DB1A85"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.submitButton,
+                    (loading || clubToken.trim().length !== 8 || !post.trim()) && styles.buttonDisabled,
+                  ]}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Submit Request</Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="warning-outline" size={18} color="#EF4444" style={{ marginRight: 8 }} />
+                  <Text style={styles.error}>{error}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.infoBox}>
+              <View style={styles.infoHeader}>
+                <Ionicons name="information-circle-outline" size={20} color="rgba(255,255,255,0.7)" style={{ marginRight: 8 }} />
+                <Text style={styles.infoTitle}>How to get a club token?</Text>
+              </View>
+              <Text style={styles.infoText}>
+                Contact your club manager or owner to receive your unique 8-character access token.
+              </Text>
+            </View>
+
+            <View style={styles.securityBox}>
+              <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.6)" style={{ marginRight: 12 }} />
+              <Text style={styles.securityText}>
+                Your request will be reviewed by the club manager before access is granted.
+              </Text>
+            </View>
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
         </View>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <View style={styles.infoHeader}>
-            <Text style={styles.infoIcon}>💡</Text>
-            <Text style={styles.infoTitle}>How to get a club token?</Text>
-          </View>
-          <Text style={styles.infoText}>
-            Contact your club manager or owner to receive your unique 8-character access token.
-          </Text>
+        <View style={styles.homeIndicator}>
+          <View style={styles.homeIndicatorBar} />
         </View>
-
-        {/* Security Note */}
-        <View style={styles.securityBox}>
-          <Text style={styles.securityIcon}>🔒</Text>
-          <Text style={styles.securityText}>
-            Your request will be reviewed by the club manager before access is granted.
-          </Text>
-        </View>
-      </ScrollView>
-      </DismissKeyboardView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </DismissKeyboardView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: "#000000",
   },
-  scrollContent: {
-    padding: 20,
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
+  },
+  content: {
+    flex: 1,
     paddingTop: 60,
-    paddingBottom: 40,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontWeight: "300",
+    marginLeft: -4,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  headerRight: { width: 32 },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  titleSection: {
     alignItems: "center",
     marginBottom: 32,
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 2,
-    borderColor: Colors.dark.borderLight,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
-  emoji: {
-    fontSize: 40,
-  },
   title: {
     fontSize: 32,
-    fontWeight: "800",
-    color: Colors.dark.primary,
+    fontWeight: "700",
+    color: "#FFFFFF",
     marginBottom: 8,
     textAlign: "center",
-    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
+    fontSize: 15,
+    color: "rgba(255, 255, 255, 0.6)",
     textAlign: "center",
     lineHeight: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderRadius: 16,
     padding: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     marginBottom: 20,
-    shadowColor: Colors.dark.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
   },
   inputGroup: {
     marginBottom: 24,
@@ -278,27 +320,24 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: "700",
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.5)",
     marginBottom: 4,
     letterSpacing: 1,
   },
   inputHint: {
     fontSize: 12,
-    color: Colors.dark.textTertiary,
+    color: "rgba(255, 255, 255, 0.4)",
     marginBottom: 10,
   },
-  inputWrapper: {
-    position: "relative",
-  },
+  inputWrapper: { position: "relative" },
   tokenInput: {
-    backgroundColor: Colors.dark.card,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: 12,
     padding: 18,
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 22,
-    borderWidth: 2,
-    borderColor: Colors.dark.border,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     letterSpacing: 6,
     textAlign: "center",
     fontWeight: "700",
@@ -311,129 +350,107 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.dark.success,
+    backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmarkText: {
-    color: Colors.dark.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
   postInput: {
-    backgroundColor: Colors.dark.card,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: 12,
     padding: 18,
-    color: Colors.dark.text,
+    color: "#FFFFFF",
     fontSize: 16,
-    borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   validationHint: {
     fontSize: 12,
-    color: Colors.dark.warning,
+    color: "#FBBF24",
     marginTop: 8,
     textAlign: "center",
     fontWeight: "500",
   },
+  buttonWrapper: { marginTop: 8 },
   submitButton: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
-    marginTop: 8,
-    shadowColor: Colors.dark.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    alignItems: "center",
   },
+  buttonDisabled: { opacity: 0.5 },
   submitButtonText: {
-    color: Colors.dark.text,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  submitButtonArrow: {
-    color: Colors.dark.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginLeft: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  buttonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600",
   },
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.errorBg,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
     padding: 14,
     borderRadius: 12,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.errorBorder,
-  },
-  errorIcon: {
-    fontSize: 18,
-    marginRight: 10,
+    borderColor: "rgba(239, 68, 68, 0.3)",
   },
   error: {
     flex: 1,
-    color: Colors.dark.error,
+    color: "#EF4444",
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "500",
   },
   infoBox: {
-    backgroundColor: Colors.dark.infoBg,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.infoBorder,
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   infoHeader: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
   },
-  infoIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
   infoTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.dark.info,
+    color: "#FFFFFF",
   },
   infoText: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.6)",
     lineHeight: 20,
   },
   securityBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.successBg,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderRadius: 16,
     padding: 18,
     borderWidth: 1,
-    borderColor: Colors.dark.successBorder,
-  },
-  securityIcon: {
-    fontSize: 22,
-    marginRight: 12,
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   securityText: {
     flex: 1,
     fontSize: 12,
-    color: Colors.dark.textSecondary,
+    color: "rgba(255, 255, 255, 0.5)",
     lineHeight: 18,
+  },
+  bottomSpacer: { height: 24 },
+  homeIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 34,
+    alignItems: "center",
+  },
+  homeIndicatorBar: {
+    width: 134,
+    height: 5,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 3,
   },
 });

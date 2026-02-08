@@ -15,32 +15,17 @@ export default function AuthLanding() {
         style={styles.primaryButton}
       >
         <Text style={styles.primaryButtonText}>
-          User / Club Login
+          Get started
         </Text>
       </Pressable>
 
       <Pressable
-        onPress={() => router.push("/signup")}
-        style={styles.secondaryButton}
+        onPress={() => router.push("/staff-login")}
+        style={styles.staffLink}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Text style={styles.secondaryButtonText}>
-          Create User Account
-        </Text>
+        <Text style={styles.staffLinkText}>Staff</Text>
       </Pressable>
-
-      <View style={styles.staffSection}>
-        <Pressable onPress={() => router.push("/staff-login")}>
-          <Text style={styles.linkText}>
-            Staff Login
-          </Text>
-        </Pressable>
-        <Text style={styles.linkText}> • </Text>
-        <Pressable onPress={() => router.push("/staff-signup")}>
-          <Text style={styles.linkText}>
-            Staff Signup
-          </Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -64,33 +49,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#DB2777",
     paddingVertical: 16,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   primaryButtonText: {
     textAlign: "center",
     color: "#FFFFFF",
     fontWeight: "600",
   },
-  secondaryButton: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#EC4899",
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 32,
+  staffLink: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
-  secondaryButtonText: {
-    textAlign: "center",
-    color: "#EC4899",
-    fontWeight: "600",
-  },
-  linkText: {
+  staffLinkText: {
+    fontSize: 14,
     color: "#9CA3AF",
     textDecorationLine: "underline",
-  },
-  staffSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
   },
 });
