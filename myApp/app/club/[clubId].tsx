@@ -171,7 +171,7 @@ export default function ClubProfile() {
             <Image
               source={{
                 uri:
-                  club.banner_image_url ||
+                  club.cover_photo ||
                   "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4",
               }}
               style={styles.banner}
@@ -248,7 +248,7 @@ export default function ClubProfile() {
           <Text style={styles.sectionHeading}>About</Text>
           <View style={styles.aboutBlock}>
             <Text style={styles.aboutDesc} numberOfLines={4}>
-              {club.description ||
+              {club.club_desc ||
                 "Combining aggressive sound design w hypnotic grooves & melodies, Massano continues to rise at a meteoric rate. Hailing from a thriving music culture in Liverpool, Massano's been universally regarded a..."}
             </Text>
             <Pressable>
@@ -335,7 +335,7 @@ export default function ClubProfile() {
                         event.banner_image_url ||
                         event.image_url ||
                         event.poster_url ||
-                        club.banner_image_url ||
+                        club.cover_photo ||
                         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400",
                     }}
                     style={styles.eventImage}
@@ -395,7 +395,7 @@ export default function ClubProfile() {
 
             <View style={styles.hostRow}>
               <Image
-                source={{ uri: club.logo_url || club.banner_image_url || "https://i.pravatar.cc/150?u=host" }}
+                source={{ uri: club.club_logo || club.cover_photo || "https://i.pravatar.cc/150?u=host" }}
                 style={styles.hostAvatar}
               />
               <View style={styles.hostInfo}>
@@ -827,24 +827,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(22, 22, 22, 0.36)",
     borderWidth: 1,
     borderColor: "rgba(219, 39, 144, 0.41)",
-    borderBottomLeftRadius: 24, // Matches card radius
-    borderBottomRightRadius: 24, // Matches card radius
-    // user asked for 15px radius, but card has 24.
-    // Let's use 24 to match the card's bottom corners,
-    // OR if this footer is meant to be the whole "content" background.
-    // The previous code had the footer flush with the bottom.
-    // Let's stick to the card's corner radius for bottom to be clean,
-    // OR maybe they want the footer to be floating?
-    // "border-radius: 15px" suggests it might be its own box.
-    // But let's apply the color and border.
-    // I will use 24 to match the container, or just apply it to the view.
-    // actually, let's respect the 15px but maybe on the inner content?
-    // User said "border-radius: 15px".
-    // I'll apply exactly what they asked to the footer, but keep bottom aligned.
-    // Wait, if I change radius to 15, and card is 24, it might look off.
-    // I'll interpret this as the card styling or the overlay styling.
-    // Given the transparency, it acts like a glass pane.
-    // I will set the styles on eventFooter.
+    borderBottomLeftRadius: 24, 
+    borderBottomRightRadius: 24, 
     paddingHorizontal: 16,
     paddingVertical: 12,
     justifyContent: "center",

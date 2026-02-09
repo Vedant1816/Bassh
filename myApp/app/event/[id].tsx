@@ -193,6 +193,12 @@ export default function EventDetailScreen() {
 
   if (!event) return null;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventDate = event?.event_date ? new Date(event.event_date) : null;
+  if (eventDate) eventDate.setHours(0, 0, 0, 0);
+  const isPassed = eventDate ? eventDate < today : false;
+
   const bannerUrl = event.banner_image_url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800";
   const couplePrice = pricing.find((p: any) => p.label?.toLowerCase().includes("couple"))?.couple_price || pricing.find((p: any) => p.label?.toLowerCase().includes("couple"))?.price || 999;
   const stagPrice = pricing.find((p: any) => p.label?.toLowerCase().includes("stag"))?.stag_price || pricing.find((p: any) => p.label?.toLowerCase().includes("stag"))?.price || 699;
@@ -200,7 +206,7 @@ export default function EventDetailScreen() {
   const truncatedAbout = aboutText.length > 180 ? aboutText.substring(0, 180) + "..." : aboutText;
 
   // Debug log for render
-  console.log("📱 [FRONTEND RENDER] guestList:", guestList.length, "totalGuests:", totalGuests);
+  console.log("📱 [FRONTEND RENDER] guestList:", guestList.length, "totalGuests:", totalGuests, "isPassed:", isPassed);
 
   const previewGuests = guestList.slice(0, 3);
   const remainingGuests = Math.max(0, totalGuests - 3);
@@ -400,13 +406,15 @@ export default function EventDetailScreen() {
           </View>
         </View>
 
-        {/* BOOK TICKETS BUTTON */}
         <View style={styles.section}>
           <Pressable
-            style={styles.bookButton}
-            onPress={() => id && router.push(`/event/${id}/book`)}
+            style={[styles.bookButton, isPassed && styles.disabledButton]}
+            onPress={() => !isPassed && id && router.push(`/event/${id}/book`)}
+            disabled={isPassed}
           >
-            <Text style={styles.bookButtonText}>Book tickets Now</Text>
+            <Text style={[styles.bookButtonText, isPassed && styles.disabledButtonText]}>
+              {isPassed ? "Event Passed" : "Book tickets Now"}
+            </Text>
           </Pressable>
         </View>
 
@@ -792,6 +800,14 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+  disabledButton: {
+    opacity: 0.5,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: "transparent",
+  },
+  disabledButtonText: {
+    color: "rgba(255, 255, 255, 0.4)",
   },
   hostRow: {
     flexDirection: "row",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, StatusBar, Dimensions, Image } from "react-native";
+import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, StatusBar, Image, useWindowDimensions, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constants/Colors";
@@ -9,8 +9,6 @@ import BengaluruIcon from "@/app/components/Bengluru.Icon";
 import ChandigarhIcon from "@/app/components/Chandigarh.Icon";
 import HyderabadIcon from "@/app/components/Hyderabad.Icon";
 import KolkataIcon from "@/app/components/Kolkata.Icon";
-
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface LocationHeaderProps {
   title: string;
@@ -61,6 +59,7 @@ const POPULAR_CITY_ICON_COLOR = "#B8A9C9";
 export default function LocationHeader({ title, address, onLocationChange, variant = "default", changeable = true }: LocationHeaderProps) {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
 
   const filteredCities = CITIES.filter(city =>
     city.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -80,25 +79,19 @@ export default function LocationHeader({ title, address, onLocationChange, varia
 
   return (
     <>
-      {/* Main container: 178x40 */}
-      <View style={styles.container}>
-        <Pressable
-          style={[styles.iconButton, variant === "circle" && styles.iconButtonCircle]}
-          onPress={handlePress}
-        >
+      {/* Main container */}
+      <Pressable style={styles.container} onPress={handlePress}>
+        <View style={[styles.iconButton, variant === "circle" && styles.iconButtonCircle]}>
           <Image
             source={require("@/assets/images/location-pin-button.png")}
             style={styles.locationPinImage}
             resizeMode="contain"
           />
-        </Pressable>
+        </View>
 
-        <Pressable
-          style={styles.textBlock}
-          onPress={handlePress}
-        >
+        <View style={styles.textBlock}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title} numberOfLines={1}>{title}</Text>
             {changeable && (
               <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={styles.arrowDown} />
             )}
@@ -106,128 +99,132 @@ export default function LocationHeader({ title, address, onLocationChange, varia
           <Text style={styles.address} numberOfLines={1}>
             {address || "Select location"}
           </Text>
-        </Pressable>
-      </View>
+        </View>
+      </Pressable>
 
       {/* NEW CITY PICKER MODAL */}
       <Modal
         visible={showCityPicker}
         animationType="slide"
-        presentationStyle="fullScreen"
+        presentationStyle="overFullScreen"
+        transparent={true} // Important for web/transparency if needed, though we use full black bg
         onRequestClose={() => setShowCityPicker(false)}
       >
         <View style={styles.modalContainer}>
-          <StatusBar barStyle="light-content" />
           <LinearGradient
             colors={["#8B0045", "#2D0A1F", "#000000"]}
             locations={[0, 0.4, 1]}
-            style={styles.gradientBackground}
+            style={[styles.gradientBackground, { height: SCREEN_HEIGHT * 0.5 }]}
           />
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Pressable
-              style={styles.backButton}
-              onPress={() => setShowCityPicker(false)}
-            >
-              <Ionicons name="chevron-down" size={28} color="#FFFFFF" />
-            </Pressable>
-            <Text style={styles.modalTitle}>Location</Text>
-            <View style={{ width: 44 }} />
-          </View>
+          <View style={styles.modalContentWrapper}>
+            <StatusBar barStyle="light-content" />
 
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.5)" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search city, area or locality"
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-            />
-          </View>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Pressable
+                style={styles.backButton}
+                onPress={() => setShowCityPicker(false)}
+              >
+                <Ionicons name="chevron-down" size={28} color="#FFFFFF" />
+              </Pressable>
+              <Text style={styles.modalTitle}>Location</Text>
+              <View style={{ width: 44 }} />
+            </View>
 
-          <ScrollView style={styles.content}>
-            {/* Use Current Location */}
-            <Pressable
-              style={styles.currentLocationCard}
-              onPress={() => {
-                onLocationChange?.({
-                  name: "Your Location",
-                  lat: 0,
-                  lng: 0
-                });
-                setShowCityPicker(false);
-                setSearchQuery("");
-              }}
-            >
-              <View style={styles.currentLocationIcon}>
-                <View style={styles.currentLocationDot} />
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.5)" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search city, area or locality"
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+              {/* Use Current Location */}
+              <Pressable
+                style={styles.currentLocationCard}
+                onPress={() => {
+                  onLocationChange?.({
+                    name: "Your Location",
+                    lat: 0,
+                    lng: 0
+                  });
+                  setShowCityPicker(false);
+                  setSearchQuery("");
+                }}
+              >
+                <View style={styles.currentLocationIcon}>
+                  <View style={styles.currentLocationDot} />
+                </View>
+                <View style={styles.currentLocationText}>
+                  <Text style={styles.currentLocationTitle}>Use current location</Text>
+                  <Text style={styles.currentLocationSubtitle}>{address || "Sector 12, Chandigarh"}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+              </Pressable>
+
+              {/* Popular Cities */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Popular cities</Text>
+                <View style={styles.cityGrid}>
+                  {POPULAR_CITIES.map((city) => (
+                    <Pressable
+                      key={city.name}
+                      style={styles.cityCard}
+                      onPress={() => handleCitySelect({ name: city.name, lat: city.lat, lng: city.lng })}
+                    >
+                      <View style={styles.cityIconContainer}>
+                        {city.name === "Mumbai" ? (
+                          <MumbaiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : city.name === "Delhi NCR" ? (
+                          <DelhiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : city.name === "Bengaluru" ? (
+                          <BengaluruIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : city.name === "Chandigarh" ? (
+                          <ChandigarhIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : city.name === "Hyderabad" ? (
+                          <HyderabadIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : city.name === "Kolkata" ? (
+                          <KolkataIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        ) : (
+                          <Ionicons name={city.icon} size={36} color={POPULAR_CITY_ICON_COLOR} />
+                        )}
+                      </View>
+                      <Text style={styles.cityCardName}>{city.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-              <View style={styles.currentLocationText}>
-                <Text style={styles.currentLocationTitle}>Use current location</Text>
-                <Text style={styles.currentLocationSubtitle}>{address || "Sector 12, Chandigarh"}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
-            </Pressable>
 
-            {/* Popular Cities */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Popular cities</Text>
-              <View style={styles.cityGrid}>
-                {POPULAR_CITIES.map((city) => (
-                  <Pressable
-                    key={city.name}
-                    style={styles.cityCard}
-                    onPress={() => handleCitySelect({ name: city.name, lat: city.lat, lng: city.lng })}
-                  >
-                    <View style={styles.cityIconContainer}>
-                      {city.name === "Mumbai" ? (
-                        <MumbaiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : city.name === "Delhi NCR" ? (
-                        <DelhiIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : city.name === "Bengaluru" ? (
-                        <BengaluruIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : city.name === "Chandigarh" ? (
-                        <ChandigarhIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : city.name === "Hyderabad" ? (
-                        <HyderabadIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : city.name === "Kolkata" ? (
-                        <KolkataIcon size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      ) : (
-                        <Ionicons name={city.icon} size={36} color={POPULAR_CITY_ICON_COLOR} />
-                      )}
+              {/* All Cities List */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>All cities</Text>
+                <View style={styles.citiesList}>
+                  {filteredCities.map((city) => (
+                    <Pressable
+                      key={city.name}
+                      style={styles.cityListItem}
+                      onPress={() => handleCitySelect(city)}
+                    >
+                      <Text style={styles.cityListName}>{city.name}</Text>
+                    </Pressable>
+                  ))}
+
+                  {filteredCities.length === 0 && (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyText}>No cities found</Text>
+                      <Text style={styles.emptySubtext}>Try a different search term</Text>
                     </View>
-                    <Text style={styles.cityCardName}>{city.name}</Text>
-                  </Pressable>
-                ))}
+                  )}
+                </View>
               </View>
-            </View>
-
-            {/* All Cities List */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>All cities</Text>
-              <View style={styles.citiesList}>
-                {filteredCities.map((city) => (
-                  <Pressable
-                    key={city.name}
-                    style={styles.cityListItem}
-                    onPress={() => handleCitySelect(city)}
-                  >
-                    <Text style={styles.cityListName}>{city.name}</Text>
-                  </Pressable>
-                ))}
-
-                {filteredCities.length === 0 && (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No cities found</Text>
-                    <Text style={styles.emptySubtext}>Try a different search term</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </>
@@ -235,25 +232,24 @@ export default function LocationHeader({ title, address, onLocationChange, varia
 }
 
 const styles = StyleSheet.create({
-  // Original Header Styles
+  // Original Header Styles - Refactored for Flexbox
   container: {
-    width: 178,
-    height: 40,
     flexDirection: "row",
     alignItems: "center",
-    padding: 0,
+    // No fixed width, let parent constrain or flex
   },
 
   iconButton: {
     width: 40,
     height: 40,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   iconButtonCircle: {
     backgroundColor: Colors.dark.surface,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   locationPinImage: {
@@ -262,25 +258,17 @@ const styles = StyleSheet.create({
   },
 
   textBlock: {
-    position: "absolute",
-    width: 128,
-    height: 40,
-    left: 50,
-    top: 0,
     flexDirection: "column",
     alignItems: "flex-start",
     justifyContent: "center",
-    padding: 0,
     gap: 2,
+    flexShrink: 1, // Allow text to shrink if constrained
   },
 
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 0,
     gap: 4,
-    width: 67,
-    height: 21,
   },
 
   title: {
@@ -288,20 +276,19 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 21,
     color: "#FFFFFF",
+    flexShrink: 1,
   },
 
   arrowDown: {
-    width: 15,
-    height: 15,
+    marginLeft: 2,
   },
 
   address: {
-    width: 128,
-    height: 17,
     fontWeight: "400",
     fontSize: 13,
     lineHeight: 17,
     color: "#E7E7E7",
+    maxWidth: 200, // Reasonable max width for address before truncation
   },
 
   // NEW Modal Styles (OTP theme: gradient, pink accents)
@@ -310,13 +297,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
   },
 
+  modalContentWrapper: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 600, // Constrain width on tablets/desktop
+    alignSelf: "center",
+  },
 
   gradientBackground: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.5,
   },
 
   modalHeader: {
@@ -324,8 +316,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'android' ? 24 : 60, // Safe area adjustment
     paddingBottom: 16,
+    marginBottom: 8,
   },
 
   backButton: {
@@ -361,6 +354,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#FFFFFF",
     fontSize: 16,
+    paddingVertical: 0, // Fix alignment on Android
   },
 
   content: {
@@ -433,16 +427,20 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 16,
     gap: 12,
+    justifyContent: 'flex-start', // ensure items start from left
   },
 
   cityCard: {
-    width: 110,
+    width: '30%', // Responsive grid
+    minWidth: 100,
     aspectRatio: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
-    padding: 16,
+    padding: 12, // Reduced padding for smaller screens
     justifyContent: "space-between",
     alignItems: "center",
+    flexGrow: 1, // Allow growth
+    maxWidth: 150, // Don't get too big on tablet
   },
 
   cityIconContainer: {
@@ -458,6 +456,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+    textAlign: 'center',
   },
 
   // All Cities List

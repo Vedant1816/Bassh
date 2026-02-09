@@ -21,14 +21,12 @@ type FilterEventsModalProps = {
 };
 
 export type FilterState = {
-  entryFeeMin: number;
-  entryFeeMax: number;
-  clubTier: "tier1" | "tier2" | "tier3" | null;
-  distanceKm: number;
-  fromMyLocation: boolean;
-  liveEvent: boolean;
-  date: "today" | "tomorrow" | "week" | "other" | null;
-  time: "day" | "night" | "choose" | null;
+  categories: string[] | null;
+  ageLimit: string | null;
+  djName: string | null;
+  date: "today" | "tomorrow" | "week" | null;
+  time: "day" | "night" | null;
+  maxAttendees: number | null;
 };
 
 const PILL_BORDER = "#7D7D7D";
@@ -56,32 +54,64 @@ function FilterPill({
   );
 }
 
+// Common event categories
+const EVENT_CATEGORIES = [
+  "Electronic",
+  "Hip Hop",
+  "Pop",
+  "Rock",
+  "Jazz",
+  "Latin",
+  "House",
+  "Techno",
+  "R&B",
+  "Reggae",
+  "Country",
+  "Indie",
+  "EDM",
+  "Trance",
+  "Dubstep",
+];
+
+const AGE_LIMITS = ["18+", "21+", "25+", "All Ages"];
+
 export default function FilterEventsModal({
   visible,
   onClose,
   onFindNow,
 }: FilterEventsModalProps) {
-  const [entryFeeMin, setEntryFeeMin] = useState(200);
-  const [entryFeeMax, setEntryFeeMax] = useState(5000);
-  const [clubTier, setClubTier] = useState<"tier1" | "tier2" | "tier3" | null>(null);
-  const [distanceKm, setDistanceKm] = useState(0.5);
-  const [fromMyLocation, setFromMyLocation] = useState(true);
-  const [liveEvent, setLiveEvent] = useState(false);
-  const [date, setDate] = useState<"today" | "tomorrow" | "week" | "other" | null>(null);
-  const [time, setTime] = useState<"day" | "night" | "choose" | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [ageLimit, setAgeLimit] = useState<string | null>(null);
+  const [djName, setDjName] = useState("");
+  const [date, setDate] = useState<"today" | "tomorrow" | "week" | null>(null);
+  const [time, setTime] = useState<"day" | "night" | null>(null);
+  const [maxAttendees, setMaxAttendees] = useState<number | null>(null);
+
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+    );
+  };
 
   const handleFindNow = () => {
     onFindNow?.({
-      entryFeeMin,
-      entryFeeMax,
-      clubTier,
-      distanceKm,
-      fromMyLocation,
-      liveEvent,
+      categories: selectedCategories.length > 0 ? selectedCategories : null,
+      ageLimit: ageLimit || null,
+      djName: djName.trim() || null,
       date,
       time,
+      maxAttendees,
     });
     onClose();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedCategories([]);
+    setAgeLimit(null);
+    setDjName("");
+    setDate(null);
+    setTime(null);
+    setMaxAttendees(null);
   };
 
   return (
@@ -98,10 +128,15 @@ export default function FilterEventsModal({
         />
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Filter the events near you</Text>
-          <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={12}>
-            <Ionicons name="close" size={28} color={Colors.dark.text} />
-          </Pressable>
+          <Text style={styles.title}>Filter Events</Text>
+          <View style={styles.headerActions}>
+            <Pressable onPress={handleClearFilters} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </Pressable>
+            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={12}>
+              <Ionicons name="close" size={28} color={Colors.dark.text} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView
@@ -109,78 +144,63 @@ export default function FilterEventsModal({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Entry fee range */}
-          <Text style={styles.sectionLabel}>Entry fee range</Text>
-          <View style={styles.sliderTrack}>
-            <View style={[styles.sliderFill, styles.sliderFillRange]} />
-            <View style={[styles.sliderThumb, styles.sliderThumbLeft]} />
-            <View style={[styles.sliderThumb, styles.sliderThumbRight]} />
-          </View>
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabel}>Rs.{entryFeeMin}</Text>
-            <Text style={styles.sliderLabel}>Rs.{entryFeeMax}</Text>
+          {/* Categories */}
+          <Text style={styles.sectionLabel}>Categories</Text>
+          <View style={styles.pillRowWrap}>
+            {EVENT_CATEGORIES.map((cat) => (
+              <FilterPill
+                key={cat}
+                label={cat}
+                selected={selectedCategories.includes(cat)}
+                onPress={() => toggleCategory(cat)}
+              />
+            ))}
           </View>
 
-          {/* Type of Club */}
-          <Text style={styles.sectionLabel}>Type of Club</Text>
+          {/* Age Limit */}
+          <Text style={styles.sectionLabel}>Age Limit</Text>
           <View style={styles.pillRow}>
-            <FilterPill
-              label="Tier-1"
-              selected={clubTier === "tier1"}
-              onPress={() => setClubTier(clubTier === "tier1" ? null : "tier1")}
-            />
-            <FilterPill
-              label="Tier-2"
-              selected={clubTier === "tier2"}
-              onPress={() => setClubTier(clubTier === "tier2" ? null : "tier2")}
-            />
-            <FilterPill
-              label="Tier-3"
-              selected={clubTier === "tier3"}
-              onPress={() => setClubTier(clubTier === "tier3" ? null : "tier3")}
-            />
+            {AGE_LIMITS.map((age) => (
+              <FilterPill
+                key={age}
+                label={age}
+                selected={ageLimit === age}
+                onPress={() => setAgeLimit(ageLimit === age ? null : age)}
+              />
+            ))}
           </View>
 
-          {/* Find party under distance of */}
-          <Text style={styles.sectionLabel}>Find party under distance of</Text>
-          <View style={styles.distanceRow}>
-            <View style={styles.sliderTrackSingle}>
-              <View style={[styles.sliderFillSingle, styles.sliderFillSingleWidth]} />
-              <View style={[styles.sliderThumbSingle, styles.sliderThumbSinglePos]} />
-            </View>
+          {/* DJ Name */}
+          <Text style={styles.sectionLabel}>DJ Name</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Search by DJ name"
+            placeholderTextColor={Colors.dark.textSecondary}
+            value={djName}
+            onChangeText={setDjName}
+            autoCapitalize="words"
+          />
+
+          {/* Max Attendees */}
+          <Text style={styles.sectionLabel}>Max Attendees</Text>
+          <View style={styles.maxAttendeesRow}>
             <TextInput
-              style={styles.distanceInput}
-              value={`${distanceKm.toFixed(3)} km`}
-              editable={false}
+              style={styles.numberInput}
+              placeholder="No limit"
+              placeholderTextColor={Colors.dark.textSecondary}
+              value={maxAttendees ? maxAttendees.toString() : ""}
+              onChangeText={(text) => {
+                const num = parseInt(text, 10);
+                setMaxAttendees(isNaN(num) ? null : num);
+              }}
+              keyboardType="numeric"
             />
-          </View>
-
-          {/* from */}
-          <Text style={styles.sectionLabel}>from</Text>
-          <View style={styles.pillRow}>
-            <FilterPill
-              label="My location"
-              selected={fromMyLocation}
-              onPress={() => setFromMyLocation(true)}
-              icon="person-outline"
-            />
-            <FilterPill
-              label="Search location"
-              selected={!fromMyLocation}
-              onPress={() => setFromMyLocation(false)}
-              icon="search-outline"
-            />
-          </View>
-
-          {/* Live event */}
-          <Text style={styles.sectionLabel}>Live event</Text>
-          <View style={styles.toggleRow}>
-            <Switch
-              value={liveEvent}
-              onValueChange={setLiveEvent}
-              trackColor={{ false: "#444", true: Colors.dark.primary }}
-              thumbColor="#FFF"
-            />
+            <Pressable
+              style={styles.clearNumberBtn}
+              onPress={() => setMaxAttendees(null)}
+            >
+              <Ionicons name="close-circle" size={20} color={Colors.dark.textSecondary} />
+            </Pressable>
           </View>
 
           {/* Date */}
@@ -190,21 +210,18 @@ export default function FilterEventsModal({
               label="Today"
               selected={date === "today"}
               onPress={() => setDate(date === "today" ? null : "today")}
+              icon="calendar-outline"
             />
             <FilterPill
               label="Tomorrow"
               selected={date === "tomorrow"}
               onPress={() => setDate(date === "tomorrow" ? null : "tomorrow")}
+              icon="calendar-outline"
             />
             <FilterPill
               label="This week"
               selected={date === "week"}
               onPress={() => setDate(date === "week" ? null : "week")}
-            />
-            <FilterPill
-              label="Other date"
-              selected={date === "other"}
-              onPress={() => setDate(date === "other" ? null : "other")}
               icon="calendar-outline"
             />
           </View>
@@ -223,12 +240,6 @@ export default function FilterEventsModal({
               selected={time === "night"}
               onPress={() => setTime(time === "night" ? null : "night")}
               icon="moon-outline"
-            />
-            <FilterPill
-              label="Choose time"
-              selected={time === "choose"}
-              onPress={() => setTime(time === "choose" ? null : "choose")}
-              icon="time-outline"
             />
           </View>
 
@@ -268,6 +279,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.dark.text,
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  clearBtn: {
+    padding: 8,
+  },
+  clearBtnText: {
+    fontSize: 16,
+    color: Colors.dark.primary,
+    fontWeight: "600",
   },
   closeBtn: {
     padding: 4,
@@ -398,6 +422,35 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  textInput: {
+    backgroundColor: PILL_BG,
+    borderWidth: 1,
+    borderColor: PILL_BORDER,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: Colors.dark.text,
+    fontSize: 16,
+  },
+  maxAttendeesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  numberInput: {
+    flex: 1,
+    backgroundColor: PILL_BG,
+    borderWidth: 1,
+    borderColor: PILL_BORDER,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: Colors.dark.text,
+    fontSize: 16,
+  },
+  clearNumberBtn: {
+    padding: 4,
   },
   findNowWrap: {
     marginTop: 32,

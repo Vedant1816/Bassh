@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Animated,
-  Dimensions,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -25,13 +24,12 @@ import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
 
-const { height: INITIAL_HEIGHT } = Dimensions.get("window");
 const CURTAIN_HEIGHT_RATIO = 1;
 
 export default function AuthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions();
 
   const [isSignupOpen, setIsSignupOpen] = useState(true);
   const slideAnim = useState(new Animated.Value(1))[0];
@@ -158,6 +156,7 @@ export default function AuthScreen() {
             style={[
               styles.formContainer,
               {
+                height: SCREEN_HEIGHT,
                 transform: [{ translateY: loginTranslateY }],
                 opacity: loginOpacity,
               },
@@ -177,7 +176,12 @@ export default function AuthScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.header}>
-                <View style={styles.backButton} />
+                <Pressable
+                  style={styles.backButton}
+                  onPress={() => router.replace("/(auth)")}
+                >
+                  <Text style={styles.backIcon}>‹</Text>
+                </Pressable>
                 <Text style={styles.headerTitle}>Welcome back</Text>
               </View>
               <View style={styles.titleSection}>
@@ -211,6 +215,9 @@ export default function AuthScreen() {
                   {loginError}
                 </Text>
               ) : null}
+
+            </ScrollView>
+            <View style={styles.bottomContainer}>
               <Pressable
                 onPress={() => toggleCurtain(true)}
                 style={styles.linkWrap}
@@ -221,8 +228,6 @@ export default function AuthScreen() {
                   <Text style={styles.link}>Create account</Text>
                 </Text>
               </Pressable>
-            </ScrollView>
-            <View style={styles.bottomContainer}>
               <ThemedButton
                 onPress={handleLogin}
                 style={styles.sendButton}
@@ -301,6 +306,9 @@ export default function AuthScreen() {
                     {signupError}
                   </Text>
                 ) : null}
+
+              </ScrollView>
+              <View style={styles.bottomContainer}>
                 <Pressable
                   onPress={() => toggleCurtain(false)}
                   style={styles.linkWrap}
@@ -311,8 +319,6 @@ export default function AuthScreen() {
                     <Text style={styles.link}>Sign in</Text>
                   </Text>
                 </Pressable>
-              </ScrollView>
-              <View style={styles.bottomContainer}>
                 <ThemedButton
                   onPress={handleSignup}
                   disabled={signupLoading}
@@ -343,7 +349,6 @@ const styles = StyleSheet.create({
   formContainer: {
     position: "absolute",
     width: "100%",
-    height: INITIAL_HEIGHT,
   },
   gradientBackground: {
     position: "absolute",
@@ -369,6 +374,14 @@ const styles = StyleSheet.create({
     left: 16,
     width: 32,
     height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontWeight: "300",
+    marginLeft: -4,
   },
   headerTitle: {
     fontSize: 20,
@@ -420,7 +433,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   linkWrap: {
-    marginTop: 24,
+    marginBottom: 16,
     alignItems: "center",
   },
   linkLabel: {

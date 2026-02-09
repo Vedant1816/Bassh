@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Animated,
-  Dimensions,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -25,14 +24,13 @@ import { redirectStaff } from "../../services/redirect-staff";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
 import { ThemedButton } from "@/components/ui/ThemedButton";
 
-const { height: INITIAL_HEIGHT } = Dimensions.get("window");
 const CURTAIN_HEIGHT_RATIO = 1;
 
 export default function StaffLoginScreen() {
   const router = useRouter();
   const { signup } = useLocalSearchParams<{ signup?: string }>();
   const insets = useSafeAreaInsets();
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions();
 
   const initialSignup = signup === "1";
   const [isSignupOpen, setIsSignupOpen] = useState(initialSignup);
@@ -75,13 +73,42 @@ export default function StaffLoginScreen() {
       email: loginEmail.trim(),
       password: loginPassword,
     });
+
     if (error) {
       setLoginError(error.message);
       setLoginLoading(false);
       return;
     }
-    await redirectStaff(router);
-    setLoginLoading(false);
+
+    try {
+      const res = await fetchWithFallback(
+        "/api/users",
+        await withAuthHeaders({ method: "GET" })
+      );
+
+      const userData = await res.json();
+
+      if (!res.ok || !userData.user) {
+        throw new Error("Failed to verify account role");
+      }
+
+      if (userData.user.role !== "staff") {
+        await supabasePublic.auth.signOut();
+        setLoginError("Access Denied: This account is not authorized for staff access.");
+        setLoginLoading(false);
+        return;
+      }
+
+      await redirectStaff(router);
+    } catch (err) {
+      console.error("Staff verification failed:", err);
+      // Try to clean up session on error just in case
+      await supabasePublic.auth.signOut();
+
+      setLoginError("Failed to verify staff privileges. Please try again.");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const handleSignup = async () => {
@@ -164,6 +191,7 @@ export default function StaffLoginScreen() {
             style={[
               styles.formContainer,
               {
+                height: SCREEN_HEIGHT,
                 transform: [{ translateY: loginTranslateY }],
                 opacity: loginOpacity,
               },
@@ -183,7 +211,7 @@ export default function StaffLoginScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Pressable style={styles.backButton} onPress={() => router.replace("/(auth)")}>
                   <Text style={styles.backIcon}>‹</Text>
                 </Pressable>
                 <Text style={styles.headerTitle}>Staff Portal</Text>
@@ -219,6 +247,9 @@ export default function StaffLoginScreen() {
                   {loginError}
                 </Text>
               ) : null}
+
+            </ScrollView>
+            <View style={styles.bottomContainer}>
               <Pressable
                 onPress={() => toggleCurtain(true)}
                 style={styles.linkWrap}
@@ -229,8 +260,6 @@ export default function StaffLoginScreen() {
                   <Text style={styles.link}>Request access</Text>
                 </Text>
               </Pressable>
-            </ScrollView>
-            <View style={styles.bottomContainer}>
               <ThemedButton
                 onPress={handleLogin}
                 loading={loginLoading}
@@ -271,7 +300,7 @@ export default function StaffLoginScreen() {
                 <View style={styles.header}>
                   <Pressable
                     style={styles.backButton}
-                    onPress={() => router.back()}
+                    onPress={() => router.replace("/(auth)")}
                   >
                     <Text style={styles.backIcon}>‹</Text>
                   </Pressable>
@@ -316,6 +345,9 @@ export default function StaffLoginScreen() {
                     {signupError}
                   </Text>
                 ) : null}
+
+              </ScrollView>
+              <View style={styles.bottomContainer}>
                 <Pressable
                   onPress={() => toggleCurtain(false)}
                   style={styles.linkWrap}
@@ -326,8 +358,6 @@ export default function StaffLoginScreen() {
                     <Text style={styles.link}>Sign in</Text>
                   </Text>
                 </Pressable>
-              </ScrollView>
-              <View style={styles.bottomContainer}>
                 <ThemedButton
                   onPress={handleSignup}
                   disabled={signupLoading}
@@ -358,7 +388,6 @@ const styles = StyleSheet.create({
   formContainer: {
     position: "absolute",
     width: "100%",
-    height: INITIAL_HEIGHT,
   },
   gradientBackground: {
     position: "absolute",
@@ -443,7 +472,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   linkWrap: {
-    marginTop: 24,
+    marginBottom: 16,
     alignItems: "center",
   },
   linkLabel: {

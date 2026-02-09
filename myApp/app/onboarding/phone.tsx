@@ -15,6 +15,8 @@ import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -68,8 +70,8 @@ export default function PhoneScreen() {
         <StatusBar barStyle="light-content" />
 
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
           style={styles.gradientBackground}
         />
 
@@ -112,25 +114,15 @@ export default function PhoneScreen() {
         </View>
 
         <View style={styles.bottomContainer}>
-          <Pressable
+          <ThemedButton
             onPress={sendOtp}
+            loading={loading}
             disabled={loading || phone.length !== 10}
-            style={styles.buttonWrapper}
+            style={styles.sendButton}
+            textStyle={styles.buttonText}
           >
-            <LinearGradient
-              colors={["#E91E8C", "#DB1A85"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.sendButton,
-                (loading || phone.length !== 10) && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Sending…" : "Send OTP"}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+            Send OTP
+          </ThemedButton>
           <View style={styles.homeIndicator} />
         </View>
       </DismissKeyboardView>
@@ -141,7 +133,7 @@ export default function PhoneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   gradientBackground: {
     position: "absolute",
@@ -163,20 +155,20 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
-  skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  skipButtonText: { fontSize: 15, fontWeight: "600", color: Colors.dark.textSecondary },
   titleSection: {
     marginBottom: 40,
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   row: {
     flexDirection: "row",
@@ -184,23 +176,27 @@ const styles = StyleSheet.create({
   },
   country: {
     width: 80,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#FFFFFF",
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    color: Colors.dark.text,
+    borderRadius: 16,
+    padding: 16,
     textAlign: "center",
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
   phoneInput: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#FFFFFF",
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    color: Colors.dark.text,
+    borderRadius: 16,
+    padding: 16,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
   error: {
-    color: "#F87171",
+    color: Colors.dark.error,
     marginTop: 12,
     fontSize: 14,
   },
@@ -212,17 +208,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
-  buttonWrapper: {
-    marginBottom: 16,
-  },
   sendButton: {
     height: 56,
     borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   buttonText: {
     fontSize: 17,

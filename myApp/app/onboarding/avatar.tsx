@@ -18,6 +18,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback, getApiBaseUrl, FALLBACK_API_URL } from "@/_services/api-config";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -131,8 +133,8 @@ export default function AvatarScreen() {
       <StatusBar barStyle="light-content" />
 
       <LinearGradient
-        colors={["#8B0045", "#2D0A1F", "#000000"]}
-        locations={[0, 0.4, 1]}
+        colors={[...HeaderGradient]}
+        locations={[...HeaderGradientLocations]}
         style={styles.gradientBackground}
       />
 
@@ -156,7 +158,7 @@ export default function AvatarScreen() {
             <Image source={{ uri: uploadedImage }} style={styles.uploadedImage} />
           ) : (
             <View style={styles.uploadContent}>
-              <Ionicons name="cloud-upload-outline" size={32} color="#E91E8C" />
+              <Ionicons name="cloud-upload-outline" size={32} color={Colors.dark.primary} />
               <Text style={styles.uploadText}>Click to select or browse file</Text>
               <Text style={styles.uploadHint}>Format: .jpeg, .png & Max file size: 25 MB</Text>
             </View>
@@ -180,7 +182,7 @@ export default function AvatarScreen() {
                 <Image source={avatar.source} style={styles.avatarImage} />
                 {loading && selectedAvatar === avatar.url && (
                   <View style={styles.loadingOverlay}>
-                    <ActivityIndicator color="#E91E8C" />
+                    <ActivityIndicator color={Colors.dark.primary} />
                   </View>
                 )}
               </Pressable>
@@ -194,25 +196,15 @@ export default function AvatarScreen() {
           <Pressable onPress={() => router.back()} style={styles.previousButton}>
             <Text style={styles.previousText}>Previous</Text>
           </Pressable>
-          <Pressable
+          <ThemedButton
             onPress={saveUploadedImage}
+            loading={loading && !!uploadedImage}
             disabled={loading || !uploadedImage}
             style={styles.buttonWrapper}
+            textStyle={styles.continueText}
           >
-            <LinearGradient
-              colors={["#E91E8C", "#DB1A85"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.continueButton,
-                (loading || !uploadedImage) && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.continueText}>
-                {loading && uploadedImage ? "Saving…" : "Continue"}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+            Continue
+          </ThemedButton>
         </View>
         <View style={styles.homeIndicator} />
       </View>
@@ -223,7 +215,7 @@ export default function AvatarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   gradientBackground: {
     position: "absolute",
@@ -246,19 +238,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   uploadArea: {
     height: 160,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderStyle: "dashed",
     justifyContent: "center",
     alignItems: "center",
@@ -274,18 +267,18 @@ const styles = StyleSheet.create({
   uploadedImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
+    borderRadius: 16,
   },
   uploadText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     lineHeight: 24,
   },
   uploadHint: {
     fontSize: 14,
     lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   avatarsSection: {
     gap: 20,
@@ -294,7 +287,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     lineHeight: 20,
-    color: "#FFFFFF",
+    color: Colors.dark.text,
   },
   avatarGrid: {
     flexDirection: "row",
@@ -306,13 +299,13 @@ const styles = StyleSheet.create({
     height: 101,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     position: "relative",
     borderWidth: 2,
     borderColor: "transparent",
   },
   avatarSelected: {
-    borderColor: "#E91E8C",
+    borderColor: Colors.dark.primary,
   },
   avatarDisabled: {
     opacity: 0.5,
@@ -345,27 +338,18 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#E91E8C",
+    borderColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   previousText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#E91E8C",
+    color: Colors.dark.textSecondary,
   },
   buttonWrapper: {
     flex: 1,
-    marginBottom: 0,
-  },
-  continueButton: {
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   continueText: {
     fontSize: 17,
@@ -379,5 +363,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 12,
+    opacity: 0.3,
   },
 });

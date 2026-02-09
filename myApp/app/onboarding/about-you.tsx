@@ -7,6 +7,8 @@ import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -59,114 +61,112 @@ export default function AboutYouScreen() {
     }
   };
 
+  const isFormValid = firstName.trim() && lastName.trim() && username.trim() && gender;
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <DismissKeyboardView style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <LinearGradient colors={["#8B0045", "#2D0A1F", "#000000"]} locations={[0, 0.4, 1]} style={styles.gradientBackground} />
+        <LinearGradient
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.gradientBackground}
+        />
 
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <OnboardingTopBar stepIndex={1} totalSteps={5} onBack={() => router.back()} />
-        <View style={styles.skipRow}>
-          <View style={styles.headerSpacer} />
-          <Pressable onPress={() => router.push("/onboarding/phone")} style={styles.skipButton}>
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Lastly, tell us more about yourself</Text>
-          <Text style={styles.subtitle}>
-            Please enter your legal name. This information will be used to verify your account.
-          </Text>
-          <Pressable onPress={() => router.back()}>
-            <Text style={styles.editButton}>Previous</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>First Name</Text>
-            <TextInput
-              placeholder=""
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              value={firstName}
-              onChangeText={setFirstName}
-              style={styles.input}
-              autoCapitalize="words"
-            />
-          </View>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Last Name</Text>
-            <TextInput
-              placeholder=""
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              value={lastName}
-              onChangeText={setLastName}
-              style={styles.input}
-              autoCapitalize="words"
-            />
-          </View>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Username</Text>
-            <TextInput
-              placeholder=""
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              value={username}
-              onChangeText={setUsername}
-              style={styles.input}
-              autoCapitalize="none"
-            />
-          </View>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Gender</Text>
-            <Pressable style={styles.pickerButton} onPress={() => setShowGenderPicker(!showGenderPicker)}>
-              <Text style={[styles.pickerText, !gender && styles.placeholderText]}>
-                {gender ? genderOptions.find((opt) => opt.value === gender)?.label || gender : "Select gender"}
-              </Text>
-              <Ionicons name={showGenderPicker ? "chevron-up" : "chevron-down"} size={20} color="#E91E8C" />
+          <OnboardingTopBar stepIndex={1} totalSteps={5} onBack={() => router.back()} />
+          <View style={styles.skipRow}>
+            <View style={styles.headerSpacer} />
+            <Pressable onPress={() => router.push("/onboarding/phone")} style={styles.skipButton}>
+              <Text style={styles.skipButtonText}>Skip</Text>
             </Pressable>
-            {showGenderPicker && (
-              <View style={styles.pickerOptions}>
-                {genderOptions.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[styles.pickerOption, gender === option.value && styles.pickerOptionSelected]}
-                    onPress={() => {
-                      setGender(option.value);
-                      setShowGenderPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, gender === option.value && styles.pickerOptionTextSelected]}>
-                      {option.label}
-                    </Text>
-                    {gender === option.value && <Ionicons name="checkmark" size={20} color="#E91E8C" />}
-                  </Pressable>
-                ))}
-              </View>
-            )}
           </View>
-        </View>
+
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Lastly, tell us more about yourself</Text>
+            <Text style={styles.subtitle}>
+              Please enter your legal name. This information will be used to verify your account.
+            </Text>
+            <Pressable onPress={() => router.back()}>
+              <Text style={styles.editButton}>Previous</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>First Name</Text>
+              <TextInput
+                placeholder=""
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={firstName}
+                onChangeText={setFirstName}
+                style={styles.input}
+                autoCapitalize="words"
+              />
+            </View>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Last Name</Text>
+              <TextInput
+                placeholder=""
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={lastName}
+                onChangeText={setLastName}
+                style={styles.input}
+                autoCapitalize="words"
+              />
+            </View>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                placeholder=""
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={username}
+                onChangeText={setUsername}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <Pressable style={styles.pickerButton} onPress={() => setShowGenderPicker(!showGenderPicker)}>
+                <Text style={[styles.pickerText, !gender && styles.placeholderText]}>
+                  {gender ? genderOptions.find((opt) => opt.value === gender)?.label || gender : "Select gender"}
+                </Text>
+                <Ionicons name={showGenderPicker ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.primary} />
+              </Pressable>
+              {showGenderPicker && (
+                <View style={styles.pickerOptions}>
+                  {genderOptions.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[styles.pickerOption, gender === option.value && styles.pickerOptionSelected]}
+                      onPress={() => {
+                        setGender(option.value);
+                        setShowGenderPicker(false);
+                      }}
+                    >
+                      <Text style={[styles.pickerOptionText, gender === option.value && styles.pickerOptionTextSelected]}>
+                        {option.label}
+                      </Text>
+                      {gender === option.value && <Ionicons name="checkmark" size={20} color={Colors.dark.primary} />}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
         </ScrollView>
 
         <View style={styles.bottomContainer}>
-          <Pressable
+          <ThemedButton
             onPress={save}
-            disabled={loading || !firstName.trim() || !lastName.trim() || !username.trim() || !gender}
-            style={styles.buttonWrapper}
+            loading={loading}
+            disabled={!isFormValid || loading}
+            style={styles.sendButton}
+            textStyle={styles.buttonText}
           >
-            <LinearGradient
-              colors={["#E91E8C", "#DB1A85"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.sendButton,
-                (loading || !firstName.trim() || !lastName.trim() || !username.trim() || !gender) && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.buttonText}>{loading ? "Saving..." : "Continue"}</Text>
-            </LinearGradient>
-          </Pressable>
+            Continue
+          </ThemedButton>
           <View style={styles.homeIndicator} />
         </View>
       </DismissKeyboardView>
@@ -175,7 +175,10 @@ export default function AboutYouScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000000" },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.dark.background
+  },
   gradientBackground: {
     position: "absolute",
     top: 0,
@@ -183,7 +186,12 @@ const styles = StyleSheet.create({
     right: 0,
     height: SCREEN_HEIGHT * 0.5,
   },
-  scrollContent: { flexGrow: 1, paddingTop: 60, paddingHorizontal: 24, paddingBottom: 120 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 120
+  },
   skipRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -192,45 +200,72 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
-  skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  skipButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.dark.primary
+  },
   titleSection: { marginBottom: 32 },
-  title: { fontSize: 32, fontWeight: "700", color: "#FFFFFF", marginBottom: 12 },
-  subtitle: { fontSize: 15, lineHeight: 20, color: "rgba(255, 255, 255, 0.6)", marginBottom: 8 },
-  editButton: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  title: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: Colors.dark.text,
+    marginBottom: 12
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: Colors.dark.textSecondary,
+    marginBottom: 8
+  },
+  editButton: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.dark.primary
+  },
   form: { gap: 20 },
   inputWrapper: { gap: 8 },
-  inputLabel: { fontSize: 14, color: "#FFFFFF", fontWeight: "500" },
+  inputLabel: {
+    fontSize: 14,
+    color: Colors.dark.text,
+    fontWeight: "500"
+  },
   input: {
     width: "100%",
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: "#FFFFFF",
+    paddingVertical: 16,
+    color: Colors.dark.text,
     fontSize: 16,
   },
   pickerButton: {
     width: "100%",
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  pickerText: { color: "#FFFFFF", fontSize: 16 },
-  placeholderText: { color: "rgba(255,255,255,0.5)" },
+  pickerText: {
+    color: Colors.dark.text,
+    fontSize: 16
+  },
+  placeholderText: {
+    color: "rgba(255,255,255,0.4)"
+  },
   pickerOptions: {
     marginTop: 8,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
     overflow: "hidden",
   },
   pickerOption: {
@@ -238,13 +273,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
-  pickerOptionSelected: { backgroundColor: "rgba(233, 30, 140, 0.15)" },
-  pickerOptionText: { color: "#FFFFFF", fontSize: 16 },
-  pickerOptionTextSelected: { color: "#E91E8C", fontWeight: "600" },
+  pickerOptionSelected: {
+    backgroundColor: "rgba(233, 30, 140, 0.1)"
+  },
+  pickerOptionText: {
+    color: Colors.dark.text,
+    fontSize: 16
+  },
+  pickerOptionTextSelected: {
+    color: Colors.dark.primary,
+    fontWeight: "600"
+  },
   bottomContainer: {
     position: "absolute",
     bottom: 0,
@@ -253,10 +296,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
-  buttonWrapper: { marginBottom: 16 },
-  sendButton: { height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center" },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { fontSize: 17, fontWeight: "600", color: "#FFFFFF" },
+  sendButton: {
+    height: 56,
+    borderRadius: 28
+  },
+  buttonText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#FFFFFF"
+  },
   homeIndicator: {
     height: 5,
     width: 134,
@@ -264,5 +312,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 12,
+    opacity: 0.3,
   },
 });

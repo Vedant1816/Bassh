@@ -30,6 +30,7 @@ export type ClubCardData = {
   club_logo?: string;
   avatar_urls?: string[];
   rating?: number;
+  tier?: number;
 };
 
 type ClubCardProps = {

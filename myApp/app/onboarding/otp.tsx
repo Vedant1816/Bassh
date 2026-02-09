@@ -16,6 +16,8 @@ import { OnboardingTopBar } from "@/app/components/OnboardingTopBar";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -124,8 +126,8 @@ export default function OtpScreen() {
         <StatusBar barStyle="light-content" />
 
         <LinearGradient
-          colors={["#8B0045", "#2D0A1F", "#000000"]}
-          locations={[0, 0.4, 1]}
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
           style={styles.gradientBackground}
         />
 
@@ -189,25 +191,15 @@ export default function OtpScreen() {
         </View>
 
         <View style={styles.bottomContainer}>
-          <Pressable
+          <ThemedButton
             onPress={() => verifyOtp()}
+            loading={loading}
             disabled={loading || otp.some((digit) => !digit)}
-            style={styles.buttonWrapper}
+            style={styles.sendButton}
+            textStyle={styles.buttonText}
           >
-            <LinearGradient
-              colors={["#E91E8C", "#DB1A85"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.sendButton,
-                (loading || otp.some((digit) => !digit)) && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Verifying..." : "Send code"}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+            Send code
+          </ThemedButton>
 
           <View style={styles.homeIndicator} />
         </View>
@@ -219,7 +211,7 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
 
   gradientBackground: {
@@ -243,7 +235,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
-  skipButtonText: { fontSize: 15, fontWeight: "600", color: "#E91E8C" },
+  skipButtonText: { fontSize: 15, fontWeight: "600", color: Colors.dark.textSecondary },
 
   titleSection: {
     paddingHorizontal: 24,
@@ -253,7 +245,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
   },
 
@@ -267,7 +259,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
 
   editButton: {
@@ -326,19 +318,9 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
 
-  buttonWrapper: {
-    marginBottom: 16,
-  },
-
   sendButton: {
     height: 56,
     borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  buttonDisabled: {
-    opacity: 0.5,
   },
 
   buttonText: {

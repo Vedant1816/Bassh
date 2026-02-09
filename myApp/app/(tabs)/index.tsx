@@ -22,10 +22,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LocationHeader from "@/app/components/LocationHeader";
 import SearchBar from "@/app/components/SearchBar";
 import MapFloatingActions from "@/app/components/MapFloatingActions";
-import FilterEventsModal from "@/app/components/FilterEventsModal";
+import FilterClubsModal, { type ClubFilterState } from "@/app/components/FilterClubsModal";
 import { NotificationsModal } from "@/app/components/Notifications";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
-import type { FilterState } from "@/app/components/FilterEventsModal";
 import { LinearGradient } from "expo-linear-gradient";
 import ClubCard, { type ClubCardData } from "@/app/components/ClubCard";
 import { Colors, PrimaryGradient, PrimaryGradientStart, PrimaryGradientEnd } from "@/constants/Colors";
@@ -81,6 +80,8 @@ export default function HomeScreen() {
     { type: "club" | "event"; id: string; name: string; subtitle?: string; date?: string; club_id?: string; image?: string }[]
   >([]);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<ClubFilterState | null>(null);
+  const [filteredClubs, setFilteredClubs] = useState<ClubCard[]>([]);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
@@ -302,6 +303,8 @@ export default function HomeScreen() {
           cover_photo: c.cover_photo, // Include cover_photo for ClubCard
           club_logo: c.club_logo, // Include club_logo for map markers
           prices: c.prices, // Explicitly include prices
+          tier: c.tier, // Include tier for filtering
+          rating: c.rating, // Include rating for filtering
         };
       });
 
@@ -311,6 +314,74 @@ export default function HomeScreen() {
       setLoadingCards(false);
     })();
   }, [location]);
+
+  // Apply filters to clubs
+  useEffect(() => {
+    let filtered = [...clubs];
+
+    if (appliedFilters) {
+      const filters = appliedFilters;
+
+      // Filter by tier
+      if (filters.tiers && filters.tiers.length > 0) {
+        filtered = filtered.filter((club) => {
+          // Check if club has tier property and it matches selected tiers
+          return club.tier !== undefined && club.tier !== null && filters.tiers!.includes(club.tier);
+        });
+      }
+
+      // Filter by minimum rating
+      if (filters.minRating !== null && filters.minRating !== undefined) {
+        filtered = filtered.filter((club) => {
+          const rating = club.rating ?? 0;
+          return rating >= filters.minRating!;
+        });
+      }
+
+      // Filter by price range
+      if (filters.priceMin !== null || filters.priceMax !== null) {
+        filtered = filtered.filter((club) => {
+          // Get today's price from prices JSONB
+          const today = new Date();
+          const jsDay = today.getDay();
+          const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+          let clubPrice: number | null = null;
+
+          // Try to get price from prices JSONB
+          if (club.prices && typeof club.prices === 'object' && !Array.isArray(club.prices)) {
+            const prices = club.prices as any;
+            const todayPrices = prices[String(dbDayOfWeek)];
+            if (todayPrices && typeof todayPrices.male === 'number') {
+              clubPrice = todayPrices.male;
+            }
+          }
+
+          // Fallback to legacy price field
+          if (clubPrice === null) {
+            clubPrice = club.price ?? null;
+          }
+
+          if (clubPrice === null) return false;
+
+          const minPrice = filters.priceMin ?? 0;
+          const maxPrice = filters.priceMax ?? Infinity;
+
+          return clubPrice >= minPrice && clubPrice <= maxPrice;
+        });
+      }
+
+      // Filter by minimum guest count
+      if (filters.minGuestCount !== null && filters.minGuestCount !== undefined) {
+        filtered = filtered.filter((club) => {
+          const guestCount = club.guest_count ?? 0;
+          return guestCount >= filters.minGuestCount!;
+        });
+      }
+    }
+
+    setFilteredClubs(filtered);
+  }, [clubs, appliedFilters]);
 
   /* ---------------- HEATMAP ---------------- */
   useEffect(() => {
@@ -446,7 +517,7 @@ export default function HomeScreen() {
 </Mapbox.ShapeSource>
 
           {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
-          {clubs.map((club, index) => (
+          {(appliedFilters ? filteredClubs : clubs).map((club, index) => (
             <Mapbox.MarkerView
               key={club.id}
               id={club.id}
@@ -593,13 +664,13 @@ export default function HomeScreen() {
           ]}
         />
 
-        {/* Filter events modal - opens from map filter button */}
-        <FilterEventsModal
+        {/* Filter clubs modal - opens from map filter button */}
+        <FilterClubsModal
           visible={filterModalVisible}
           onClose={() => setFilterModalVisible(false)}
-          onFindNow={(filters: FilterState) => {
+          onFindNow={(filters: ClubFilterState) => {
+            setAppliedFilters(filters);
             setFilterModalVisible(false);
-            // TODO: apply filters to clubs/events (e.g. refetch with query params)
           }}
         />
 
@@ -615,19 +686,23 @@ export default function HomeScreen() {
               <ActivityIndicator color={Colors.dark.primary} />
               <Text style={styles.loadingCardsText}>Loading clubs...</Text>
             </View>
-          ) : clubs.length === 0 ? (
+          ) : (appliedFilters ? filteredClubs : clubs).length === 0 ? (
             <View style={styles.emptyCards}>
-              <Text style={styles.emptyCardsText}>No clubs found</Text>
-              <Text style={styles.emptyCardsSubtext}>Try a different city</Text>
+              <Text style={styles.emptyCardsText}>
+                {appliedFilters ? "No clubs match your filters" : "No clubs found"}
+              </Text>
+              <Text style={styles.emptyCardsSubtext}>
+                {appliedFilters ? "Try adjusting your filters" : "Try a different city"}
+              </Text>
             </View>
           ) : (
             <ScrollView
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ width: CARD_WIDTH * clubs.length }}
+              contentContainerStyle={{ width: CARD_WIDTH * (appliedFilters ? filteredClubs : clubs).length }}
             >
-              {clubs.map((club) => (
+              {(appliedFilters ? filteredClubs : clubs).map((club) => (
                 <ClubCard
                   key={club.id}
                   club={club}

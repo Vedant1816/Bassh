@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { withAuthHeaders } from "@/_services/auth-fetch";
+import { withAuthHeaders, authFetch } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
@@ -32,6 +32,36 @@ export default function JoinClubScreen() {
   const [post, setPost] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    checkStaffStatus();
+  }, []);
+
+  const checkStaffStatus = async () => {
+    try {
+      const res = await authFetch("/api/staff/me");
+      const data = await res.json();
+      if (res.ok && data?.club_status === "approved") {
+        router.replace("/staff");
+      }
+    } catch (_) { }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await authFetch("/api/auth/logout", { method: "POST" });
+          } catch (_) { }
+          router.replace("/(auth)/login");
+        },
+      },
+    ]);
+  };
 
   const handleSubmit = async () => {
     if (!clubToken.trim()) {
@@ -113,7 +143,11 @@ export default function JoinClubScreen() {
               <Text style={styles.backIcon}>‹</Text>
             </Pressable>
             <Text style={styles.headerTitle}>Join Club</Text>
-            <View style={styles.headerRight} />
+            <View style={styles.headerRight}>
+              <Pressable onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={24} color="#FFF" />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView

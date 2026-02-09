@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import LocationHeader from "@/app/components/LocationHeader";
 import { PayBillModal } from "@/app/club/components/PayBillModal";
 import type { Discount } from "@/app/club/components/PayBillModal";
 import BookmarkButton from "@/app/components/BookmarkButton";
+import FilterEventsModal, { FilterState } from "@/app/components/FilterEventsModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -171,6 +172,10 @@ export default function EventsScreen() {
   const [payBillDiscounts, setPayBillDiscounts] = useState<Discount[]>([]);
   const [savedEvents, setSavedEvents] = useState<SavedEventBookmark[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<FilterState | null>(null);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -193,6 +198,101 @@ export default function EventsScreen() {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // Apply search and filters to events
+  useEffect(() => {
+    let filtered = [...events];
+
+    // Apply search query
+    if (searchQuery.trim().length >= 2) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((e) => {
+        const nameMatch = e.name?.toLowerCase().includes(query);
+        const djMatch = e.dj_name?.toLowerCase().includes(query);
+        const clubMatch = e.clubs?.club_name?.toLowerCase().includes(query);
+        return nameMatch || djMatch || clubMatch;
+      });
+    }
+
+    // Apply filters
+    if (appliedFilters) {
+      const filters = appliedFilters;
+      
+      // Filter by categories
+      if (filters.categories && filters.categories.length > 0) {
+        filtered = filtered.filter((e) => {
+          if (!e.categories || e.categories.length === 0) return false;
+          return filters.categories!.some((cat: string) => e.categories!.includes(cat));
+        });
+      }
+
+      // Filter by age limit
+      if (filters.ageLimit) {
+        filtered = filtered.filter((e) => e.age_limit === filters.ageLimit);
+      }
+
+      // Filter by DJ name
+      if (filters.djName && filters.djName.trim().length > 0) {
+        const djQuery = filters.djName.toLowerCase().trim();
+        filtered = filtered.filter((e) => e.dj_name?.toLowerCase().includes(djQuery));
+      }
+
+      // Filter by date
+      if (filters.date) {
+        const now = new Date();
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const weekFromNow = new Date(today);
+        weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+        filtered = filtered.filter((e) => {
+          const eventDate = new Date(e.event_date);
+          eventDate.setHours(0, 0, 0, 0);
+
+          switch (filters.date) {
+            case "today":
+              return eventDate.getTime() === today.getTime();
+            case "tomorrow":
+              return eventDate.getTime() === tomorrow.getTime();
+            case "week":
+              return eventDate >= today && eventDate <= weekFromNow;
+            default:
+              return true;
+          }
+        });
+      }
+
+      // Filter by time (day/night)
+      if (filters.time) {
+        filtered = filtered.filter((e) => {
+          if (!e.start_time) return false;
+          const [hours] = e.start_time.split(":").map(Number);
+          const hour = hours ?? 0;
+
+          switch (filters.time) {
+            case "day":
+              return hour >= 6 && hour < 18; // 6 AM to 6 PM
+            case "night":
+              return hour >= 18 || hour < 6; // 6 PM to 6 AM
+            default:
+              return true;
+          }
+        });
+      }
+
+      // Filter by max attendees
+      if (filters.maxAttendees) {
+        filtered = filtered.filter((e) => {
+          if (!e.max_attendees) return false;
+          return e.max_attendees <= filters.maxAttendees!;
+        });
+      }
+    }
+
+    setFilteredEvents(filtered);
+  }, [events, searchQuery, appliedFilters]);
 
   const fetchMyBookings = useCallback(async () => {
     setLoadingBookings(true);
@@ -364,6 +464,32 @@ export default function EventsScreen() {
 
   const formatDateTimePipe = (dateString: string, timeString: string) => {
     return `${formatEventDateShort(dateString)} | ${formatTimeRange(timeString)}`;
+  };
+
+  /** Check if an event date has passed */
+  const isEventPast = (eventDate: string, startTime: string | null): boolean => {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+
+    const eventDateObj = new Date(eventDate);
+    eventDateObj.setHours(0, 0, 0, 0);
+
+    // If event date is before today, it's past
+    if (eventDateObj.getTime() < today.getTime()) {
+      return true;
+    }
+
+    // If event date is today, check if start time has passed
+    if (eventDateObj.getTime() === today.getTime() && startTime) {
+      const [sh, sm] = startTime.split(":").map(Number);
+      const startMins = (sh ?? 0) * 60 + (sm ?? 0);
+      return startMins < currentMins;
+    }
+
+    // If event date is in the future, it's not past
+    return false;
   };
 
   const goToBook = (eventId: string) => {
@@ -599,75 +725,86 @@ export default function EventsScreen() {
     );
   };
 
-  const renderEventCard = ({ item }: { item: Event }) => (
-    <View style={styles.cardWrapper}>
-      <Pressable style={styles.card} onPress={() => router.push(`/event/${item.id}`)}>
-        <View style={styles.cardImageWrap}>
-          {item.banner_image_url ? (
-            <Image source={{ uri: item.banner_image_url }} style={styles.cardImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.cardImagePlaceholder}>
-              <Ionicons name="musical-notes-outline" size={48} color="rgba(255,255,255,0.4)" />
-            </View>
-          )}
-        </View>
-        <View style={styles.cardBody}>
-          <View style={styles.cardTitleRow}>
-            <Text style={styles.cardEventName} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <View style={styles.shareRatingRow}>
-              <BookmarkButton
-                eventId={item.id}
-                bookmarkType="event"
-                size={22}
-              />
-              <View style={styles.shareIconWrap}>
-                <Image
-                  source={require("@/assets/images/share-icon.png")}
-                  style={styles.shareIconImage}
-                  resizeMode="contain"
-                />
+  const renderEventCard = ({ item }: { item: Event }) => {
+    const isPast = isEventPast(item.event_date, item.start_time);
+    
+    return (
+      <View style={styles.cardWrapper}>
+        <Pressable style={styles.card} onPress={() => router.push(`/event/${item.id}`)}>
+          <View style={styles.cardImageWrap}>
+            {item.banner_image_url ? (
+              <Image source={{ uri: item.banner_image_url }} style={styles.cardImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.cardImagePlaceholder}>
+                <Ionicons name="musical-notes-outline" size={48} color="rgba(255,255,255,0.4)" />
               </View>
-              <Ionicons name="star" size={16} color={RATING_STAR} />
-              <Text style={styles.ratingText}>4.6</Text>
-            </View>
+            )}
           </View>
-          <Text style={styles.venueName}>{item.clubs?.club_name || "Venue TBA"}</Text>
-          <Text style={styles.venueAddress} numberOfLines={1}>
-            {item.clubs?.address_text || "Address TBA"}
-          </Text>
-          <Text style={styles.dateTimeText}>
-            {formatDateTimePipe(item.event_date, item.start_time)}
-          </Text>
-          <View style={styles.attendeesRow}>
-            <View style={styles.avatarGroup}>
-              {AVATARS.map((src, i) => (
-                <Image
-                  key={i}
-                  source={src}
-                  style={[styles.avatarImg, i > 0 && { marginLeft: -8 }]}
-                  resizeMode="cover"
+          <View style={styles.cardBody}>
+            <View style={styles.cardTitleRow}>
+              <Text style={styles.cardEventName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <View style={styles.shareRatingRow}>
+                <BookmarkButton
+                  eventId={item.id}
+                  bookmarkType="event"
+                  size={22}
                 />
-              ))}
+                <View style={styles.shareIconWrap}>
+                  <Image
+                    source={require("@/assets/images/share-icon.png")}
+                    style={styles.shareIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Ionicons name="star" size={16} color={RATING_STAR} />
+                <Text style={styles.ratingText}>4.6</Text>
+              </View>
             </View>
-            <View style={styles.attendeesBadge}>
-              <Text style={styles.attendeesCount}>{item.max_attendees ?? 120}</Text>
+            <Text style={styles.venueName}>{item.clubs?.club_name || "Venue TBA"}</Text>
+            <Text style={styles.venueAddress} numberOfLines={1}>
+              {item.clubs?.address_text || "Address TBA"}
+            </Text>
+            <Text style={styles.dateTimeText}>
+              {formatDateTimePipe(item.event_date, item.start_time)}
+            </Text>
+            <View style={styles.attendeesRow}>
+              <View style={styles.avatarGroup}>
+                {AVATARS.map((src, i) => (
+                  <Image
+                    key={i}
+                    source={src}
+                    style={[styles.avatarImg, i > 0 && { marginLeft: -8 }]}
+                    resizeMode="cover"
+                  />
+                ))}
+              </View>
+              <View style={styles.attendeesBadge}>
+                <Text style={styles.attendeesCount}>{item.max_attendees ?? 120}</Text>
+              </View>
             </View>
+            {isPast ? (
+              <View style={styles.bookTicketsBtnLocked}>
+                <Ionicons name="lock-closed" size={16} color={MUTED_COLOR} />
+                <Text style={styles.bookTicketsTextLocked}>Book Ticket Locked</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={styles.bookTicketsBtn}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  goToBook(item.id);
+                }}
+              >
+                <Text style={styles.bookTicketsText}>BOOK Tickets</Text>
+              </Pressable>
+            )}
           </View>
-          <Pressable
-            style={styles.bookTicketsBtn}
-            onPress={(e) => {
-              e.stopPropagation();
-              goToBook(item.id);
-            }}
-          >
-            <Text style={styles.bookTicketsText}>BOOK Tickets</Text>
-          </Pressable>
-        </View>
-      </Pressable>
-    </View>
-  );
+        </Pressable>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -752,9 +889,12 @@ export default function EventsScreen() {
               onChangeText={setSearchQuery}
             />
           </View>
-          <View style={styles.filterButton}>
+          <Pressable
+            style={styles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+          >
             <Ionicons name="options-outline" size={22} color="#FFFFFF" />
-          </View>
+          </Pressable>
         </View>
         <ScrollView
           horizontal
@@ -917,6 +1057,7 @@ export default function EventsScreen() {
             ) : (
               savedEventsList.map((bookmark) => {
                 const ev = bookmark.event!;
+                const isPast = isEventPast(ev.event_date, ev.start_time);
                 return (
                   <View key={bookmark.id} style={styles.cardWrapper}>
                     <Pressable style={styles.card} onPress={() => router.push(`/event/${ev.id}`)}>
@@ -975,15 +1116,22 @@ export default function EventsScreen() {
                             <Text style={styles.attendeesCount}>120</Text>
                           </View>
                         </View>
-                        <Pressable
-                          style={styles.bookTicketsBtn}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            goToBook(ev.id);
-                          }}
-                        >
-                          <Text style={styles.bookTicketsText}>BOOK Tickets</Text>
-                        </Pressable>
+                        {isPast ? (
+                          <View style={styles.bookTicketsBtnLocked}>
+                            <Ionicons name="lock-closed" size={16} color={MUTED_COLOR} />
+                            <Text style={styles.bookTicketsTextLocked}>Book Ticket Locked</Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            style={styles.bookTicketsBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              goToBook(ev.id);
+                            }}
+                          >
+                            <Text style={styles.bookTicketsText}>BOOK Tickets</Text>
+                          </Pressable>
+                        )}
                       </View>
                     </Pressable>
                   </View>
@@ -993,22 +1141,55 @@ export default function EventsScreen() {
           })()
         ) : (
           (() => {
-            const today = new Date();
+            const now = new Date();
+            const today = new Date(now);
             today.setHours(0, 0, 0, 0);
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+            
+            // Use filteredEvents if search or filters are active, otherwise use events
+            const baseEvents = (searchQuery.trim().length >= 2 || appliedFilters) ? filteredEvents : events;
+            
             const displayEvents =
               selectedFilter === "past"
-                ? events.filter((e) => {
-                  const d = new Date(e.event_date);
-                  d.setHours(0, 0, 0, 0);
-                  return d < today;
+                ? baseEvents.filter((e) => {
+                  const eventDate = new Date(e.event_date);
+                  eventDate.setHours(0, 0, 0, 0);
+                  // Past events: event date is before today, or if today, start time has passed
+                  if (eventDate.getTime() < today.getTime()) {
+                    return true;
+                  }
+                  if (eventDate.getTime() === today.getTime() && e.start_time) {
+                    const [sh, sm] = e.start_time.split(":").map(Number);
+                    const startMins = (sh ?? 0) * 60 + (sm ?? 0);
+                    return startMins < currentMins;
+                  }
+                  return false;
                 })
-                : events;
+                : selectedFilter === "live"
+                  ? baseEvents.filter((e) => {
+                    const eventDate = new Date(e.event_date);
+                    eventDate.setHours(0, 0, 0, 0);
+                    // Future events: event date is after today, or if today, start time hasn't passed yet
+                    if (eventDate.getTime() > today.getTime()) {
+                      return true;
+                    }
+                    if (eventDate.getTime() === today.getTime() && e.start_time) {
+                      const [sh, sm] = e.start_time.split(":").map(Number);
+                      const startMins = (sh ?? 0) * 60 + (sm ?? 0);
+                      return startMins >= currentMins;
+                    }
+                    // If no start_time, only include if date is in the future
+                    return eventDate.getTime() > today.getTime();
+                  })
+                  : baseEvents;
             return displayEvents.length === 0 ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyText}>
                   {selectedFilter === "past"
                     ? "No past events"
-                    : "No events found"}
+                    : selectedFilter === "live"
+                      ? "No upcoming events"
+                      : "No events found"}
                 </Text>
               </View>
             ) : (
@@ -1036,6 +1217,15 @@ export default function EventsScreen() {
         clubId={payBillClubId ?? ""}
         club={payBillClub}
         discounts={payBillDiscounts}
+      />
+
+      <FilterEventsModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        onFindNow={(filters) => {
+          setAppliedFilters(filters);
+          setFilterModalVisible(false);
+        }}
       />
     </View>
   );
@@ -1376,6 +1566,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     color: "#FFFFFF",
+  },
+  bookTicketsBtnLocked: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+  },
+  bookTicketsTextLocked: {
+    fontFamily: Platform.select({ ios: "System", default: "sans-serif" }),
+    fontWeight: "600",
+    fontSize: 15,
+    lineHeight: 20,
+    color: MUTED_COLOR,
   },
   emptyWrap: {
     paddingVertical: 48,

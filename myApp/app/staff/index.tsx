@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { authFetch } from "@/_services/auth-fetch";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
 import { ThemedButton } from "@/components/ui/ThemedButton";
+import supabasePublic from "@/_services/supabase-public";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -213,6 +214,11 @@ export default function StaffDashboard() {
     );
   }
 
+  const handleLogout = async () => {
+    await supabasePublic.auth.signOut();
+    router.replace("/(auth)/staff-login");
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -238,9 +244,24 @@ export default function StaffDashboard() {
               <Text style={styles.welcomeLabel}>Welcome,</Text>
               <Text style={styles.staffName}>{staffStatus.club_name}</Text>
             </View>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color={Colors.dark.success} />
-              <Text style={styles.verifiedText}>Verified</Text>
+            <View style={{ alignItems: "flex-end", gap: 12 }}>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.dark.success} />
+                <Text style={styles.verifiedText}>Verified</Text>
+              </View>
+              <Pressable
+                onPress={handleLogout}
+                style={{ flexDirection: "row", alignItems: "center", opacity: 0.8 }}
+                hitSlop={8}
+              >
+                <Ionicons name="log-out-outline" size={18} color={Colors.dark.error} />
+                <Text style={{
+                  color: Colors.dark.error,
+                  marginLeft: 4,
+                  fontWeight: "600",
+                  fontSize: 14
+                }}>Logout</Text>
+              </Pressable>
             </View>
           </View>
 
