@@ -131,14 +131,20 @@ Bassh/
 ## ✨ Features
 
 ### User Features
-- ✅ **Interactive Map**: Real-time location-based event discovery
-- ✅ **Event Discovery**: Browse events by location, category, date
+- ✅ **Interactive Map**: Real-time location-based event discovery with club markers
+- ✅ **Event Discovery**: Browse events by location, category, date with advanced filtering
+- ✅ **Event Filtering**: Filter events by category, age limit, DJ name, date, time, and max attendees
+- ✅ **Event Search**: Real-time search functionality for events
 - ✅ **Event Details**: View event information, pricing, DJ details
 - ✅ **Ticket Booking**: Multi-participant booking with age validation
+- ✅ **Booking Lock**: Past events show "Book Ticket Locked" status
 - ✅ **Smart Pricing**: Automatic stag/couple pricing logic
 - ✅ **Payment Integration**: Secure Razorpay payment processing
 - ✅ **QR Code Entry**: Digital QR codes for venue entry
 - ✅ **Booking History**: View past and upcoming bookings
+- ✅ **Wallet Management**: Modern wallet interface with quick add amounts and ongoing event cards
+- ✅ **Club Filtering**: Filter clubs by tier, rating, price range, and guest count with dynamic slider
+- ✅ **Notifications**: In-app notification system with booking confirmations
 - ✅ **User Profile**: Manage personal information and preferences
 - ✅ **Onboarding Flow**: Guided setup for new users
 
@@ -205,7 +211,7 @@ docker-compose up --build
 ```
 
 This will start:
-- **Expo** (myApp): dev server on `http://localhost:8081`
+- **Expo** (bassh): dev server on `http://localhost:8081`
 - **Web** (Next.js API): dev server on `http://localhost:3000`
 
 See [web/Dockerfile](web/Dockerfile) and [myApp/Dockerfile](myApp/Dockerfile) for image definitions.
@@ -514,6 +520,16 @@ For issues, questions, or contributions, please open an issue on GitHub or conta
 ---
 
 ## 🔄 Changelog
+
+### Version 1.1.0 (Latest)
+- ✨ **Event Filtering**: Advanced filtering by category, age limit, DJ name, date, time, and max attendees
+- ✨ **Event Search**: Real-time search functionality for events
+- ✨ **Club Filtering**: Filter clubs by tier, rating, price range (with slider), and guest count
+- ✨ **Wallet Redesign**: Modern wallet interface with quick add amounts and full-width ongoing event cards
+- ✨ **Club Cover Photos**: Display club cover photos in ongoing event cards
+- 🎨 **UI Improvements**: Replaced PNG icons with Ionicons for better consistency
+- 🔒 **Booking Lock**: Past events automatically show "Book Ticket Locked" status
+- 🧹 **Code Cleanup**: Removed debug console logs and improved code quality
 
 ### Version 1.0.0
 - Initial release

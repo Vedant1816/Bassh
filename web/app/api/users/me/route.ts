@@ -7,11 +7,6 @@ export const PATCH = withAuth(async (req: Request, user: any) => {
   try {
     const body = await req.json().catch(() => ({}));
 
-    console.log("📝 Updating customer profile:", {
-      userId: user.id,
-      body,
-    });
-
     /* -------------------- WHITELIST FIELDS -------------------- */
 
     const updateData: Record<string, any> = {};

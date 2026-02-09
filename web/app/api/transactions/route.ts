@@ -28,7 +28,7 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
           club_name,
           address_text
         ),
-        events (
+        events:events!transactions_event_id_fkey (
           name,
           event_date
         )

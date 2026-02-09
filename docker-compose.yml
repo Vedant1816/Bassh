@@ -1,6 +1,6 @@
 services:
   expo:
-    container_name: baash-expo
+    container_name: bassh-expo
     build:
       context: ./myApp
       dockerfile: Dockerfile
@@ -18,7 +18,7 @@ services:
     tty: true
 
   web:
-    container_name: baash-web
+    container_name: bassh-web
     build:
       context: ./web
       dockerfile: Dockerfile

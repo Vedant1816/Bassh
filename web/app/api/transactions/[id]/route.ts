@@ -10,7 +10,7 @@ function getIdFromRequest(req: Request, params: { id?: string }): string | null 
     const segments = url.pathname.split("/").filter(Boolean);
     const idSegment = segments[segments.length - 1];
     if (idSegment && /^[0-9a-f-]{36}$/i.test(idSegment)) return idSegment;
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -42,7 +42,7 @@ export const GET = withAuth(async (req: Request, params: { id?: string }, user: 
           club_name,
           address_text
         ),
-        events (
+        events:events!transactions_event_id_fkey (
           name,
           event_date,
           start_time

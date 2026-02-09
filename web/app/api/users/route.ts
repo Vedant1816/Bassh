@@ -5,16 +5,10 @@ export const runtime = "nodejs";
 
 export const POST = withAuth(async (req: Request, user: any) => {
   try {
-    console.log("📥 POST /api/users - Request received");
-
     const body = await req.json().catch(() => ({}));
-    console.log("📦 Request body:", body);
-
     const email = body.email || user.email;
     const role = body.role || "user";
     const name = body.name || email.split("@")[0];
-
-    console.log("🔍 Parsed values:", { email, role, name, userId: user.id });
 
     /* ---------------- VALIDATION ---------------- */
 
@@ -30,13 +24,6 @@ export const POST = withAuth(async (req: Request, user: any) => {
 
     /* ---------------- USERS TABLE ---------------- */
     // Identity table (auth-linked)
-
-    console.log("📝 Creating user record in users table:", {
-      id: user.id,
-      email,
-      name,
-      role,
-    });
 
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
@@ -60,8 +47,6 @@ export const POST = withAuth(async (req: Request, user: any) => {
       });
       return Response.json({ error: userError.message }, { status: 500 });
     }
-
-    console.log("✅ User record created successfully:", userData);
 
     /* ---------------- CUSTOMERS TABLE ---------------- */
     // Always create customer profile for users

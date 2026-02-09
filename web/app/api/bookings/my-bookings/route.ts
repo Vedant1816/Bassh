@@ -25,21 +25,22 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
         participants,
         qr_code,
         created_at,
-        events!bookings_event_id_fkey (
+        events:events!bookings_event_id_fkey (
           name,
           event_date,
           start_time,
           banner_image_url,
           club_id,
-          clubs!events_club_id_fkey (
+          clubs:clubs!events_club_id_fkey (
             club_name,
             address_text
           )
         ),
-        clubs!bookings_club_id_fkey (
+        clubs:clubs!bookings_club_id_fkey (
           id,
           club_name,
-          address_text
+          address_text,
+          cover_photo
         )
       `)
       .eq("user_id", userId)

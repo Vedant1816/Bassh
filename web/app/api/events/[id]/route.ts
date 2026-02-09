@@ -83,73 +83,55 @@ export const GET = withAuth(
         console.error("❌ Pricing fetch error:", pricingError);
       }
 
-      /* ---------------- BOOKINGS FOR GUEST LIST ---------------- */
-
-      const { data: bookings, error: bookingsError } = await supabaseAdmin
-        .from("bookings")
-        .select("id, user_id, participants, created_at, booking_status")
+      /* ---------------- GUEST LIST (from guests table) ---------------- */
+      // Only fetch approved guests for the public list
+      const { data: approvedGuests, error: approvedError } = await supabaseAdmin
+        .from("guests")
+        .select(`
+          id,
+          user_id,
+          created_at,
+          status,
+          bookings (
+            participants
+          )
+        `)
         .eq("event_id", id)
-        .eq("booking_status", "confirmed")
+        .eq("status", "approved")
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (bookingsError) {
-        console.error("❌ Bookings fetch error:", bookingsError);
+      if (approvedError) {
+        console.error("❌ Approved guests fetch error:", approvedError);
       }
 
-      console.log("📋 Bookings found:", bookings?.length || 0);
-
-      // Log all bookings with participants
-      console.log("────────────────────────────────────────");
-      console.log("📋 BOOKINGS WITH PARTICIPANTS:");
-      console.log("────────────────────────────────────────");
-      (bookings || []).forEach((booking: any, bookingIndex: number) => {
-        console.log(`\n📌 Booking ${bookingIndex + 1}:`);
-        console.log(`   ID: ${booking.id}`);
-        console.log(`   User ID: ${booking.user_id}`);
-        console.log(`   Status: ${booking.booking_status}`);
-        console.log(`   Created: ${booking.created_at}`);
-        console.log(`   Participants:`, JSON.stringify(booking.participants, null, 2));
-      });
-      console.log("────────────────────────────────────────");
-
-      // Build guest list from participants in each booking
       const guestList: any[] = [];
-      let totalGuests = 0;
-
-      (bookings || []).forEach((booking: any) => {
-        const participants = booking.participants;
-
-        if (Array.isArray(participants) && participants.length > 0) {
-          // participants is an array: [{ name, age, email, gender }, ...]
-          participants.forEach((participant: any, index: number) => {
-            totalGuests++;
-            guestList.push({
-              id: `${booking.id}-${index}`,
-              booking_id: booking.id,
-              user_id: booking.user_id,
-              created_at: booking.created_at,
-              name: participant.name || "Guest",
-              age: participant.age || null,
-              gender: participant.gender || null,
-              email: participant.email || null,
-            });
-          });
-        } else {
-          // Fallback: count as 1 guest
-          totalGuests++;
-          guestList.push({
-            id: booking.id,
-            booking_id: booking.id,
-            user_id: booking.user_id,
-            created_at: booking.created_at,
-            name: "Guest",
-            age: null,
-            gender: null,
-            email: null,
-          });
-        }
+      (approvedGuests || []).forEach((g: any) => {
+        const participant = g.bookings?.participants?.[0] || {};
+        guestList.push({
+          id: g.id,
+          user_id: g.user_id,
+          created_at: g.created_at,
+          name: participant.name || "Guest",
+          age: participant.age || null,
+          gender: participant.gender || null,
+          email: participant.email || null,
+        });
       });
+
+      // Fetch count of all applications or just approved? 
+      // User said "approved only approved one can acces guest list"
+      // Let's get total approved count for the badge/display
+      const { count: totalApproved, error: countError } = await supabaseAdmin
+        .from("guests")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", id)
+        .eq("status", "approved");
+
+      if (countError) console.error("❌ Count error:", countError);
+
+      const totalGuests = totalApproved || 0;
+
 
       console.log("✅ Total guests calculated:", totalGuests);
       console.log("✅ Guest list entries:", guestList.length);
@@ -178,8 +160,8 @@ export const GET = withAuth(
           available_tickets: availableTickets,
         },
         club: {
-          ...data.clubs,
-          phone_number: data.clubs?.phone_number || null,
+          ...(Array.isArray(data.clubs) ? (data.clubs[0] as any) : (data.clubs as any)),
+          phone_number: (Array.isArray(data.clubs) ? (data.clubs[0] as any)?.phone_number : (data.clubs as any)?.phone_number) || null,
         },
         pricing: pricing ?? [],
         guestList: guestList.slice(0, 50),
