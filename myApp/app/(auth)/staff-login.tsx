@@ -13,7 +13,10 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +26,9 @@ import { fetchWithFallback } from "@/_services/api-config";
 import { redirectStaff } from "../../services/redirect-staff";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
 import { ThemedButton } from "@/components/ui/ThemedButton";
+import { Ionicons } from "@expo/vector-icons";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const CURTAIN_HEIGHT_RATIO = 1;
 
@@ -41,6 +47,7 @@ export default function StaffLoginScreen() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -62,6 +69,58 @@ export default function StaffLoginScreen() {
     setSignupError("");
   };
 
+  const verifyStaffUser = async () => {
+    try {
+      const { data: { user } } = await supabasePublic.auth.getUser();
+      if (!user) throw new Error("No user session");
+
+      const res = await fetchWithFallback(
+        "/api/users",
+        await withAuthHeaders({ method: "GET" })
+      );
+
+      if (res.status === 404) {
+        // New user signup through staff portal -> Create as staff
+        await fetchWithFallback(
+          "/api/users",
+          await withAuthHeaders({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: user.email,
+              role: "staff",
+            }),
+          })
+        );
+        await redirectStaff(router);
+        return true;
+      }
+
+      const userData = await res.json();
+      if (!res.ok || !userData.user) {
+        throw new Error("Failed to verify account");
+      }
+
+      if (userData.user.role !== "staff") {
+        await supabasePublic.auth.signOut();
+        const errorMsg = "already registered as user";
+        setLoginError(errorMsg);
+        setSignupError(errorMsg);
+        return false;
+      }
+
+      await redirectStaff(router);
+      return true;
+    } catch (err) {
+      console.error("Staff verification failed:", err);
+      if (err instanceof Error && err.message !== "No user session") {
+        await supabasePublic.auth.signOut();
+      }
+      setLoginError("Verification failed. Please try again.");
+      return false;
+    }
+  };
+
   const handleLogin = async () => {
     if (!loginEmail?.trim() || !loginPassword) {
       setLoginError("Email and password required");
@@ -80,34 +139,67 @@ export default function StaffLoginScreen() {
       return;
     }
 
+    const success = await verifyStaffUser();
+    if (!success) setLoginLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
     try {
-      const res = await fetchWithFallback(
-        "/api/users",
-        await withAuthHeaders({ method: "GET" })
-      );
+      setGoogleLoading(true);
+      setLoginError("");
+      setSignupError("");
 
-      const userData = await res.json();
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: "bassh",
+        path: "auth/callback",
+      });
 
-      if (!res.ok || !userData.user) {
-        throw new Error("Failed to verify account role");
-      }
+      const { data, error } = await supabasePublic.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
 
-      if (userData.user.role !== "staff") {
-        await supabasePublic.auth.signOut();
-        setLoginError("Access Denied: This account is not authorized for staff access.");
-        setLoginLoading(false);
+      if (error) {
+        setLoginError(error.message);
+        setGoogleLoading(false);
         return;
       }
 
-      await redirectStaff(router);
-    } catch (err) {
-      console.error("Staff verification failed:", err);
-      // Try to clean up session on error just in case
-      await supabasePublic.auth.signOut();
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-      setLoginError("Failed to verify staff privileges. Please try again.");
+        if (result.type === "success") {
+          const url = new URL(result.url);
+          const hashParams = new URLSearchParams(url.hash.substring(1));
+          const queryParams = new URLSearchParams(url.search);
+          const accessToken = hashParams.get("access_token") || queryParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabasePublic.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              setLoginError(sessionError.message);
+              setGoogleLoading(false);
+              return;
+            }
+
+            await verifyStaffUser();
+          } else {
+            setLoginError("Failed to retrieve authentication tokens");
+          }
+        }
+      }
+    } catch (error: any) {
+      setLoginError(error.message || "Failed to sign in with Google");
     } finally {
-      setLoginLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -133,33 +225,17 @@ export default function StaffLoginScreen() {
     });
 
     if (error) {
-      setSignupError(error.message);
+      if (error.message.includes("already registered")) {
+        setSignupError("already registered as user");
+      } else {
+        setSignupError(error.message);
+      }
       setSignupLoading(false);
       return;
     }
 
-    try {
-      const res = await fetchWithFallback(
-        "/api/users",
-        await withAuthHeaders({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: signupEmail.trim(),
-            role: "staff",
-          }),
-        })
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("[Staff Signup] Profile creation failed:", err);
-      }
-    } catch {
-      // If profile creation fails, staff can still continue
-    }
-
-    router.replace("/staff" as Parameters<typeof router.replace>[0]);
-    setSignupLoading(false);
+    const success = await verifyStaffUser();
+    if (!success) setSignupLoading(false);
   };
 
   const loginTranslateY = slideAnim.interpolate({
@@ -248,6 +324,27 @@ export default function StaffLoginScreen() {
                 </Text>
               ) : null}
 
+              <View style={styles.socialAuthContainer}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <Pressable
+                  style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color={Colors.dark.text} />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </ScrollView>
             <View style={styles.bottomContainer}>
               <Pressable
@@ -258,6 +355,16 @@ export default function StaffLoginScreen() {
                 <Text style={styles.linkLabel}>
                   Need a staff account?{" "}
                   <Text style={styles.link}>Request access</Text>
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.replace("/(auth)")}
+                style={[styles.linkWrap, { marginBottom: 24 }]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={styles.linkLabel}>
+                  Not a staff member? <Text style={styles.link}>User Login</Text>
                 </Text>
               </Pressable>
               <ThemedButton
@@ -346,6 +453,27 @@ export default function StaffLoginScreen() {
                   </Text>
                 ) : null}
 
+                <View style={styles.socialAuthContainer}>
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                  <Pressable
+                    style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                    onPress={handleGoogleSignIn}
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={Colors.dark.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
               </ScrollView>
               <View style={styles.bottomContainer}>
                 <Pressable
@@ -356,6 +484,16 @@ export default function StaffLoginScreen() {
                   <Text style={styles.linkLabel}>
                     Already have access?{" "}
                     <Text style={styles.link}>Sign in</Text>
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => router.replace("/(auth)")}
+                  style={[styles.linkWrap, { marginBottom: 24 }]}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={styles.linkLabel}>
+                    Not staff? <Text style={styles.link}>Back to Home</Text>
                   </Text>
                 </Pressable>
                 <ThemedButton
@@ -544,5 +682,43 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingBottom: 120,
+  },
+  socialAuthContainer: {
+    marginTop: 24,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    gap: 12,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.text,
   },
 });

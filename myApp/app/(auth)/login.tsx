@@ -13,7 +13,10 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ThemedButton } from "@/components/ui/ThemedButton";
@@ -23,6 +26,9 @@ import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
 import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const CURTAIN_HEIGHT_RATIO = 1;
 
@@ -38,6 +44,7 @@ export default function AuthScreen() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -74,6 +81,107 @@ export default function AuthScreen() {
       return;
     }
     await redirectToRoleHome(router);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      setLoginError("");
+      setSignupError("");
+
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: "bassh",
+        path: "auth/callback",
+      });
+
+      const { data, error } = await supabasePublic.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        setLoginError(error.message);
+        setGoogleLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+        if (result.type === "success") {
+          // Supabase returns tokens in URL hash fragment
+          const url = new URL(result.url);
+          const hashParams = new URLSearchParams(url.hash.substring(1));
+          const queryParams = new URLSearchParams(url.search);
+
+          // Try hash fragment first (Supabase default), then query params
+          const accessToken = hashParams.get("access_token") || queryParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabasePublic.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              setLoginError(sessionError.message);
+              setGoogleLoading(false);
+              return;
+            }
+
+            // Check if user exists, if not create profile
+            const {
+              data: { user },
+            } = await supabasePublic.auth.getUser();
+
+            if (user) {
+              try {
+                // Check if profile exists
+                const checkRes = await fetchWithFallback(
+                  "/api/users",
+                  await withAuthHeaders({ method: "GET" })
+                );
+
+                if (checkRes.status === 404) {
+                  // NEW USER SIGNUP -> Go to onboarding
+                  await fetchWithFallback(
+                    "/api/users",
+                    await withAuthHeaders({
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        email: user.email,
+                        role: "user",
+                      }),
+                    })
+                  );
+                  router.replace("/onboarding/about-you");
+                  return;
+                }
+              } catch (err) {
+                console.error("Google sign in profile check failed:", err);
+              }
+            }
+
+            await redirectToRoleHome(router);
+          } else {
+            setLoginError("Failed to retrieve authentication tokens");
+          }
+        } else if (result.type === "cancel") {
+          // User cancelled, don't show error
+        } else {
+          setLoginError("Google sign in failed");
+        }
+      }
+    } catch (error: any) {
+      setLoginError(error.message || "Failed to sign in with Google");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleSignup = async () => {
@@ -216,6 +324,28 @@ export default function AuthScreen() {
                 </Text>
               ) : null}
 
+              {/* Google Sign In Button */}
+              <View style={styles.socialAuthContainer}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <Pressable
+                  style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color={Colors.dark.text} />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </ScrollView>
             <View style={styles.bottomContainer}>
               <Pressable
@@ -307,6 +437,28 @@ export default function AuthScreen() {
                   </Text>
                 ) : null}
 
+                {/* Google Sign In Button */}
+                <View style={styles.socialAuthContainer}>
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                  <Pressable
+                    style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                    onPress={handleGoogleSignIn}
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={Colors.dark.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
               </ScrollView>
               <View style={styles.bottomContainer}>
                 <Pressable
@@ -505,5 +657,43 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingBottom: 120,
+  },
+  socialAuthContainer: {
+    marginTop: 24,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    gap: 12,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.text,
   },
 });

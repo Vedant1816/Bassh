@@ -1,5 +1,5 @@
 {
-  "name": "myapp",
+  "name": "bassh",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -26,6 +26,7 @@
     "@supabase/supabase-js": "^2.91.0",
     "expo": "~54.0.31",
     "expo-application": "~7.0.8",
+    "expo-auth-session": "~7.0.10",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",

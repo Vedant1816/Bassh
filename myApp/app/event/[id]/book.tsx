@@ -227,16 +227,30 @@ export default function EventBookingScreen() {
 
   const getTotalPrice = () => {
     let p = 0;
-    selections.forEach((s) => {
-      // Use entry type specific pricing
-      if (selectedEntryType === "stag" && s.stagPrice) {
-        p += s.quantity * s.stagPrice;
-      } else if (selectedEntryType === "couple" && s.couplePrice) {
-        p += s.quantity * s.couplePrice;
-      } else {
-        p += s.quantity * s.price;
-      }
-    });
+    if (selectedEntryType === "couple" && showParticipantForm === false && participants.length > 0) {
+      // If we have participants, use the pairing logic
+      const males = participants.filter((p) => p.gender?.toLowerCase() === "male").length;
+      const females = participants.filter((p) => p.gender?.toLowerCase() === "female").length;
+      const couplesFound = Math.min(males, females);
+      const stagsFound = participants.length - couplesFound * 2;
+
+      selections.forEach((s) => {
+        const cPrice = s.couplePrice || s.price;
+        const sPrice = s.stagPrice || (s.couplePrice ? Math.round(s.couplePrice * 0.6) : s.price);
+        p += couplesFound * cPrice + stagsFound * sPrice;
+      });
+    } else {
+      // Default ticket-based price
+      selections.forEach((s) => {
+        if (selectedEntryType === "stag" && s.stagPrice) {
+          p += s.quantity * s.stagPrice;
+        } else if (selectedEntryType === "couple" && s.couplePrice) {
+          p += s.quantity * s.couplePrice;
+        } else {
+          p += s.quantity * s.price;
+        }
+      });
+    }
     return p;
   };
 
@@ -280,7 +294,7 @@ export default function EventBookingScreen() {
     const current = participants[currentParticipantIndex];
 
     if (!current.name.trim()) {
-      Alert.alert("Error", "Please enter name");
+      Alert.alert("Error", "Please enter username");
       return;
     }
     if (!current.gender) {
@@ -300,8 +314,25 @@ export default function EventBookingScreen() {
   };
 
   const calculateFinalPrice = async () => {
-    const total = getTotalPrice();
-    const fee = Math.round(total * 0.07); // 7% booking fee
+    let total = 0;
+
+    if (selectedEntryType === "couple") {
+      const males = participants.filter((p) => p.gender?.toLowerCase() === "male").length;
+      const females = participants.filter((p) => p.gender?.toLowerCase() === "female").length;
+      const couplesFound = Math.min(males, females);
+      const stagsFound = participants.length - couplesFound * 2;
+
+      // Since updateQuantity ensures a single selection, we can iterate
+      selections.forEach((s) => {
+        const cPrice = s.couplePrice || s.price;
+        const sPrice = s.stagPrice || (s.couplePrice ? Math.round(s.couplePrice * 0.6) : s.price); // Fallback: stag is ~60% of couple if unknown
+        total += couplesFound * cPrice + stagsFound * sPrice;
+      });
+    } else {
+      total = getTotalPrice();
+    }
+
+    const fee = 0; // 0 booking fee
     const discount = appliedDiscount ? getDiscountValue(appliedDiscount, total) : 0;
 
     setOrderTotal(total);
@@ -775,7 +806,7 @@ export default function EventBookingScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Order Total Price</Text>
-              <Text style={styles.summaryValue}>Rs.{totalPrice}</Text>
+              <Text style={styles.summaryValue}>Rs.{showPaymentDetails ? orderTotal : totalPrice}</Text>
             </View>
 
             {appliedDiscount && (
@@ -787,7 +818,7 @@ export default function EventBookingScreen() {
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Booking fee (inc. of GST)</Text>
-              <Text style={styles.summaryValue}>Rs.{Math.round(totalPrice * 0.07)}</Text>
+              <Text style={styles.summaryValue}>Rs.0</Text>
             </View>
 
             <View style={styles.summaryDivider} />
@@ -795,7 +826,7 @@ export default function EventBookingScreen() {
             <View style={styles.summaryTotalRow}>
               <Text style={styles.summaryTotalLabel}>Grand Total</Text>
               <Text style={styles.summaryTotalValue}>
-                Rs.{totalPrice + Math.round(totalPrice * 0.07) - (appliedDiscount ? discountAmount : 0)}
+                Rs.{showPaymentDetails ? finalPrice : (totalPrice - (appliedDiscount ? discountAmount : 0))}
               </Text>
             </View>
           </View>
@@ -809,7 +840,7 @@ export default function EventBookingScreen() {
         <View style={styles.footerPriceContainer}>
           <Text style={styles.footerLabel}>Total Price</Text>
           <Text style={styles.footerPrice}>
-            Rs.{totalPrice + Math.round(totalPrice * 0.07) - (appliedDiscount ? discountAmount : 0)}
+            Rs.{showPaymentDetails ? finalPrice : (totalPrice - (appliedDiscount ? discountAmount : 0))}
           </Text>
         </View>
         <Pressable
@@ -846,12 +877,12 @@ export default function EventBookingScreen() {
           </View>
 
           <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.inputLabel}>Name *</Text>
+            <Text style={styles.inputLabel}>Username *</Text>
             <TextInput
               style={styles.input}
               value={participants[currentParticipantIndex]?.name || ""}
               onChangeText={(text) => updateParticipant("name", text)}
-              placeholder="Enter name"
+              placeholder="Enter username"
               placeholderTextColor="rgba(255,255,255,0.5)"
             />
 

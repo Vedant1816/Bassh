@@ -26,7 +26,7 @@ sudo gem install cocoapods
 
 ## Step 3: Verify Info.plist Configuration
 
-The `app.json` already has the required `NSAppTransportSecurity` configuration. After `expo prebuild`, verify that `ios/myApp/Info.plist` contains:
+The `app.json` already has the required `NSAppTransportSecurity` configuration. After `expo prebuild`, verify that `ios/bassh/Info.plist` contains:
 
 ```xml
 <key>NSAppTransportSecurity</key>

@@ -34,7 +34,6 @@ import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, PrimaryGradient } from "@/constants/Colors";
-import { BookEntryModal } from "@/app/club/components/BookEntryModal";
 import { CouponsModal } from "@/app/club/components/CouponsModal";
 
 interface Discount {
@@ -57,7 +56,6 @@ export default function ClubProfile() {
   const [events, setEvents] = useState<any[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showBookingModal, setShowBookingModal] = useState(false);
   const [showCouponsModal, setShowCouponsModal] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
 
@@ -125,7 +123,6 @@ export default function ClubProfile() {
     Linking.openURL(url).catch(() => { });
   };
 
-  const handleBookTable = () => setShowBookingModal(true);
 
   if (loading) {
     return (
@@ -300,17 +297,6 @@ export default function ClubProfile() {
             );
           })()}
 
-          {/* RESERVE A TABLE BUTTON - perfectly centered */}
-          <Pressable style={styles.reserveTableBtn} onPress={handleBookTable}>
-            <LinearGradient
-              colors={PrimaryGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Text style={styles.reserveTableBtnText}>Reserve a table</Text>
-          </Pressable>
-
           {/* EVENTS IN CLUB - symmetric cards */}
           <View style={styles.eventsHeader}>
             <Text style={styles.eventsInClubHeading}>Events in club</Text>
@@ -476,14 +462,6 @@ export default function ClubProfile() {
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
-
-      <BookEntryModal
-        visible={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
-        clubId={clubId!}
-        club={club}
-        discounts={discounts}
-      />
 
       <CouponsModal
         visible={showCouponsModal}
@@ -743,27 +721,6 @@ const styles = StyleSheet.create({
   galleryImage: {
     width: "100%",
     height: "100%",
-  },
-
-  /* Reserve table button - perfectly centered */
-  reserveTableBtn: {
-    width: CARD_WIDTH,
-    height: 56,
-    alignSelf: "center",
-    marginTop: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.primaryBorder,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  reserveTableBtnText: {
-    color: Colors.dark.text,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: -0.24,
   },
 
   /* Events section header */

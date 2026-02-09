@@ -18,8 +18,8 @@ echo "🔨 Building iOS app with provisioning updates enabled..."
 cd ios
 
 # Check if workspace exists
-if [ ! -f "myApp.xcworkspace/contents.xcworkspacedata" ]; then
-    echo "❌ Error: myApp.xcworkspace not found"
+if [ ! -f "bassh.xcworkspace/contents.xcworkspacedata" ]; then
+    echo "❌ Error: bassh.xcworkspace not found"
     echo "Run 'npx expo prebuild --platform ios' first"
     exit 1
 fi
@@ -34,8 +34,8 @@ echo "⚙️  Configuration: $CONFIGURATION"
 if [ "$SDK" = "iphoneos" ]; then
     # Device build: allow Xcode to create/update provisioning profile
     xcodebuild \
-        -workspace myApp.xcworkspace \
-        -scheme myApp \
+        -workspace bassh.xcworkspace \
+        -scheme bassh \
         -configuration "$CONFIGURATION" \
         -sdk iphoneos \
         -destination "generic/platform=iOS" \
@@ -43,8 +43,8 @@ if [ "$SDK" = "iphoneos" ]; then
         -derivedDataPath ./build
 else
     xcodebuild \
-        -workspace myApp.xcworkspace \
-        -scheme myApp \
+        -workspace bassh.xcworkspace \
+        -scheme bassh \
         -configuration "$CONFIGURATION" \
         -sdk "$SDK" \
         -allowProvisioningUpdates \
