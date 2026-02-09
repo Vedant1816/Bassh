@@ -13,6 +13,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,7 +25,8 @@ import { Colors, PrimaryGradient, PrimaryGradientStart, PrimaryGradientEnd } fro
 import BookmarkButton from "@/app/components/BookmarkButton";
 import LocationHeader from "@/app/components/LocationHeader";
 
-const { width } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const width = SCREEN_WIDTH;
 
 type Guest = {
   id: string;
@@ -53,6 +55,13 @@ export default function EventDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showFullAbout, setShowFullAbout] = useState(false);
   const [guestListModalVisible, setGuestListModalVisible] = useState(false);
+  const [applyGuestModalVisible, setApplyGuestModalVisible] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestUsername, setGuestUsername] = useState("");
+  const [guestAge, setGuestAge] = useState("");
+  const [guestGender, setGuestGender] = useState("");
+  const [userGuestStatus, setUserGuestStatus] = useState<{ applied: boolean, status: string | null } | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -99,6 +108,16 @@ export default function EventDetailScreen() {
         if (discountRes.ok && discountData.discounts) {
           setDiscounts(discountData.discounts);
         }
+
+        // Fetch user guest status
+        const statusRes = await fetchWithFallback(
+          `/api/events/${id}/guest-list/status`,
+          await withAuthHeaders({ method: "GET" })
+        );
+        const statusData = await statusRes.json();
+        if (statusRes.ok) {
+          setUserGuestStatus(statusData);
+        }
       } catch (e) {
         console.error("📱 [FRONTEND] Error:", e);
         setError(e instanceof Error ? e.message : "Failed to load event");
@@ -143,6 +162,51 @@ export default function EventDetailScreen() {
 
   const openChat = () => {
     // chat integration can be added here
+  };
+
+  const handleGuestApply = async () => {
+    if (!id) return;
+    if (!guestUsername || !guestPhone || !guestAge || !guestGender) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    try {
+      setApplying(true);
+      const res = await fetchWithFallback(
+        `/api/events/${id}/guest-list/apply`,
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: guestPhone,
+            username: guestUsername,
+            age: parseInt(guestAge),
+            gender: guestGender
+          }),
+        })
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to apply");
+        return;
+      }
+
+      alert("Applied for guest list successfully!");
+      setApplyGuestModalVisible(false);
+      setGuestPhone("");
+      setGuestUsername("");
+      setGuestAge("");
+      setGuestGender("");
+      // Refresh status
+      setUserGuestStatus({ applied: true, status: "pending" });
+    } catch (e) {
+      console.error("Guest apply error:", e);
+      alert("Something went wrong");
+    } finally {
+      setApplying(false);
+    }
   };
 
   const getAvatarUrl = (name: string, gender: string | null) => {
@@ -266,10 +330,16 @@ export default function EventDetailScreen() {
             <Pressable
               style={styles.attendeesContainer}
               onPress={() => {
-                setGuestListModalVisible(true);
+                if (!userGuestStatus?.applied) {
+                  setApplyGuestModalVisible(true);
+                } else if (userGuestStatus.status === "approved") {
+                  setGuestListModalVisible(true);
+                } else {
+                  setApplyGuestModalVisible(true); // Open the status modal
+                }
               }}
             >
-              {previewGuests.length > 0 ? (
+              {userGuestStatus?.status === "approved" && previewGuests.length > 0 ? (
                 <>
                   {previewGuests.map((guest, index) => (
                     <Image
@@ -289,7 +359,8 @@ export default function EventDetailScreen() {
                 </>
               ) : (
                 <View style={[styles.attendeeAvatar, styles.attendeeBadge]}>
-                  <Text style={styles.attendeeBadgeText}>+{totalGuests || 0}</Text>
+                  <Ionicons name="lock-closed" size={12} color="#fff" />
+                  <Text style={[styles.attendeeBadgeText, { marginLeft: 2 }]}>{totalGuests || 0}</Text>
                 </View>
               )}
             </Pressable>
@@ -358,17 +429,25 @@ export default function EventDetailScreen() {
           <Pressable
             style={styles.guestListButton}
             onPress={() => {
-              setGuestListModalVisible(true);
+              if (!userGuestStatus?.applied) {
+                setApplyGuestModalVisible(true);
+              } else if (userGuestStatus.status === "approved") {
+                setGuestListModalVisible(true);
+              } else {
+                setApplyGuestModalVisible(true);
+              }
             }}
           >
             <View style={styles.guestListButtonInner}>
               <View style={styles.guestListIconBadge}>
-                <Ionicons name="people" size={18} color="#fff" />
+                <Ionicons name={userGuestStatus?.status === "approved" ? "people" : "lock-closed"} size={18} color="#fff" />
                 <View style={styles.guestListBadge}>
                   <Text style={styles.guestListBadgeText}>{totalGuests > 99 ? '99+' : totalGuests}</Text>
                 </View>
               </View>
-              <Text style={styles.guestListText}>Get access to the guest list</Text>
+              <Text style={styles.guestListText}>
+                {userGuestStatus?.status === "approved" ? "View Guest List" : "Get access to the guest list"}
+              </Text>
             </View>
           </Pressable>
           <Text style={styles.guestListSubtext}>Spots filling fast</Text>
@@ -511,6 +590,143 @@ export default function EventDetailScreen() {
                 <Text style={styles.emptyGuestText}>No guests yet</Text>
                 <Text style={styles.emptyGuestSubtext}>Be the first to join this event!</Text>
               </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* GUEST LIST APPLICATION MODAL */}
+      <Modal
+        visible={applyGuestModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setApplyGuestModalVisible(false)}
+      >
+        <View style={styles.applyModalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setApplyGuestModalVisible(false)}
+          />
+          <View style={styles.applyModalContent}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.applyModalTitle}>Guest List Access</Text>
+
+            {userGuestStatus?.applied ? (
+              <View style={styles.statusView}>
+                <View style={[styles.statusIconContainer, { backgroundColor: userGuestStatus.status === 'suspended' ? 'rgba(255, 68, 68, 0.1)' : 'rgba(255, 187, 51, 0.1)' }]}>
+                  <Ionicons
+                    name={userGuestStatus.status === 'suspended' ? "alert-circle" : "time"}
+                    size={48}
+                    color={userGuestStatus.status === 'suspended' ? "#FF4444" : "#FFBB33"}
+                  />
+                </View>
+                <Text style={styles.statusTitle}>
+                  Application {userGuestStatus.status === 'suspended' ? 'Suspended' : 'Pending'}
+                </Text>
+                <Text style={styles.statusDescription}>
+                  {userGuestStatus.status === 'suspended'
+                    ? "Your access to the guest list has been suspended by the organizer. Please contact the host for more information."
+                    : "Your application is currently being reviewed by the club. You'll be able to see the full guest list once approved."}
+                </Text>
+
+                <Pressable
+                  style={styles.statusCloseButton}
+                  onPress={() => setApplyGuestModalVisible(false)}
+                >
+                  <Text style={styles.statusCloseButtonText}>Got it</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: SCREEN_HEIGHT * 0.6 }}>
+                <Text style={styles.applyModalSubtitle}>Enter your details to apply for the guest list.</Text>
+
+                <Text style={styles.applyInputLabel}>Username *</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="person-outline" size={20} color="rgba(255, 255, 255, 0.5)" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.applyInput}
+                    placeholder="Username"
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={guestUsername}
+                    onChangeText={setGuestUsername}
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <Text style={styles.applyInputLabel}>Phone Number *</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="call-outline" size={20} color="rgba(255, 255, 255, 0.5)" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.applyInput}
+                    placeholder="Phone Number"
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    keyboardType="phone-pad"
+                    value={guestPhone}
+                    onChangeText={setGuestPhone}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.applyInputLabel}>Age *</Text>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={styles.applyInput}
+                        placeholder="Age"
+                        placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                        keyboardType="numeric"
+                        value={guestAge}
+                        onChangeText={setGuestAge}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={styles.applyInputLabel}>Gender *</Text>
+                    <View style={styles.genderRowSmall}>
+                      {["Male", "Female"].map((gender) => (
+                        <Pressable
+                          key={gender}
+                          style={[
+                            styles.genderBtnSmall,
+                            guestGender === gender && styles.genderBtnSmallActive,
+                          ]}
+                          onPress={() => setGuestGender(gender)}
+                        >
+                          <Text style={[
+                            styles.genderBtnSmallText,
+                            guestGender === gender && styles.genderBtnSmallActiveText
+                          ]}>
+                            {gender}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={[styles.applySubmitButton, (applying || !guestUsername || !guestPhone || !guestAge || !guestGender) && styles.disabledButton]}
+                  onPress={handleGuestApply}
+                  disabled={applying || !guestUsername || !guestPhone || !guestAge || !guestGender}
+                >
+                  {applying ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.applySubmitButtonText}>Submit Application</Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  style={styles.viewGuestListLink}
+                  onPress={() => {
+                    setApplyGuestModalVisible(false);
+                    setGuestListModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.viewGuestListLinkText}>View current guest list</Text>
+                </Pressable>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -1017,5 +1233,154 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
+  },
+  applyModalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  applyModalContent: {
+    backgroundColor: "#1A1A1A",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  applyModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  applyModalSubtitle: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.6)",
+    marginBottom: 24,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  applyInput: {
+    flex: 1,
+    height: 50,
+    color: "#fff",
+    fontSize: 16,
+  },
+  applySubmitButton: {
+    backgroundColor: Colors.dark.primary,
+    borderRadius: 12,
+    height: 54,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: Colors.dark.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  applySubmitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  viewGuestListLink: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  viewGuestListLinkText: {
+    color: Colors.dark.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  applyInputLabel: {
+    color: "rgba(255, 255, 255, 0.6)",
+    fontSize: 12,
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  genderRowSmall: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  genderBtnSmall: {
+    flex: 1,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  genderBtnSmallActive: {
+    backgroundColor: Colors.dark.primary + "30",
+    borderColor: Colors.dark.primary,
+  },
+  genderBtnSmallText: {
+    color: "rgba(255, 255, 255, 0.6)",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  genderBtnSmallActiveText: {
+    color: Colors.dark.primary,
+    fontWeight: "700",
+  },
+  statusView: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    width: '100%',
+  },
+  statusIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  statusTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  statusDescription: {
+    color: "rgba(255, 255, 255, 0.6)",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 30,
+    paddingHorizontal: 20,
+  },
+  statusCloseButton: {
+    backgroundColor: Colors.dark.card,
+    borderRadius: 12,
+    width: '100%',
+    height: 54,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  statusCloseButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
