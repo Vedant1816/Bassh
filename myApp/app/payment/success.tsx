@@ -18,13 +18,6 @@ export default function PaymentSuccess() {
     const rawBookingId = booking_id ? (Array.isArray(booking_id) ? booking_id[0] : booking_id) : null;
 
     (async () => {
-      console.log("🎉 [FRONTEND] Payment success page loaded");
-      console.log("🎉 [FRONTEND] Params:", {
-        has_qr: !!qr,
-        booking_id: rawBookingId || "not provided",
-        amount: amount || "not provided",
-      });
-
       if (qr) {
         try {
           const qrStr = Array.isArray(qr) ? qr[0] : qr;
@@ -35,8 +28,6 @@ export default function PaymentSuccess() {
           } else {
             setQrUri(`data:image/png;base64,${decoded}`);
           }
-
-          console.log("✅ [FRONTEND] QR code processed");
         } catch (error) {
           console.error("❌ [FRONTEND] Error processing QR code:", error);
           const qrStr = Array.isArray(qr) ? qr[0] : qr;

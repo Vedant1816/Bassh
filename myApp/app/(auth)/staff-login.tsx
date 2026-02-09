@@ -154,8 +154,8 @@ export default function StaffLoginScreen() {
         const err = await res.json().catch(() => ({}));
         console.error("[Staff Signup] Profile creation failed:", err);
       }
-    } catch (e) {
-      console.warn("[Staff Signup] API unreachable, continuing anyway");
+    } catch {
+      // If profile creation fails, staff can still continue
     }
 
     router.replace("/staff" as Parameters<typeof router.replace>[0]);

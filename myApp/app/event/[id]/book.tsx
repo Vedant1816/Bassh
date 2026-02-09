@@ -122,11 +122,6 @@ export default function EventBookingScreen() {
 
         // Use available_tickets from API (max_attendees - totalGuests)
         const tickets = data.event?.available_tickets ?? 100;
-        console.log("🎟️ Available tickets:", tickets);
-        console.log("🎟️ Max attendees:", data.event?.max_attendees);
-        console.log("🎟️ Total guests:", data.totalGuests);
-        console.log("🎫 Pricing options:", data.pricing?.length || 0);
-
         setAvailableTickets(tickets);
       }
 
@@ -190,8 +185,6 @@ export default function EventBookingScreen() {
     const currentQty = getTotalTickets();
     const newQty = Math.max(0, Math.min(currentQty + delta, availableTickets));
 
-    console.log("🎫 updateQuantity called:", { delta, currentQty, newQty, availableTickets, pricingCount: pricing.length });
-
     if (newQty === 0) {
       setSelections(new Map());
       return;
@@ -204,7 +197,7 @@ export default function EventBookingScreen() {
 
     // If no pricing, create a default one
     if (!targetPricing && pricing.length === 0) {
-      console.warn("⚠️ No pricing options available, using default");
+      // No pricing options available, using default
       targetPricing = {
         id: "default",
         label: selectedEntryType === "couple" ? "Couple" : "Stag",
@@ -215,7 +208,6 @@ export default function EventBookingScreen() {
     }
 
     if (targetPricing) {
-      console.log("🎫 Setting selection:", { pricingId: targetPricing.id, quantity: newQty });
       setSelections(new Map([[targetPricing.id, {
         pricingId: targetPricing.id,
         label: targetPricing.label,
@@ -363,7 +355,6 @@ export default function EventBookingScreen() {
           }),
         })
       );
-      console.log("✅ Booking confirmation notification sent");
     } catch (err) {
       console.error("❌ Failed to send booking confirmation notification:", err);
       // Don't block the booking flow if notification fails
@@ -389,7 +380,6 @@ export default function EventBookingScreen() {
           }),
         })
       );
-      console.log("✅ Notifications sent to matching participants");
     } catch (err) {
       console.error("❌ Failed to send notifications:", err);
       // Don't block the booking flow if notifications fail

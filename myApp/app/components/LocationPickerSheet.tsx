@@ -35,7 +35,6 @@ export default function LocationPickerSheet({ sheetRef, onSelect }: Props) {
 
       const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
       if (!mapboxToken) {
-        console.error("Mapbox token not found");
         return;
       }
 
@@ -60,8 +59,7 @@ export default function LocationPickerSheet({ sheetRef, onSelect }: Props) {
 
       sheetRef.current?.close();
       setQuery("");
-    } catch (err) {
-      console.warn("Location search failed", err);
+    } catch {
     } finally {
       setLoading(false);
     }

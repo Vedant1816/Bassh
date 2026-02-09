@@ -123,26 +123,14 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     };
 
     const handleNotificationPress = (item: NotificationItem) => {
-        console.log("📱 [NOTIFICATIONS] Press detected!");
-        console.log("📱 [NOTIFICATIONS] Item:", JSON.stringify(item, null, 2));
-        console.log("📱 [NOTIFICATIONS] Type:", item.type);
-        console.log("📱 [NOTIFICATIONS] Has booking:", !!item.booking);
-        console.log("📱 [NOTIFICATIONS] Metadata:", item.metadata);
-
         // Check if it's a booking notification with booking data
         if ((item.type === "booking" || item.type === "booking_confirmation") && item.booking) {
-            console.log("📱 [NOTIFICATIONS] Opening QR modal for booking:", item.booking.id);
             setSelectedBooking(item.booking);
             // Close notification modal first, then open QR modal after animation completes
             onClose();
             setTimeout(() => {
-                console.log("📱 [NOTIFICATIONS] Setting qrModalVisible to true after delay");
                 setQrModalVisible(true);
             }, 400);
-        } else {
-            console.log("📱 [NOTIFICATIONS] Not a booking notification or no booking data attached");
-            console.log("📱 [NOTIFICATIONS] Expected type: 'booking' or 'booking_confirmation', got:", item.type);
-            console.log("📱 [NOTIFICATIONS] Booking data:", item.booking);
         }
     };
 

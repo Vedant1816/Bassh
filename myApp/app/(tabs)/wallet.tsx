@@ -14,6 +14,7 @@ import {
   Platform,
   InteractionManager,
   Image,
+  Dimensions,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,11 +53,12 @@ interface MyBooking {
     club_id?: string;
     clubs: { club_name: string; address_text: string } | null;
   } | null;
-  clubs?: { id?: string; club_name: string; address_text: string } | null;
+  clubs?: { id?: string; club_name: string; address_text: string; cover_photo: string | null } | null;
 }
 
-const ONGOING_CARD_WIDTH = 160;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const ONGOING_CARD_GAP = 12;
+const ONGOING_CARD_WIDTH = SCREEN_WIDTH - 40;
 
 const formatCurrency = (amount: string) => {
   const cleaned = amount.replace(/[^\d.]/g, "");
@@ -303,7 +305,6 @@ export default function WalletScreen() {
 
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => {
-          console.log("💳 [WALLET] Opening Razorpay...");
           let RazorpayCheckout: any;
           try {
             RazorpayCheckout = require("react-native-razorpay").default;
@@ -321,14 +322,12 @@ export default function WalletScreen() {
 
           RazorpayCheckout.open(options)
             .then(async (response: any) => {
-              console.log("✅ [WALLET] Payment successful:", response);
               if (!response?.razorpay_payment_id) {
                 Alert.alert("Error", "Invalid payment response");
                 return;
               }
 
               try {
-                console.log("💳 [WALLET] Verifying payment...");
                 const verifyRes = await fetchWithFallback(
                   "/api/payments/wallet/verify",
                   await withAuthHeaders({
@@ -350,8 +349,6 @@ export default function WalletScreen() {
                   Alert.alert("Error", verified.error || "Payment verification failed");
                   return;
                 }
-
-                console.log("✅ [WALLET] Wallet credited successfully");
                 setBalance(verified.wallet_balance ?? balance + amount);
                 Alert.alert(
                   "Success",
@@ -375,8 +372,6 @@ export default function WalletScreen() {
                   "Payment Failed",
                   error?.description || error?.message || "Payment could not be completed"
                 );
-              } else {
-                console.log("ℹ️ [WALLET] Payment cancelled by user");
               }
             });
         }, 600);
@@ -406,24 +401,24 @@ export default function WalletScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.balanceCard}>
-          <LinearGradient
-            colors={PrimaryGradient}
-            start={PrimaryGradientStart}
-            end={PrimaryGradientEnd}
-            style={styles.balanceCardGradient}
-          >
+        {/* Simple, non-card balance header */}
+        <View style={styles.balanceRow}>
+          <View style={styles.balanceInfo}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
             {loadingBalance ? (
-              <ActivityIndicator color={Colors.dark.text} size="small" style={{ marginVertical: 16 }} />
+              <ActivityIndicator
+                color={Colors.dark.text}
+                size="small"
+                style={{ marginTop: 8 }}
+              />
             ) : (
               <Text style={styles.balanceAmount}>₹{balance.toFixed(0)}</Text>
             )}
-            <Pressable style={styles.addMoneyButton} onPress={handleAddMoney}>
-              <Ionicons name="add" size={22} color={Colors.dark.text} />
-              <Text style={styles.addMoneyText}>Add Money</Text>
-            </Pressable>
-          </LinearGradient>
+          </View>
+          <Pressable style={styles.addMoneyPill} onPress={handleAddMoney}>
+            <Ionicons name="add" size={20} color={Colors.dark.text} />
+            <Text style={styles.addMoneyPillText}>Add Money</Text>
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -492,9 +487,17 @@ export default function WalletScreen() {
                     <View key={b.id} style={[styles.ongoingCard, { marginRight: ONGOING_CARD_GAP }]}>
                       <Pressable onPress={() => router.push(`/club/${b.club_id}`)}>
                         <View style={styles.ongoingCardImageWrap}>
-                          <View style={styles.ongoingCardPlaceholder}>
-                            <Ionicons name="business-outline" size={32} color={Colors.dark.textTertiary} />
-                          </View>
+                          {club?.cover_photo ? (
+                            <Image
+                              source={{ uri: club.cover_photo }}
+                              style={styles.ongoingCardImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.ongoingCardPlaceholder}>
+                              <Ionicons name="business-outline" size={32} color={Colors.dark.textTertiary} />
+                            </View>
+                          )}
                         </View>
                         <View style={styles.ongoingCardBody}>
                           <Text style={styles.ongoingCardTitle} numberOfLines={1}>
@@ -630,19 +633,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
-  balanceCard: {
-    borderRadius: 20,
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 24,
-    overflow: "hidden",
-    shadowColor: Colors.dark.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
   },
-  balanceCardGradient: {
-    padding: 24,
-    borderRadius: 20,
+  balanceInfo: {
+    flexShrink: 1,
   },
   balanceLabel: {
     fontSize: 14,
@@ -656,17 +654,18 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     marginBottom: 20,
   },
-  addMoneyButton: {
+  addMoneyPill: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.card,
     gap: 8,
   },
-  addMoneyText: {
+  addMoneyPillText: {
     color: Colors.dark.text,
     fontSize: 16,
     fontWeight: "600",

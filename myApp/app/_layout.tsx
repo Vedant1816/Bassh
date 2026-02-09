@@ -12,11 +12,8 @@ import Mapbox from "@rnmapbox/maps";
 // Set Mapbox access token from environment variable (same as Supabase setup)
 const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
 
-if (!mapboxToken) {
-  console.error("❌ EXPO_PUBLIC_MAPBOX_TOKEN is missing. Add it to your .env file");
-} else {
+if (mapboxToken) {
   Mapbox.setAccessToken(mapboxToken);
-  console.log("✅ Mapbox token loaded");
 }
 
 // Removed anchor to prevent default navigation to tabs
@@ -78,8 +75,7 @@ export default function RootLayout() {
             }
             return;
           }
-          // For other errors, log but don't redirect (especially if on onboarding)
-          console.warn("Error checking onboarding status:", error.message);
+          // For other errors, don't redirect (especially if on onboarding)
           return;
         }
 
@@ -94,8 +90,8 @@ export default function RootLayout() {
             router.replace("/(tabs)");
           }
         }
-      } catch (err) {
-        console.warn("Unexpected error in bootstrap:", err);
+      } catch {
+        // ignore bootstrap errors
       }
     };
 

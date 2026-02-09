@@ -119,8 +119,8 @@ export default function AuthScreen() {
         const err = await res.json().catch(() => ({}));
         console.error("[Signup] Profile creation failed:", err);
       }
-    } catch (e) {
-      console.warn("[Signup] API unreachable, continuing anyway");
+    } catch {
+      // If profile creation fails, user can still continue onboarding
     }
 
     router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);

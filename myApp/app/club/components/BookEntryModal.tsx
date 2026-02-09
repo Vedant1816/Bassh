@@ -431,7 +431,6 @@ export function BookEntryModal({
   /* ---------------- NOTIFICATION LOGIC ---------------- */
   const sendBookingConfirmationNotification = async (bookingId: string) => {
     try {
-      console.log("🔔 [NOTIFICATIONS] Sending booking confirmation for:", bookingId);
       // Send confirmation notification to the current user
       await fetchWithFallback(
         "/api/notifications/send",
@@ -448,7 +447,6 @@ export function BookEntryModal({
           }),
         })
       );
-      console.log("✅ [NOTIFICATIONS] Booking confirmation notification sent");
     } catch (err) {
       console.error("❌ [NOTIFICATIONS] Failed to send booking confirmation notification:", err);
       // Don't block the booking flow if notification fails
@@ -457,7 +455,6 @@ export function BookEntryModal({
 
   const sendNotificationToMatchingUsers = async (participantNames: string[], bookingId?: string) => {
     try {
-      console.log("🔔 [NOTIFICATIONS] Sending bulk notifications to:", participantNames);
       // Send notification to all matching participants
       await fetchWithFallback(
         "/api/notifications/send-bulk",
@@ -475,7 +472,6 @@ export function BookEntryModal({
           }),
         })
       );
-      console.log("✅ [NOTIFICATIONS] Notifications sent to matching participants");
     } catch (err) {
       console.error("❌ [NOTIFICATIONS] Failed to send notifications:", err);
       // Don't block the booking flow if notifications fail
@@ -498,7 +494,6 @@ export function BookEntryModal({
 
     try {
       setProcessing(true);
-      console.log("💸 [PAYMENT] Starting wallet payment...");
 
       const res = await fetchWithFallback(
         "/api/payments/table/pay-with-wallet",
@@ -529,8 +524,6 @@ export function BookEntryModal({
         Alert.alert("Payment Failed", data.error || "Failed to process wallet payment");
         return;
       }
-
-      console.log("✅ [PAYMENT] Wallet payment successful, booking ID:", data.booking_id);
 
       // Send notifications to matching participants with booking_id
       await sendNotificationToMatchingUsers(participants.map(p => p.name), data.booking_id);
@@ -801,8 +794,6 @@ export function BookEntryModal({
                         );
                         return;
                       }
-
-                      console.log("✅ [PAYMENT] Razorpay payment verified, sending notifications...");
                       await sendNotificationToMatchingUsers(participants.map(p => p.name), currentBookingId);
 
                       const qrCode = verified.qr || verified.qr_code;

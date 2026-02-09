@@ -26,9 +26,9 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 let ImagePicker: any = null;
 try {
   ImagePicker = require("expo-image-picker");
-} catch (error) {
-  console.warn("expo-image-picker not available:", error);
-}
+  } catch {
+    // image picker not available; ignore
+  }
 
 /* Local avatar assets (same 4 as design); served at /avatars/avatar-N.png for API */
 const AVATAR_IDS = ["avatar-1", "avatar-2", "avatar-3", "avatar-4"];

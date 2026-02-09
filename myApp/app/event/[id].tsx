@@ -73,11 +73,6 @@ export default function EventDetailScreen() {
 
         const data = await res.json();
 
-        console.log("📱 [FRONTEND] Event API response received");
-        console.log("📱 [FRONTEND] Guest list length:", data.guestList?.length);
-        console.log("📱 [FRONTEND] Total guests:", data.totalGuests);
-        console.log("📱 [FRONTEND] Sample guest:", data.guestList?.[0]);
-
         if (!res.ok) {
           setError(data?.error || `Error ${res.status}`);
           setLoading(false);
@@ -91,9 +86,6 @@ export default function EventDetailScreen() {
         // Set guest list data
         const guests = data.guestList ?? [];
         const total = data.totalGuests ?? 0;
-
-        console.log("📱 [FRONTEND] Setting guestList state:", guests.length);
-        console.log("📱 [FRONTEND] Setting totalGuests state:", total);
 
         setGuestList(guests);
         setTotalGuests(total);
@@ -116,14 +108,7 @@ export default function EventDetailScreen() {
     })();
   }, [id]);
 
-  // Debug: Log when state changes
-  useEffect(() => {
-    console.log("📱 [FRONTEND] guestList state updated:", guestList.length);
-  }, [guestList]);
-
-  useEffect(() => {
-    console.log("📱 [FRONTEND] totalGuests state updated:", totalGuests);
-  }, [totalGuests]);
+  // Debug effects removed for production
 
   const formatEventDate = (d: string | undefined) => {
     if (!d) return "Date TBA";
@@ -157,7 +142,7 @@ export default function EventDetailScreen() {
   };
 
   const openChat = () => {
-    console.log("Open chat");
+    // chat integration can be added here
   };
 
   const getAvatarUrl = (name: string, gender: string | null) => {
@@ -204,9 +189,6 @@ export default function EventDetailScreen() {
   const stagPrice = pricing.find((p: any) => p.label?.toLowerCase().includes("stag"))?.stag_price || pricing.find((p: any) => p.label?.toLowerCase().includes("stag"))?.price || 699;
   const aboutText = event.about || "Join us for an unforgettable night filled with music, energy, and great vibes.";
   const truncatedAbout = aboutText.length > 180 ? aboutText.substring(0, 180) + "..." : aboutText;
-
-  // Debug log for render
-  console.log("📱 [FRONTEND RENDER] guestList:", guestList.length, "totalGuests:", totalGuests, "isPassed:", isPassed);
 
   const previewGuests = guestList.slice(0, 3);
   const remainingGuests = Math.max(0, totalGuests - 3);
@@ -284,7 +266,6 @@ export default function EventDetailScreen() {
             <Pressable
               style={styles.attendeesContainer}
               onPress={() => {
-                console.log("📱 [FRONTEND] Opening modal, guests:", guestList.length);
                 setGuestListModalVisible(true);
               }}
             >
@@ -377,7 +358,6 @@ export default function EventDetailScreen() {
           <Pressable
             style={styles.guestListButton}
             onPress={() => {
-              console.log("📱 [FRONTEND] Guest list button pressed, guests:", guestList.length);
               setGuestListModalVisible(true);
             }}
           >

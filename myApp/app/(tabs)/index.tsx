@@ -96,8 +96,8 @@ export default function HomeScreen() {
       if (res.ok) {
         setUnreadNotificationCount(json.unreadCount || 0);
       }
-    } catch (err) {
-      console.error("❌ Failed to fetch unread count", err);
+    } catch {
+      // ignore notification count errors
     }
   };
 
@@ -124,7 +124,6 @@ export default function HomeScreen() {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        console.log("⚠️ Location permission denied");
         return;
       }
 
@@ -134,7 +133,6 @@ export default function HomeScreen() {
 
       setLocation((prev) => {
         if (prev?.source === "manual") {
-          console.log("🏙️ Keeping manually selected city");
           return prev;
         }
 
@@ -169,8 +167,6 @@ export default function HomeScreen() {
 
   /* ---------------- HANDLE CITY SELECTION ---------------- */
   const handleCitySelect = async (city: { name: string; lat: number; lng: number }) => {
-    console.log("🏙️ City selected:", city.name);
-
     // If "Your Location" is selected, get GPS coordinates
     if (city.name === "Your Location") {
       try {
@@ -263,38 +259,18 @@ export default function HomeScreen() {
 
     (async () => {
       setLoadingCards(true);
-
-      console.log(`[index.tsx] ========================================`);
-      console.log(`[index.tsx] 📍 Fetching clubs for: ${location.cityName || "GPS location"}`);
-      console.log(`[index.tsx] Location: lat=${location.lat}, lng=${location.lng}`);
-
       const res = await fetchWithFallback(
         `/api/clubs/nearby?lat=${location.lat}&lng=${location.lng}`,
         await withAuthHeaders({ method: "GET" })
       );
 
-      console.log(`[index.tsx] Response status: ${res.status} ${res.ok ? "OK" : "FAILED"}`);
-
       if (!res.ok) {
-        console.error("[index.tsx] ❌ Clubs fetch failed");
         setLoadingCards(false);
         return;
       }
 
       const raw = await res.json();
-      console.log(`[index.tsx] Raw response:`, raw);
-      console.log(`[index.tsx] Number of clubs in response: ${raw?.length || 0}`);
-
-      const mapped: ClubCard[] = (raw || []).map((c: any, index: number) => {
-        console.log(`[index.tsx] ────────────────────────────────────────`);
-        console.log(`[index.tsx] Club ${index + 1}: ${c.club_name || c.name || "Unknown"}`);
-        console.log(`[index.tsx]   - cover_photo:`, c.cover_photo);
-        console.log(`[index.tsx]   - typeof cover_photo:`, typeof c.cover_photo);
-        console.log(`[index.tsx]   - profile_picture_url:`, c.profile_picture_url);
-        console.log(`[index.tsx]   - banner_image_url:`, c.banner_image_url);
-        console.log(`[index.tsx]   - prices:`, c.prices);
-        console.log(`[index.tsx]   - typeof prices:`, typeof c.prices);
-
+      const mapped: ClubCard[] = (raw || []).map((c: any) => {
         return {
           ...c,
           club_name: c.club_name ?? c.name ?? "Club",
@@ -308,8 +284,6 @@ export default function HomeScreen() {
         };
       });
 
-      console.log(`[index.tsx] ✅ Mapped ${mapped.length} clubs`);
-      console.log(`[index.tsx] Sample mapped club cover_photo:`, mapped[0]?.cover_photo);
       setClubs(mapped);
       setLoadingCards(false);
     })();
@@ -529,7 +503,6 @@ export default function HomeScreen() {
               <Pressable
                 style={[styles.clubMarkerContainer, { zIndex: 10000 + index, elevation: 10000 + index }]}
                 onPress={() => {
-                  console.log("📍 Club tapped:", club.club_name);
                   router.push(`/club/${club.id}`);
                 }}
               >
@@ -580,11 +553,7 @@ export default function HomeScreen() {
             style={styles.headerChatButton}
             onPress={() => setNotificationModalVisible(true)}
           >
-            <Image
-              source={require("@/assets/images/chat-bubble-icon.png")}
-              style={styles.headerChatIcon}
-              resizeMode="contain"
-            />
+            <Ionicons name="notifications-outline" size={22} color={Colors.dark.text} />
             {unreadNotificationCount > 0 && (
               <View style={styles.notificationBadge} />
             )}
@@ -771,11 +740,8 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  headerChatIcon: {
-    width: 36,
-    height: 36,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 50,
   },
 
   searchResultsContainer: {
