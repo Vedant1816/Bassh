@@ -446,7 +446,11 @@ export default function EventDetailScreen() {
                 </View>
               </View>
               <Text style={styles.guestListText}>
-                {userGuestStatus?.status === "approved" ? "View Guest List" : "Get access to the guest list"}
+                {userGuestStatus?.status === "approved"
+                  ? "View Guest List"
+                  : userGuestStatus?.status === "suspended"
+                    ? "Access Denied"
+                    : "Get access to the guest list"}
               </Text>
             </View>
           </Pressable>
@@ -621,11 +625,11 @@ export default function EventDetailScreen() {
                   />
                 </View>
                 <Text style={styles.statusTitle}>
-                  Application {userGuestStatus.status === 'suspended' ? 'Suspended' : 'Pending'}
+                  {userGuestStatus.status === 'suspended' ? 'Access Denied' : 'Application Pending'}
                 </Text>
                 <Text style={styles.statusDescription}>
                   {userGuestStatus.status === 'suspended'
-                    ? "Your access to the guest list has been suspended by the organizer. Please contact the host for more information."
+                    ? "Your access to the guest list has been denied by the organizer. Please contact the host for more information."
                     : "Your application is currently being reviewed by the club. You'll be able to see the full guest list once approved."}
                 </Text>
 
