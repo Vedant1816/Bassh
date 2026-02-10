@@ -103,7 +103,7 @@ export default function StaffLoginScreen() {
 
       if (userData.user.role !== "staff") {
         await supabasePublic.auth.signOut();
-        const errorMsg = "already registered as user";
+        const errorMsg = "ALREADY REGISTERED AS USER";
         setLoginError(errorMsg);
         setSignupError(errorMsg);
         return false;
@@ -128,7 +128,7 @@ export default function StaffLoginScreen() {
     }
     setLoginError("");
     setLoginLoading(true);
-    const { error } = await supabasePublic.auth.signInWithPassword({
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
       email: loginEmail.trim(),
       password: loginPassword,
     });
@@ -137,6 +137,18 @@ export default function StaffLoginScreen() {
       setLoginError(error.message);
       setLoginLoading(false);
       return;
+    }
+
+    // Log authentication tokens for staff login
+    if (data?.session) {
+      console.log("========================================");
+      console.log("🔐 STAFF LOGIN SUCCESSFUL");
+      console.log("========================================");
+      console.log("Access Token:", data.session.access_token);
+      console.log("Refresh Token:", data.session.refresh_token);
+      console.log("User ID:", data.user?.id);
+      console.log("Email:", data.user?.email);
+      console.log("========================================");
     }
 
     const success = await verifyStaffUser();
@@ -179,7 +191,7 @@ export default function StaffLoginScreen() {
           const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
 
           if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabasePublic.auth.setSession({
+            const { data: sessionData, error: sessionError } = await supabasePublic.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
@@ -189,6 +201,16 @@ export default function StaffLoginScreen() {
               setGoogleLoading(false);
               return;
             }
+
+            // Log authentication tokens for Google staff sign-in
+            console.log("========================================");
+            console.log("🔐 STAFF GOOGLE SIGN-IN SUCCESSFUL");
+            console.log("========================================");
+            console.log("Access Token:", accessToken);
+            console.log("Refresh Token:", refreshToken);
+            console.log("User ID:", sessionData?.user?.id);
+            console.log("Email:", sessionData?.user?.email);
+            console.log("========================================");
 
             await verifyStaffUser();
           } else {
@@ -226,7 +248,7 @@ export default function StaffLoginScreen() {
 
     if (error) {
       if (error.message.includes("already registered")) {
-        setSignupError("already registered as user");
+        setSignupError("ALREADY REGISTERED AS USER");
       } else {
         setSignupError(error.message);
       }

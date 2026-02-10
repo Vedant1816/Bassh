@@ -75,9 +75,9 @@ export const GET = withAuth(
 
       const { data: pricing, error: pricingError } = await supabaseAdmin
         .from("event_ticket_pricing")
-        .select("*")
+        .select("id, event_id, label, stag_price, couple_price, created_at")
         .eq("event_id", id)
-        .order("price", { ascending: true });
+        .order("stag_price", { ascending: true, nullsFirst: false });
 
       if (pricingError) {
         console.error("❌ Pricing fetch error:", pricingError);

@@ -72,7 +72,7 @@ export default function AuthScreen() {
       return;
     }
     setLoginError("");
-    const { error } = await supabasePublic.auth.signInWithPassword({
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
       email: loginEmail.trim(),
       password: loginPassword,
     });
@@ -80,6 +80,19 @@ export default function AuthScreen() {
       setLoginError(error.message);
       return;
     }
+
+    // Log authentication tokens
+    if (data?.session) {
+      console.log("========================================");
+      console.log("🔐 LOGIN SUCCESSFUL");
+      console.log("========================================");
+      console.log("Access Token:", data.session.access_token);
+      console.log("Refresh Token:", data.session.refresh_token);
+      console.log("User ID:", data.user?.id);
+      console.log("Email:", data.user?.email);
+      console.log("========================================");
+    }
+
     await redirectToRoleHome(router);
   };
 
@@ -122,7 +135,7 @@ export default function AuthScreen() {
           const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
 
           if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabasePublic.auth.setSession({
+            const { data: sessionData, error: sessionError } = await supabasePublic.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
@@ -132,6 +145,16 @@ export default function AuthScreen() {
               setGoogleLoading(false);
               return;
             }
+
+            // Log authentication tokens from Google sign-in
+            console.log("========================================");
+            console.log("🔐 GOOGLE SIGN-IN SUCCESSFUL");
+            console.log("========================================");
+            console.log("Access Token:", accessToken);
+            console.log("Refresh Token:", refreshToken);
+            console.log("User ID:", sessionData?.user?.id);
+            console.log("Email:", sessionData?.user?.email);
+            console.log("========================================");
 
             // Check if user exists, if not create profile
             const {

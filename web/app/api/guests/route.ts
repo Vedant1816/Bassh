@@ -212,7 +212,7 @@ export const POST = withAuth(async (req: Request, user: { id: string }) => {
 
     const { data: guest, error: guestError } = await supabaseAdmin
       .from("guests")
-      .select("id, club_id, booking_id")
+      .select("id, club_id, booking_id, user_id, event_id")
       .eq("id", guest_id)
       .eq("club_id", clubId)
       .single();
@@ -273,6 +273,56 @@ export const POST = withAuth(async (req: Request, user: { id: string }) => {
           "⚠️ [BACKEND] QR generation failed:",
           qrErr.message
         );
+      }
+
+      /* ================= SEND NOTIFICATION ================= */
+
+      try {
+        // Fetch event details for the notification
+        const { data: event } = await supabaseAdmin
+          .from("events")
+          .select("name")
+          .eq("id", guest.event_id)
+          .single();
+
+        // Fetch user details to get username
+        const { data: userDetails } = await supabaseAdmin
+          .from("users")
+          .select("name")
+          .eq("id", guest.user_id)
+          .single();
+
+        if (event && userDetails) {
+          const notificationTitle = action === "make_vip"
+            ? "VIP Access Granted! 🌟"
+            : "Guest List Approved! 🎉";
+
+          const notificationMessage = action === "make_vip"
+            ? `Congratulations! You've been granted VIP access to ${event.name}. See you at the event!`
+            : `You're on the guest list for ${event.name}. See you at the event!`;
+
+          // Create notification directly in the database
+          await supabaseAdmin
+            .from("notifications")
+            .insert({
+              user_id: guest.user_id,
+              title: notificationTitle,
+              message: notificationMessage,
+              type: "guest_list",
+              metadata: {
+                booking_id: bookingId,
+                event_id: guest.event_id,
+                is_vip: action === "make_vip",
+              },
+              is_read: false,
+              created_at: new Date().toISOString(),
+            });
+
+          console.log(`✅ [NOTIFICATIONS] Sent ${action} notification to user ${guest.user_id}`);
+        }
+      } catch (notifErr: any) {
+        console.error("❌ Failed to send guest list notification:", notifErr);
+        // Don't block the guest update if notification fails
       }
     }
 

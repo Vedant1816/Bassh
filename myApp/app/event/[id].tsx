@@ -1121,8 +1121,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingHorizontal: 16,
-    maxHeight: "85%",
-    minHeight: 300,
+    height: "75%",
   },
   modalHandle: {
     width: 40,

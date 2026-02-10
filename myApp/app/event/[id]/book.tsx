@@ -201,7 +201,6 @@ export default function EventBookingScreen() {
       targetPricing = {
         id: "default",
         label: selectedEntryType === "couple" ? "Couple" : "Stag",
-        price: 0,
         stag_price: 0,
         couple_price: 0,
       };
@@ -211,9 +210,9 @@ export default function EventBookingScreen() {
       setSelections(new Map([[targetPricing.id, {
         pricingId: targetPricing.id,
         label: targetPricing.label,
-        price: targetPricing.price,
-        stagPrice: targetPricing.stag_price,
-        couplePrice: targetPricing.couple_price,
+        price: targetPricing.stag_price || 0, // Use stag_price as default/base price
+        stagPrice: targetPricing.stag_price || 0,
+        couplePrice: targetPricing.couple_price || 0,
         quantity: newQty,
       }]]));
     }
@@ -301,8 +300,13 @@ export default function EventBookingScreen() {
       Alert.alert("Error", "Please select gender");
       return;
     }
-    if (!current.age || current.age < (event?.age_limit || 18)) {
-      Alert.alert("Error", `Age must be at least ${event?.age_limit || 18}`);
+    // Parse age_limit from strings like "18+" or "21+"
+    const eventAgeLimit = event?.age_limit
+      ? parseInt(String(event.age_limit).replace(/\D/g, '')) || 18
+      : 18;
+    const minAge = Math.max(eventAgeLimit, 18); // Always enforce minimum 18+
+    if (!current.age || current.age < minAge) {
+      Alert.alert("Error", `Age must be at least ${minAge}`);
       return;
     }
 
