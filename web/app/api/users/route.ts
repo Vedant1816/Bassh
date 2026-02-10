@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const POST = withAuth(async (req: Request, user: any) => {
   try {
     console.log("📥 POST /api/users - Request received");
-    
+
     const body = await req.json().catch(() => ({}));
     console.log("📦 Request body:", body);
 
@@ -179,6 +179,32 @@ export const POST = withAuth(async (req: Request, user: any) => {
     }
 
     return Response.json({ ok: true });
+  } catch (err: any) {
+    return Response.json(
+      { error: err.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+});
+
+export const GET = withAuth(async (req: Request, _ctx: any, user: any) => {
+  try {
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (userError) {
+      console.error("❌ GET USER ERROR:", userError);
+      return Response.json({ error: userError.message }, { status: 500 });
+    }
+
+    if (!userData) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    return Response.json({ user: userData });
   } catch (err: any) {
     return Response.json(
       { error: err.message || "Internal server error" },

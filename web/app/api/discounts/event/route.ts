@@ -22,18 +22,48 @@ export async function GET(req: NextRequest) {
 
     console.log("🔍 [BACKEND] Fetching discounts for event:", event_id);
 
-    // Fetch active discounts for the event
-    const { data: discounts, error } = await supabaseAdmin
+    // Step 1: Get all discount_ids from discounts_events junction table
+    const { data: discountLinks, error: linksError } = await supabaseAdmin
+      .from("discount_events")
+      .select("discount_id")
+      .eq("event_id", event_id);
+
+    if (linksError) {
+      console.error("❌ [BACKEND] Error fetching discount links:", linksError.message);
+      return Response.json(
+        { error: "Failed to fetch discount links", details: linksError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log(`🔗 [BACKEND] Found ${discountLinks?.length || 0} discount links`);
+
+    // If no discounts linked to this event, return empty array
+    if (!discountLinks || discountLinks.length === 0) {
+      console.log("ℹ️ [BACKEND] No discounts linked to this event");
+      return Response.json({
+        success: true,
+        discounts: [],
+        count: 0,
+      });
+    }
+
+    // Step 2: Extract discount_ids
+    const discountIds = discountLinks.map((link) => link.discount_id);
+    console.log("🔍 [BACKEND] Discount IDs to fetch:", discountIds);
+
+    // Step 3: Fetch full discount details from discounts table
+    const { data: discounts, error: discountsError } = await supabaseAdmin
       .from("discounts")
       .select("*")
-      .eq("event_id", event_id)
+      .in("id", discountIds)
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("❌ [BACKEND] Database error:", error.message);
+    if (discountsError) {
+      console.error("❌ [BACKEND] Error fetching discounts:", discountsError.message);
       return Response.json(
-        { error: "Failed to fetch discounts", details: error.message },
+        { error: "Failed to fetch discounts", details: discountsError.message },
         { status: 500 }
       );
     }

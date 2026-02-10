@@ -81,25 +81,17 @@ export async function GET(request: NextRequest) {
     const event_id = searchParams.get("event_id");
     const user_id = searchParams.get("user_id");
 
+    // user_id references auth.users; no public users table in schema, so don't embed it
     let query = supabaseAdmin
       .from("reviews")
       .select(
         `
         id,
+        user_id,
         rating,
         comment,
         is_verified,
         created_at,
-        users:user_id (
-          id,
-          email,
-          customers (
-            first_name,
-            last_name,
-            username,
-            avatar_url
-          )
-        ),
         clubs:club_id (
           id,
           club_name

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,31 +10,68 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { withAuthHeaders } from "@/_services/auth-fetch";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { withAuthHeaders, authFetch } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
-import { Colors } from "@/constants/Colors";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { ThemedButton } from "@/components/ui/ThemedButton";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function JoinClubScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [clubToken, setClubToken] = useState("");
   const [post, setPost] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    checkStaffStatus();
+  }, []);
+
+  const checkStaffStatus = async () => {
+    try {
+      const res = await authFetch("/api/staff/me");
+      const data = await res.json();
+      if (res.ok && data?.club_status === "approved") {
+        router.replace("/staff");
+      }
+    } catch (_) { }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await authFetch("/api/auth/logout", { method: "POST" });
+          } catch (_) { }
+          router.replace("/(auth)/login");
+        },
+      },
+    ]);
+  };
 
   const handleSubmit = async () => {
     if (!clubToken.trim()) {
       setError("Please enter a club token");
       return;
     }
-
     if (!post.trim()) {
       setError("Please enter your role/position");
       return;
     }
-
     const normalizedToken = clubToken.trim().toUpperCase();
     if (normalizedToken.length !== 8) {
       setError("Club token must be exactly 8 characters");
@@ -66,24 +103,18 @@ export default function JoinClubScreen() {
       }
 
       Alert.alert(
-        "✅ Request Submitted!",
-        `You've requested to join ${data.data?.club_name} as ${data.data?.post}.\n\nYour request is pending approval from the club manager.`,
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/staff"),
-          },
-        ]
+        "Request Submitted",
+        `You've requested to join ${data.data?.club_name} as ${data.data?.post}. Your request is pending approval from the club manager.`,
+        [{ text: "OK", onPress: () => router.replace("/staff") }]
       );
     } catch (err: any) {
-      setError(err.message || "Network error. Please check your connection and try again.");
+      setError(err.message || "Network error. Please try again.");
       setLoading(false);
     }
   };
 
   const handleTokenChange = (text: string) => {
-    const formatted = text.toUpperCase().slice(0, 8);
-    setClubToken(formatted);
+    setClubToken(text.toUpperCase().slice(0, 8));
     setError("");
   };
 
@@ -93,126 +124,136 @@ export default function JoinClubScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <DismissKeyboardView style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.emoji}>🏢</Text>
-          </View>
-          <Text style={styles.title}>Join Club</Text>
-          <Text style={styles.subtitle}>
-            Enter your club's unique token and your role to request access
-          </Text>
-        </View>
+    <DismissKeyboardView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <StatusBar barStyle="light-content" />
 
-        {/* Form Card */}
-        <View style={styles.card}>
-          {/* Club Token Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>CLUB TOKEN</Text>
-            <Text style={styles.inputHint}>8-character code from your manager</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                placeholder="ABC12345"
-                placeholderTextColor={Colors.dark.textTertiary}
-                value={clubToken}
-                onChangeText={handleTokenChange}
-                style={styles.tokenInput}
-                editable={!loading}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={8}
-              />
-              {clubToken.length === 8 && (
-                <View style={styles.checkmark}>
-                  <Text style={styles.checkmarkText}>✓</Text>
-                </View>
-              )}
+        <LinearGradient
+          colors={[...HeaderGradient]}
+          locations={[...HeaderGradientLocations]}
+          style={styles.background}
+        />
+
+        <View style={[styles.content, { paddingTop: insets.top + 16 }]}>
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backIcon}>‹</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>Join Club</Text>
+            <View style={styles.headerRight}>
+              <Pressable onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={24} color="#FFF" />
+              </Pressable>
             </View>
-            {clubToken.length > 0 && clubToken.length < 8 && (
-              <Text style={styles.validationHint}>
-                {8 - clubToken.length} more character{clubToken.length !== 7 ? "s" : ""} needed
-              </Text>
-            )}
           </View>
 
-          {/* Post/Role Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>YOUR ROLE</Text>
-            <Text style={styles.inputHint}>e.g., Bouncer, Manager, Bartender</Text>
-            <TextInput
-              placeholder="Enter your role"
-              placeholderTextColor={Colors.dark.textTertiary}
-              value={post}
-              onChangeText={handlePostChange}
-              style={styles.postInput}
-              editable={!loading}
-              autoCapitalize="words"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-            />
-          </View>
-
-          {/* Submit Button */}
-          <Pressable
-            onPress={handleSubmit}
-            style={({ pressed }) => [
-              styles.submitButton,
-              (loading || clubToken.trim().length !== 8 || !post.trim()) &&
-                styles.buttonDisabled,
-              pressed && styles.buttonPressed,
-            ]}
-            disabled={loading || clubToken.trim().length !== 8 || !post.trim()}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {loading ? (
-              <ActivityIndicator color={Colors.dark.text} />
-            ) : (
-              <>
-                <Text style={styles.submitButtonText}>Submit Request</Text>
-                <Text style={styles.submitButtonArrow}>→</Text>
-              </>
-            )}
-          </Pressable>
-
-          {/* Error Message */}
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorIcon}>⚠️</Text>
-              <Text style={styles.error}>{error}</Text>
+            <View style={styles.titleSection}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="business-outline" size={36} color={Colors.dark.text} />
+              </View>
+              <Text style={styles.title}>Apply for Access</Text>
+              <Text style={styles.subtitle}>
+                Enter your club's token to link your staff profile
+              </Text>
             </View>
-          ) : null}
+
+            <View style={styles.formCard}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Club Token</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    placeholder="ABC12345"
+                    placeholderTextColor={Colors.dark.textSecondary}
+                    value={clubToken}
+                    onChangeText={handleTokenChange}
+                    style={styles.tokenInput}
+                    editable={!loading}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={8}
+                  />
+                  {clubToken.length === 8 && (
+                    <View style={styles.checkmark}>
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                {clubToken.length > 0 && clubToken.length < 8 && (
+                  <Text style={styles.validationHint}>
+                    {8 - clubToken.length} more character{clubToken.length !== 7 ? "s" : ""} needed
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Your Position</Text>
+                <TextInput
+                  placeholder="e.g. Manager, Security, Bartender"
+                  placeholderTextColor={Colors.dark.textSecondary}
+                  value={post}
+                  onChangeText={handlePostChange}
+                  style={styles.postInput}
+                  editable={!loading}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                />
+              </View>
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="warning-outline" size={18} color={Colors.dark.error} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <ThemedButton
+                onPress={handleSubmit}
+                loading={loading}
+                disabled={loading || clubToken.trim().length !== 8 || !post.trim()}
+                style={styles.submitButton}
+              >
+                Submit Request
+              </ThemedButton>
+            </View>
+
+            <View style={styles.infoSection}>
+              <View style={styles.infoCard}>
+                <Ionicons name="information-circle-outline" size={20} color={Colors.dark.primary} />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoTitle}>Where is my token?</Text>
+                  <Text style={styles.infoText}>
+                    Each club has a unique 8-character code. Ask your manager or owner for yours.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.securityNote}>
+                <Ionicons name="lock-closed-outline" size={16} color={Colors.dark.textSecondary} />
+                <Text style={styles.securityText}>
+                  Your application must be manually approved by club management.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
         </View>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <View style={styles.infoHeader}>
-            <Text style={styles.infoIcon}>💡</Text>
-            <Text style={styles.infoTitle}>How to get a club token?</Text>
-          </View>
-          <Text style={styles.infoText}>
-            Contact your club manager or owner to receive your unique 8-character access token.
-          </Text>
+        <View style={styles.homeIndicator}>
+          <View style={styles.homeIndicatorBar} />
         </View>
-
-        {/* Security Note */}
-        <View style={styles.securityBox}>
-          <Text style={styles.securityIcon}>🔒</Text>
-          <Text style={styles.securityText}>
-            Your request will be reviewed by the club manager before access is granted.
-          </Text>
-        </View>
-      </ScrollView>
-      </DismissKeyboardView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </DismissKeyboardView>
   );
 }
 
@@ -221,87 +262,112 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.dark.background,
   },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+  background: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  content: {
+    flex: 1,
   },
   header: {
+    flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    height: 44,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontWeight: "300",
+    marginLeft: -4,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginRight: 32, // Balance back button
+  },
+  headerRight: { width: 32 },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  titleSection: {
+    alignItems: "center",
+    marginTop: 20,
     marginBottom: 32,
   },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 2,
-    borderColor: Colors.dark.borderLight,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
-  },
-  emoji: {
-    fontSize: 40,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   title: {
     fontSize: 32,
     fontWeight: "800",
-    color: Colors.dark.primary,
+    color: "#FFFFFF",
     marginBottom: 8,
     textAlign: "center",
-    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.dark.textSecondary,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
     paddingHorizontal: 20,
   },
-  card: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 20,
+  formCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderRadius: 32,
     padding: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
-    marginBottom: 20,
-    shadowColor: Colors.dark.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 8,
   },
   inputGroup: {
     marginBottom: 24,
   },
   label: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
-    color: Colors.dark.textSecondary,
-    marginBottom: 4,
+    color: Colors.dark.text,
+    marginBottom: 12,
+    marginLeft: 4,
+    textTransform: "uppercase",
     letterSpacing: 1,
   },
-  inputHint: {
-    fontSize: 12,
-    color: Colors.dark.textTertiary,
-    marginBottom: 10,
-  },
-  inputWrapper: {
-    position: "relative",
-  },
+  inputWrapper: { position: "relative" },
   tokenInput: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: 12,
-    padding: 18,
-    color: Colors.dark.text,
-    fontSize: 22,
-    borderWidth: 2,
-    borderColor: Colors.dark.border,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 20,
+    padding: 20,
+    color: "#FFFFFF",
+    fontSize: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
     letterSpacing: 6,
     textAlign: "center",
-    fontWeight: "700",
+    fontWeight: "800",
   },
   checkmark: {
     position: "absolute",
@@ -315,125 +381,95 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmarkText: {
-    color: Colors.dark.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
   postInput: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: 12,
-    padding: 18,
-    color: Colors.dark.text,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 20,
+    padding: 20,
+    color: "#FFFFFF",
     fontSize: 16,
-    borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   validationHint: {
     fontSize: 12,
-    color: Colors.dark.warning,
-    marginTop: 8,
+    color: "#FBBF24",
+    marginTop: 10,
     textAlign: "center",
-    fontWeight: "500",
+    fontWeight: "600",
   },
   submitButton: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    height: 56,
     marginTop: 8,
-    shadowColor: Colors.dark.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  submitButtonText: {
-    color: Colors.dark.text,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  submitButtonArrow: {
-    color: Colors.dark.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginLeft: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  buttonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
   },
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.errorBg,
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 16,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.errorBorder,
+    borderColor: "rgba(239, 68, 68, 0.2)",
   },
-  errorIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  error: {
+  errorText: {
     flex: 1,
     color: Colors.dark.error,
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "500",
+    marginLeft: 10,
+    fontWeight: "600",
   },
-  infoBox: {
-    backgroundColor: Colors.dark.infoBg,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.infoBorder,
+  infoSection: {
+    gap: 16,
   },
-  infoHeader: {
+  infoCard: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(59, 130, 246, 0.15)",
   },
-  infoIcon: {
-    fontSize: 18,
-    marginRight: 8,
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
   },
   infoTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
-    color: Colors.dark.info,
+    color: "#FFFFFF",
+    marginBottom: 4,
   },
   infoText: {
     fontSize: 13,
     color: Colors.dark.textSecondary,
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  securityBox: {
+  securityNote: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.successBg,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.dark.successBorder,
-  },
-  securityIcon: {
-    fontSize: 22,
-    marginRight: 12,
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
   securityText: {
-    flex: 1,
     fontSize: 12,
     color: Colors.dark.textSecondary,
-    lineHeight: 18,
+    marginLeft: 8,
+    textAlign: "center",
+  },
+  bottomSpacer: { height: 40 },
+  homeIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 34,
+    alignItems: "center",
+  },
+  homeIndicatorBar: {
+    width: 134,
+    height: 5,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 3,
+    opacity: 0.2,
   },
 });

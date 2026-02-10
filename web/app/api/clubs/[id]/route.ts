@@ -34,9 +34,29 @@ export const GET = withAuth(async (_req: Request, params: { id: string }, _user:
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
+    function toPublicUrl(value: string | null | undefined): string | undefined {
+      if (!value || typeof value !== "string") return undefined;
+      if (value.startsWith("http://") || value.startsWith("https://")) return value;
+      const { data } = supabaseAdmin.storage.from("event-images").getPublicUrl(value);
+      return data?.publicUrl;
+    }
+
+    const enrichedClub = {
+      ...club,
+      cover_photo: toPublicUrl(club.cover_photo) ?? club.cover_photo,
+      banner_image_url: toPublicUrl(club.banner_image_url || club.cover_photo) ?? (club.banner_image_url || club.cover_photo),
+      logo_url: toPublicUrl(club.club_logo || club.logo_url) ?? (club.club_logo || club.logo_url),
+      club_logo: toPublicUrl(club.club_logo) ?? club.club_logo,
+    };
+
+    const enrichedEvents = (events ?? []).map((e: any) => ({
+      ...e,
+      banner_image_url: toPublicUrl(e.banner_image_url || e.image_url || e.poster_url) ?? (e.banner_image_url || e.image_url || e.poster_url),
+    }));
+
     return Response.json({
-      club,
-      events: events ?? [],
+      club: enrichedClub,
+      events: enrichedEvents,
       discounts: discounts ?? [],
     });
   } catch (err: any) {

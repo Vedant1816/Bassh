@@ -42,12 +42,12 @@ export async function GET(req: Request) {
     const [clubsRes, eventsRes] = await Promise.all([
       supabaseAdmin
         .from("clubs")
-        .select("id, club_name, address_text")
+        .select("id, club_name, address_text, cover_photo")
         .ilike("club_name", `%${q}%`)
         .limit(5),
       supabaseAdmin
         .from("events")
-        .select("id, name, event_date, club_id")
+        .select("id, name, event_date, club_id, banner_image_url")
         .ilike("name", `%${q}%`)
         .limit(5),
     ]);
@@ -58,6 +58,7 @@ export async function GET(req: Request) {
           id: c.id,
           name: c.club_name,
           subtitle: c.address_text,
+          image: c.cover_photo,
         })
       );
       console.log("🔍 [SEARCH] Clubs (fallback):", clubsRes.data.length);
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
           name: e.name,
           date: e.event_date,
           club_id: e.club_id,
+          image: e.banner_image_url,
         })
       );
       console.log("🔍 [SEARCH] Events (fallback):", eventsRes.data.length);
@@ -79,7 +81,7 @@ export async function GET(req: Request) {
     if (clubIds.length) {
       const { data } = await supabaseAdmin
         .from("clubs")
-        .select("id, club_name, address_text")
+        .select("id, club_name, address_text, cover_photo")
         .in("id", clubIds)
         .limit(5);
       data?.forEach((c) =>
@@ -88,6 +90,7 @@ export async function GET(req: Request) {
           id: c.id,
           name: c.club_name,
           subtitle: c.address_text,
+          image: c.cover_photo,
         })
       );
       console.log("🔍 [SEARCH] Clubs found:", data?.length ?? 0);
@@ -95,7 +98,7 @@ export async function GET(req: Request) {
     if (eventIds.length) {
       const { data } = await supabaseAdmin
         .from("events")
-        .select("id, name, event_date, club_id")
+        .select("id, name, event_date, club_id, banner_image_url")
         .in("id", eventIds)
         .limit(5);
       data?.forEach((e) =>
@@ -105,6 +108,7 @@ export async function GET(req: Request) {
           name: e.name,
           date: e.event_date,
           club_id: e.club_id,
+          image: e.banner_image_url,
         })
       );
       console.log("🔍 [SEARCH] Events found:", data?.length ?? 0);

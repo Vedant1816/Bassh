@@ -93,11 +93,36 @@ if (Array.isArray(pricing) && pricing.length > 0) {
 });
 export const runtime = "nodejs";
 
+/** Haversine distance in km between two lat/lng points */
+function distanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export async function GET(req: NextRequest) {
   console.log("📋 [EVENTS] Get all events request");
 
   try {
-    // Fetch all events with club details
+    const { searchParams } = new URL(req.url);
+    const lat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
+    const lng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
+    const radiusKm = searchParams.get("radius_km") ? Number(searchParams.get("radius_km")) : 30;
+
+    // Fetch all events with club details including lat/lng for radius filter
     const { data: events, error, count } = await supabaseAdmin
       .from("events")
       .select(`
@@ -116,7 +141,9 @@ export async function GET(req: NextRequest) {
         created_at,
         clubs!events_club_id_fkey (
           club_name,
-          address_text
+          address_text,
+          latitude,
+          longitude
         )
       `, { count: 'exact' })
       .order("event_date", { ascending: true })
@@ -131,24 +158,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(`✅ [EVENTS] Fetched ${events?.length || 0} events (total: ${count})`);
-    console.log("✅ [EVENTS] Events:", events);
+    let allEvents = events || [];
 
-    // Optional: Filter out past events
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const allEvents = events || [];
-    
-    // Return all events (including past ones for now)
-    // If you want only upcoming events, uncomment below:
-    /*
-    const upcomingEvents = allEvents.filter((event) => {
-      const eventDate = new Date(event.event_date);
-      eventDate.setHours(0, 0, 0, 0);
-      return eventDate >= today;
-    });
-    */
+    // Filter by radius when lat/lng provided (default 30 km)
+    if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+      allEvents = allEvents.filter((event: any) => {
+        const club = event.clubs;
+        if (!club || club.latitude == null || club.longitude == null) return false;
+        const d = distanceKm(lat, lng, club.latitude, club.longitude);
+        return d <= radiusKm;
+      });
+      console.log(`✅ [EVENTS] Filtered to ${allEvents.length} events within ${radiusKm} km`);
+    } else {
+      console.log(`✅ [EVENTS] Fetched ${allEvents.length} events (no lat/lng, no radius filter)`);
+    }
 
     return Response.json({
       events: allEvents,

@@ -257,7 +257,7 @@ export default function BookingsScreen() {
           </Text>
           <Pressable
             style={styles.exploreButton}
-            onPress={() => router.push("/(tabs)/")}
+            onPress={() => router.push("/(tabs)")}
           >
             <Text style={styles.exploreButtonText}>Explore Events</Text>
           </Pressable>

@@ -1,10 +1,12 @@
 # iOS Provisioning Profile Fix
 
 ## Problem
-Xcode can't find or generate a provisioning profile for `com.harshsehra.myApp`. The error indicates:
+Xcode can't find or generate a provisioning profile for `com.harshsehra.bassh`. The error indicates:
 ```
-No profiles for 'com.harshsehra.myApp' were found: Xcode couldn't find any iOS App Development provisioning profiles matching 'com.harshsehra.myApp'. Automatic signing is disabled and unable to generate a profile.
+No profiles for 'com.harshsehra.bassh' were found: Xcode couldn't find any iOS App Development provisioning profiles matching 'com.harshsehra.bassh'. Automatic signing is disabled and unable to generate a profile.
 ```
+
+This often happens when running **`npx expo run:ios --device`** from the terminal: Expo runs `xcodebuild` without `-allowProvisioningUpdates`, so Xcode won't create or update the provisioning profile.
 
 ## Solutions
 
@@ -13,12 +15,12 @@ No profiles for 'com.harshsehra.myApp' were found: Xcode couldn't find any iOS A
 1. Open the Xcode project:
    ```bash
    cd /Users/harsh/Desktop/Bassh/myApp
-   open ios/myApp.xcodeproj
+   open ios/bassh.xcodeproj
    ```
 
 2. In Xcode:
-   - Select the `myApp` project in the navigator
-   - Select the `myApp` target
+   - Select the `bassh` project in the navigator
+   - Select the `bassh` target
    - Go to the **Signing & Capabilities** tab
    - Check **"Automatically manage signing"**
    - Select your **Team** from the dropdown (or sign in with your Apple ID)
@@ -29,27 +31,23 @@ No profiles for 'com.harshsehra.myApp' were found: Xcode couldn't find any iOS A
    npm run ios
    ```
 
-### Solution 2: Use Command Line with Provisioning Updates Flag
+### Solution 2: Create Profile Once with `-allowProvisioningUpdates`, Then Use Expo
 
-Build with the `-allowProvisioningUpdates` flag:
+Run a device build **once** so Xcode creates the provisioning profile:
 
 ```bash
-cd /Users/harsh/Desktop/Bassh/myApp/ios
-xcodebuild -workspace myApp.xcworkspace \
-  -scheme myApp \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -allowProvisioningUpdates
+npm run ios:device
 ```
 
-Or if building for a device:
+Or use the script directly:
+
 ```bash
-xcodebuild -workspace myApp.xcworkspace \
-  -scheme myApp \
-  -configuration Debug \
-  -sdk iphoneos \
-  -allowProvisioningUpdates
+./scripts/build-ios.sh iphoneos
 ```
+
+After the profile is created, **`npx expo run:ios --device`** should work for future builds.
+
+To build for simulator or device manually with xcodebuild, see the full commands in `scripts/build-ios.sh`.
 
 ### Solution 3: Sign In to Xcode Command Line Tools
 
@@ -86,7 +84,7 @@ If you want to specify the team in Expo config, add it to `app.json`:
 {
   "expo": {
     "ios": {
-      "bundleIdentifier": "com.harshsehra.myApp",
+      "bundleIdentifier": "com.harshsehra.bassh",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -108,8 +106,8 @@ Run this script to build with provisioning updates enabled:
 ```bash
 #!/bin/bash
 cd /Users/harsh/Desktop/Bassh/myApp/ios
-xcodebuild -workspace myApp.xcworkspace \
-  -scheme myApp \
+xcodebuild -workspace bassh.xcworkspace \
+  -scheme bassh \
   -configuration Debug \
   -sdk iphonesimulator \
   -allowProvisioningUpdates \
@@ -122,7 +120,7 @@ xcodebuild -workspace myApp.xcworkspace \
 The project currently has team ID `G7HB7HM7RF`. If this doesn't match your Apple Developer account:
 1. Open Xcode project
 2. Change the team in Signing & Capabilities
-3. Or update it in `ios/myApp.xcodeproj/project.pbxproj`
+3. Or update it in `ios/bassh.xcodeproj/project.pbxproj`
 
 ### If you don't have an Apple Developer account:
 - For simulator: You can use a free Apple ID
@@ -132,5 +130,5 @@ The project currently has team ID `G7HB7HM7RF`. If this doesn't match your Apple
 ```bash
 cd /Users/harsh/Desktop/Bassh/myApp/ios
 rm -rf build DerivedData
-xcodebuild clean -workspace myApp.xcworkspace -scheme myApp
+xcodebuild clean -workspace bassh.xcworkspace -scheme bassh
 ```

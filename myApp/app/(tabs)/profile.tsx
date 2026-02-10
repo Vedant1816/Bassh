@@ -14,9 +14,9 @@ import { router } from 'expo-router';
 import supabase from '@/_services/supabase-public';
 
 interface UserProfile {
-  name?: string;
   first_name?: string;
   last_name?: string;
+  username?: string;
   email?: string;
   avatar_url?: string;
 }
@@ -41,7 +41,8 @@ export default function ProfileScreen() {
 
       const { data: customerData, error } = await supabase
         .from('customers')
-        .select('name, first_name, last_name, email, avatar_url')
+        // Use customers schema fields (avoid legacy/absent columns like `name`)
+        .select('first_name, last_name, username, email, avatar_url')
         .eq('id', user.id)
         .single();
 
@@ -66,16 +67,13 @@ export default function ProfileScreen() {
     }
   };
 
-  const getDisplayName = () => {
-    if (profile?.first_name && profile?.last_name) {
-      return `${profile.first_name} ${profile.last_name}`;
-    }
-    if (profile?.name) {
-      return profile.name;
-    }
-    if (profile?.first_name) {
-      return profile.first_name;
-    }
+  const getDisplayName = (): string | null => {
+    const first = profile?.first_name?.trim();
+    const last = profile?.last_name?.trim();
+    if (first && last) return `${first} ${last}`;
+    if (first) return first;
+    if (profile?.username?.trim()) return profile.username.trim();
+    if (profile?.email?.trim()) return profile.email.trim();
     return null;
   };
 
@@ -153,7 +151,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => router.push('/(tabs)/events')}
+            onPress={() => router.push('/events-booked')}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -180,9 +178,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.subMenuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to transactions
-            }}
+            onPress={() => router.push('/transactions')}
           >
             <View style={styles.subMenuItemLeft}>
               <View style={styles.subIconContainer}>
@@ -200,9 +196,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to reviews
-            }}
+            onPress={() => router.push("/my-reviews" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -238,9 +232,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to FAQ
-            }}
+            onPress={() => router.push("/faq" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -256,9 +248,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to contact
-            }}
+            onPress={() => router.push("/contact-us" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -276,9 +266,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to settings
-            }}
+            onPress={() => router.push("/account-settings" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -294,9 +282,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to feedback
-            }}
+            onPress={() => router.push("/feedback" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>
@@ -312,9 +298,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              // Navigate to about
-            }}
+            onPress={() => router.push("/about-us" as import("expo-router").Href)}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.iconContainer}>

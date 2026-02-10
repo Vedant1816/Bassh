@@ -21,7 +21,6 @@ export async function getUserRole(): Promise<"user" | "staff" | null> {
       // If user doesn't exist in users table yet (PGRST116), that's okay
       // This can happen right after signup before the API creates the user record
       if (error.code === "PGRST116") {
-        console.log("User record not found in users table yet - this is normal right after signup");
         return null;
       }
       console.error("Error fetching user role:", error);
@@ -54,7 +53,6 @@ export async function redirectToRoleHome(router: any, role?: "user" | "staff" | 
     router.replace("/(tabs)");
   } else {
     // Default to user home if role not found
-    console.warn("Role not found, defaulting to user home");
     router.replace("/(tabs)");
   }
 }

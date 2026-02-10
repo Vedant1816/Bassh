@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Animated,
-  Dimensions,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -14,27 +13,29 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { ThemedButton } from "@/components/ui/ThemedButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
+import { Colors, HeaderGradient, HeaderGradientLocations } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
 
-const { height: INITIAL_HEIGHT } = Dimensions.get("window");
+WebBrowser.maybeCompleteAuthSession();
+
 const CURTAIN_HEIGHT_RATIO = 1;
-
-/* Same gradient as onboarding/otp.tsx */
-const GRADIENT_COLORS = ["#8B0045", "#2D0A1F", "#000000"] as const;
-const GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
-const BUTTON_GRADIENT = ["#E91E8C", "#DB1A85"] as const;
 
 export default function AuthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions();
 
   const [isSignupOpen, setIsSignupOpen] = useState(true);
   const slideAnim = useState(new Animated.Value(1))[0];
@@ -43,6 +44,7 @@ export default function AuthScreen() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -79,6 +81,107 @@ export default function AuthScreen() {
       return;
     }
     await redirectToRoleHome(router);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      setLoginError("");
+      setSignupError("");
+
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: "bassh",
+        path: "auth/callback",
+      });
+
+      const { data, error } = await supabasePublic.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        setLoginError(error.message);
+        setGoogleLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+        if (result.type === "success") {
+          // Supabase returns tokens in URL hash fragment
+          const url = new URL(result.url);
+          const hashParams = new URLSearchParams(url.hash.substring(1));
+          const queryParams = new URLSearchParams(url.search);
+
+          // Try hash fragment first (Supabase default), then query params
+          const accessToken = hashParams.get("access_token") || queryParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabasePublic.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              setLoginError(sessionError.message);
+              setGoogleLoading(false);
+              return;
+            }
+
+            // Check if user exists, if not create profile
+            const {
+              data: { user },
+            } = await supabasePublic.auth.getUser();
+
+            if (user) {
+              try {
+                // Check if profile exists
+                const checkRes = await fetchWithFallback(
+                  "/api/users",
+                  await withAuthHeaders({ method: "GET" })
+                );
+
+                if (checkRes.status === 404) {
+                  // NEW USER SIGNUP -> Go to onboarding
+                  await fetchWithFallback(
+                    "/api/users",
+                    await withAuthHeaders({
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        email: user.email,
+                        role: "user",
+                      }),
+                    })
+                  );
+                  router.replace("/onboarding/about-you");
+                  return;
+                }
+              } catch (err) {
+                console.error("Google sign in profile check failed:", err);
+              }
+            }
+
+            await redirectToRoleHome(router);
+          } else {
+            setLoginError("Failed to retrieve authentication tokens");
+          }
+        } else if (result.type === "cancel") {
+          // User cancelled, don't show error
+        } else {
+          setLoginError("Google sign in failed");
+        }
+      }
+    } catch (error: any) {
+      setLoginError(error.message || "Failed to sign in with Google");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleSignup = async () => {
@@ -124,8 +227,8 @@ export default function AuthScreen() {
         const err = await res.json().catch(() => ({}));
         console.error("[Signup] Profile creation failed:", err);
       }
-    } catch (e) {
-      console.warn("[Signup] API unreachable, continuing anyway");
+    } catch {
+      // If profile creation fails, user can still continue onboarding
     }
 
     router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
@@ -135,6 +238,11 @@ export default function AuthScreen() {
   const loginTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 72],
+  });
+
+  const loginOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
   });
 
   const curtainTranslateY = slideAnim.interpolate({
@@ -150,16 +258,21 @@ export default function AuthScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardView}
         >
-          {/* LOGIN (BACKGROUND) – same theme as otp */}
+          {/* LOGIN (BACKGROUND) */}
           <Animated.View
+            pointerEvents={isSignupOpen ? "none" : "auto"}
             style={[
               styles.formContainer,
-              { transform: [{ translateY: loginTranslateY }] },
+              {
+                height: SCREEN_HEIGHT,
+                transform: [{ translateY: loginTranslateY }],
+                opacity: loginOpacity,
+              },
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.gradientBackground, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <ScrollView
@@ -171,7 +284,12 @@ export default function AuthScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.header}>
-                <View style={styles.backButton} />
+                <Pressable
+                  style={styles.backButton}
+                  onPress={() => router.replace("/(auth)")}
+                >
+                  <Text style={styles.backIcon}>‹</Text>
+                </Pressable>
                 <Text style={styles.headerTitle}>Welcome back</Text>
               </View>
               <View style={styles.titleSection}>
@@ -183,7 +301,7 @@ export default function AuthScreen() {
               <View style={styles.inputsWrap}>
                 <TextInput
                   placeholder="Email"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   style={styles.input}
                   value={loginEmail}
                   onChangeText={setLoginEmail}
@@ -193,7 +311,7 @@ export default function AuthScreen() {
                 />
                 <TextInput
                   placeholder="Password"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  placeholderTextColor={Colors.dark.textSecondary}
                   secureTextEntry
                   style={styles.input}
                   value={loginPassword}
@@ -205,6 +323,31 @@ export default function AuthScreen() {
                   {loginError}
                 </Text>
               ) : null}
+
+              {/* Google Sign In Button */}
+              <View style={styles.socialAuthContainer}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <Pressable
+                  style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color={Colors.dark.text} />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+            <View style={styles.bottomContainer}>
               <Pressable
                 onPress={() => toggleCurtain(true)}
                 style={styles.linkWrap}
@@ -215,26 +358,18 @@ export default function AuthScreen() {
                   <Text style={styles.link}>Create account</Text>
                 </Text>
               </Pressable>
-            </ScrollView>
-            <View style={styles.bottomContainer}>
-              <Pressable
+              <ThemedButton
                 onPress={handleLogin}
-                style={styles.buttonWrapper}
+                style={styles.sendButton}
+                textStyle={styles.buttonText}
               >
-                <LinearGradient
-                  colors={[...BUTTON_GRADIENT]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.sendButton}
-                >
-                  <Text style={styles.buttonText}>Sign in</Text>
-                </LinearGradient>
-              </Pressable>
+                Sign in
+              </ThemedButton>
               <View style={styles.homeIndicator} />
             </View>
           </Animated.View>
 
-          {/* SIGNUP CURTAIN – same gradient + UI as otp */}
+          {/* SIGNUP CURTAIN */}
           <Animated.View
             style={[
               styles.curtainPanel,
@@ -245,8 +380,8 @@ export default function AuthScreen() {
             ]}
           >
             <LinearGradient
-              colors={[...GRADIENT_COLORS]}
-              locations={[...GRADIENT_LOCATIONS]}
+              colors={[...HeaderGradient]}
+              locations={[...HeaderGradientLocations]}
               style={[styles.curtainGradient, { height: SCREEN_HEIGHT * 0.5 }]}
             />
             <View style={styles.curtainContentWrap}>
@@ -271,7 +406,7 @@ export default function AuthScreen() {
                 <View style={styles.inputsWrap}>
                   <TextInput
                     placeholder="Email"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     style={styles.input}
                     value={signupEmail}
                     onChangeText={setSignupEmail}
@@ -281,7 +416,7 @@ export default function AuthScreen() {
                   />
                   <TextInput
                     placeholder="Password (min 6 characters)"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     secureTextEntry
                     style={styles.input}
                     value={signupPassword}
@@ -289,7 +424,7 @@ export default function AuthScreen() {
                   />
                   <TextInput
                     placeholder="Confirm password"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    placeholderTextColor={Colors.dark.textSecondary}
                     secureTextEntry
                     style={styles.input}
                     value={signupConfirmPassword}
@@ -301,6 +436,31 @@ export default function AuthScreen() {
                     {signupError}
                   </Text>
                 ) : null}
+
+                {/* Google Sign In Button */}
+                <View style={styles.socialAuthContainer}>
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                  <Pressable
+                    style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                    onPress={handleGoogleSignIn}
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={Colors.dark.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={20} color={Colors.dark.text} />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </ScrollView>
+              <View style={styles.bottomContainer}>
                 <Pressable
                   onPress={() => toggleCurtain(false)}
                   style={styles.linkWrap}
@@ -311,27 +471,15 @@ export default function AuthScreen() {
                     <Text style={styles.link}>Sign in</Text>
                   </Text>
                 </Pressable>
-              </ScrollView>
-              <View style={styles.bottomContainer}>
-                <Pressable
+                <ThemedButton
                   onPress={handleSignup}
                   disabled={signupLoading}
-                  style={styles.buttonWrapper}
+                  loading={signupLoading}
+                  style={styles.sendButton}
+                  textStyle={styles.buttonText}
                 >
-                  <LinearGradient
-                    colors={[...BUTTON_GRADIENT]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.sendButton,
-                      signupLoading && styles.buttonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.buttonText}>
-                      {signupLoading ? "Creating…" : "Sign up"}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
+                  {signupLoading ? "Creating…" : "Sign up"}
+                </ThemedButton>
                 <View style={styles.homeIndicator} />
               </View>
             </View>
@@ -345,7 +493,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: Colors.dark.background,
   },
   keyboardView: {
     flex: 1,
@@ -353,7 +501,6 @@ const styles = StyleSheet.create({
   formContainer: {
     position: "absolute",
     width: "100%",
-    height: INITIAL_HEIGHT,
   },
   gradientBackground: {
     position: "absolute",
@@ -369,65 +516,84 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     marginBottom: 32,
-    gap: 12,
+    width: "100%",
   },
   backButton: {
+    position: "absolute",
+    left: 16,
     width: 32,
     height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontWeight: "300",
+    marginLeft: -4,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
+    textAlign: "center",
   },
   titleSection: {
-    marginBottom: 32,
+    marginBottom: 40,
+    alignItems: "center",
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     marginBottom: 12,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
-    lineHeight: 20,
-    color: "rgba(255, 255, 255, 0.6)",
+    lineHeight: 22,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
   },
   inputsWrap: {
-    gap: 14,
+    gap: 16,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     fontSize: 16,
-    color: "#FFFFFF",
+    color: Colors.dark.text,
     borderWidth: 1,
-    borderColor: "rgba(233, 30, 140, 0.3)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
   error: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   curtainError: {
-    color: "#F87171",
+    color: Colors.dark.error,
     fontSize: 13,
     marginTop: 14,
+    textAlign: "center",
   },
   linkWrap: {
-    marginTop: 24,
+    marginBottom: 16,
+    alignItems: "center",
   },
   linkLabel: {
     fontSize: 15,
-    color: "rgba(255, 255, 255, 0.6)",
+    color: Colors.dark.textSecondary,
   },
   link: {
-    color: "#E91E8C",
+    color: Colors.dark.primary,
     fontWeight: "600",
   },
   bottomContainer: {
@@ -438,17 +604,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
   },
-  buttonWrapper: {
-    marginBottom: 16,
-  },
   sendButton: {
     height: 56,
     borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   buttonText: {
     fontSize: 17,
@@ -462,6 +620,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 12,
+    opacity: 0.3,
   },
 
   /* Curtain */
@@ -472,6 +631,8 @@ const styles = StyleSheet.create({
     right: 0,
     overflow: "hidden",
     zIndex: 10,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -496,5 +657,43 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingBottom: 120,
+  },
+  socialAuthContainer: {
+    marginTop: 24,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    gap: 12,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.text,
   },
 });

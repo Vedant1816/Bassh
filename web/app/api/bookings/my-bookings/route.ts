@@ -15,6 +15,7 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
       .select(`
         id,
         event_id,
+        club_id,
         booking_date,
         booking_time,
         booking_status,
@@ -29,10 +30,16 @@ export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
           event_date,
           start_time,
           banner_image_url,
+          club_id,
           clubs!events_club_id_fkey (
             club_name,
             address_text
           )
+        ),
+        clubs!bookings_club_id_fkey (
+          id,
+          club_name,
+          address_text
         )
       `)
       .eq("user_id", userId)

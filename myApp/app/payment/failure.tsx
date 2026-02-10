@@ -11,15 +11,6 @@ export default function PaymentFailure() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("❌ [FRONTEND] Payment failure page loaded");
-    console.log("❌ [FRONTEND] Params:", {
-      booking_id: booking_id || "not provided",
-      amount: amount || "not provided",
-      error_message: error_message || "not provided",
-      event_id: event_id || "not provided",
-      club_id: club_id || "not provided",
-    });
-
     setLoading(false);
   }, [booking_id, amount, error_message, event_id, club_id]);
 
