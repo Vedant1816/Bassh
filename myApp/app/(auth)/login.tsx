@@ -1,145 +1,343 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  StatusBar,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import supabasePublic from "@/_services/supabase-public";
+import { withAuthHeaders } from "@/_services/auth-fetch";
+import { fetchWithFallback } from "@/_services/api-config";
 import { redirectToRoleHome } from "@/_services/user-role";
 
-export default function LoginScreen() {
+const { height: INITIAL_HEIGHT } = Dimensions.get("window");
+const CURTAIN_HEIGHT_RATIO = 1;
+
+/* Same gradient as onboarding/otp.tsx */
+const GRADIENT_COLORS = ["#8B0045", "#2D0A1F", "#000000"] as const;
+const GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
+const BUTTON_GRADIENT = ["#E91E8C", "#DB1A85"] as const;
+
+export default function AuthScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
 
-  const validateForm = (): string | null => {
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+  const [isSignupOpen, setIsSignupOpen] = useState(true);
+  const slideAnim = useState(new Animated.Value(1))[0];
+  const curtainHeight = SCREEN_HEIGHT * CURTAIN_HEIGHT_RATIO;
 
-    if (!trimmedEmail) {
-      return "Email is required";
-    }
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
 
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      return "Please enter a valid email address";
-    }
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupError, setSignupError] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
 
-    if (!trimmedPassword) {
-      return "Password is required";
-    }
-
-    return null;
+  const toggleCurtain = (openSignup: boolean) => {
+    Keyboard.dismiss();
+    Animated.spring(slideAnim, {
+      toValue: openSignup ? 1 : 0,
+      useNativeDriver: true,
+      tension: 55,
+      friction: 12,
+      velocity: openSignup ? 0 : 2,
+    }).start();
+    setIsSignupOpen(openSignup);
+    setLoginError("");
+    setSignupError("");
   };
 
   const handleLogin = async () => {
-    // Validate form before submission
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
+    if (!loginEmail || !loginPassword) {
+      setLoginError("Email and password required");
+      return;
+    }
+    setLoginError("");
+    const { error } = await supabasePublic.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError(error.message);
+      return;
+    }
+    await redirectToRoleHome(router);
+  };
+
+  const handleSignup = async () => {
+    if (!signupEmail?.trim() || !signupPassword || !signupConfirmPassword) {
+      setSignupError("Please fill in email, password, and confirm password");
+      return;
+    }
+    if (signupPassword.length < 6) {
+      setSignupError("Password must be at least 6 characters");
+      return;
+    }
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Password and confirm password do not match");
+      return;
+    }
+    setSignupError("");
+    setSignupLoading(true);
+
+    const { error } = await supabasePublic.auth.signUp({
+      email: signupEmail.trim(),
+      password: signupPassword.trim(),
+    });
+
+    if (error) {
+      setSignupError(error.message);
+      setSignupLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError("");
-
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
     try {
-      const { data, error } = await supabasePublic.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: trimmedPassword,
-      });
-
-      if (error) {
-        console.error("Login error:", error);
-        setError(error.message || "Login failed. Please try again.");
-        setLoading(false);
-        return;
+      const res = await fetchWithFallback(
+        "/api/users",
+        await withAuthHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: signupEmail.trim(),
+            role: "user",
+          }),
+        })
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("[Signup] Profile creation failed:", err);
       }
-
-      // Verify session was created
-      const { data: sessionData, error: sessionError } = await supabasePublic.auth.getSession();
-      
-      if (sessionError || !sessionData.session) {
-        console.error("Session error:", sessionError);
-        setError("Failed to create session. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Log the access token
-      const token = sessionData.session.access_token;
-      console.log("🔑 Access Token:", token);
-      console.log("Login successful, redirecting based on role...");
-      await redirectToRoleHome(router);
-    } catch (err: any) {
-      console.error("Unexpected login error:", err);
-      setError(err.message || "An unexpected error occurred. Please try again.");
-      setLoading(false);
+    } catch (e) {
+      console.warn("[Signup] API unreachable, continuing anyway");
     }
+
+    router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
+    setSignupLoading(false);
   };
+
+  const loginTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 72],
+  });
+
+  const curtainTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-curtainHeight, 0],
+  });
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
-
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Email address"
-            placeholderTextColor="#6B7280"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-
-          <Pressable
-            onPress={handleLogin}
-            disabled={loading || !email.trim() || !password.trim()}
-            style={[styles.button, (loading || !email.trim() || !password.trim()) && styles.buttonDisabled]}
+      <StatusBar barStyle="light-content" />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardView}
+        >
+          {/* LOGIN (BACKGROUND) – same theme as otp */}
+          <Animated.View
+            style={[
+              styles.formContainer,
+              { transform: [{ translateY: loginTranslateY }] },
+            ]}
           >
-            <Text style={styles.buttonText}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Text>
-          </Pressable>
-
-          {error && (
-            <Text style={styles.error} numberOfLines={3}>
-              {error}
-            </Text>
-          )}
-          {__DEV__ && error && (
-            <Text style={[styles.error, { fontSize: 10, marginTop: 4 }]}>
-              Check console for details
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Don't have an account?{" "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.push("/signup")}
+            <LinearGradient
+              colors={[...GRADIENT_COLORS]}
+              locations={[...GRADIENT_LOCATIONS]}
+              style={[styles.gradientBackground, { height: SCREEN_HEIGHT * 0.5 }]}
+            />
+            <ScrollView
+              contentContainerStyle={[
+                styles.scrollContent,
+                { paddingTop: insets.top + 60 || 60 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              Sign up
-            </Text>
-          </Text>
-        </View>
-      </View>
+              <View style={styles.header}>
+                <View style={styles.backButton} />
+                <Text style={styles.headerTitle}>Welcome back</Text>
+              </View>
+              <View style={styles.titleSection}>
+                <Text style={styles.title}>Sign in to BASSH</Text>
+                <Text style={styles.subtitle}>
+                  Enter your email and password to continue
+                </Text>
+              </View>
+              <View style={styles.inputsWrap}>
+                <TextInput
+                  placeholder="Email"
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  style={styles.input}
+                  value={loginEmail}
+                  onChangeText={setLoginEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
+                <TextInput
+                  placeholder="Password"
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  secureTextEntry
+                  style={styles.input}
+                  value={loginPassword}
+                  onChangeText={setLoginPassword}
+                />
+              </View>
+              {loginError ? (
+                <Text style={styles.error} numberOfLines={2}>
+                  {loginError}
+                </Text>
+              ) : null}
+              <Pressable
+                onPress={() => toggleCurtain(true)}
+                style={styles.linkWrap}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={styles.linkLabel}>
+                  Don't have an account?{" "}
+                  <Text style={styles.link}>Create account</Text>
+                </Text>
+              </Pressable>
+            </ScrollView>
+            <View style={styles.bottomContainer}>
+              <Pressable
+                onPress={handleLogin}
+                style={styles.buttonWrapper}
+              >
+                <LinearGradient
+                  colors={[...BUTTON_GRADIENT]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.sendButton}
+                >
+                  <Text style={styles.buttonText}>Sign in</Text>
+                </LinearGradient>
+              </Pressable>
+              <View style={styles.homeIndicator} />
+            </View>
+          </Animated.View>
+
+          {/* SIGNUP CURTAIN – same gradient + UI as otp */}
+          <Animated.View
+            style={[
+              styles.curtainPanel,
+              {
+                height: curtainHeight,
+                transform: [{ translateY: curtainTranslateY }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[...GRADIENT_COLORS]}
+              locations={[...GRADIENT_LOCATIONS]}
+              style={[styles.curtainGradient, { height: SCREEN_HEIGHT * 0.5 }]}
+            />
+            <View style={styles.curtainContentWrap}>
+              <ScrollView
+                contentContainerStyle={[
+                  styles.curtainScroll,
+                  { paddingTop: insets.top + 60 || 60 },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.header}>
+                  <View style={styles.backButton} />
+                  <Text style={styles.headerTitle}>BASSH</Text>
+                </View>
+                <View style={styles.titleSection}>
+                  <Text style={styles.title}>Create your account</Text>
+                  <Text style={styles.subtitle}>
+                    Enter your details to get started
+                  </Text>
+                </View>
+                <View style={styles.inputsWrap}>
+                  <TextInput
+                    placeholder="Email"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    style={styles.input}
+                    value={signupEmail}
+                    onChangeText={setSignupEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoCorrect={false}
+                  />
+                  <TextInput
+                    placeholder="Password (min 6 characters)"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    secureTextEntry
+                    style={styles.input}
+                    value={signupPassword}
+                    onChangeText={setSignupPassword}
+                  />
+                  <TextInput
+                    placeholder="Confirm password"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    secureTextEntry
+                    style={styles.input}
+                    value={signupConfirmPassword}
+                    onChangeText={setSignupConfirmPassword}
+                  />
+                </View>
+                {signupError ? (
+                  <Text style={styles.curtainError} numberOfLines={2}>
+                    {signupError}
+                  </Text>
+                ) : null}
+                <Pressable
+                  onPress={() => toggleCurtain(false)}
+                  style={styles.linkWrap}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={styles.linkLabel}>
+                    Already have an account?{" "}
+                    <Text style={styles.link}>Sign in</Text>
+                  </Text>
+                </Pressable>
+              </ScrollView>
+              <View style={styles.bottomContainer}>
+                <Pressable
+                  onPress={handleSignup}
+                  disabled={signupLoading}
+                  style={styles.buttonWrapper}
+                >
+                  <LinearGradient
+                    colors={[...BUTTON_GRADIENT]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[
+                      styles.sendButton,
+                      signupLoading && styles.buttonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.buttonText}>
+                      {signupLoading ? "Creating…" : "Sign up"}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+                <View style={styles.homeIndicator} />
+              </View>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </View>
   );
 }
@@ -148,88 +346,155 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000000",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
   },
-  card: {
+  keyboardView: {
+    flex: 1,
+  },
+  formContainer: {
+    position: "absolute",
     width: "100%",
-    maxWidth: 400,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    backgroundColor: "#000000",
-    padding: 32,
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 40,
-    elevation: 10,
+    height: INITIAL_HEIGHT,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    color: "#EC4899",
-    marginBottom: 8,
+  gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
   },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    color: "#9CA3AF",
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 120,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 32,
+    gap: 12,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  titleSection: {
     marginBottom: 32,
   },
-  form: {
-    gap: 16,
+  title: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: "rgba(255, 255, 255, 0.6)",
+  },
+  inputsWrap: {
+    gap: 14,
   },
   input: {
-    width: "100%",
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: "#FFFFFF",
+    paddingVertical: 14,
     fontSize: 16,
-  },
-  button: {
-    width: "100%",
-    borderRadius: 8,
-    backgroundColor: "#DB2777",
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+    borderWidth: 1,
+    borderColor: "rgba(233, 30, 140, 0.3)",
   },
   error: {
-    textAlign: "center",
-    fontSize: 14,
     color: "#F87171",
-    marginTop: 8,
+    fontSize: 13,
+    marginTop: 14,
   },
-  footer: {
+  curtainError: {
+    color: "#F87171",
+    fontSize: 13,
+    marginTop: 14,
+  },
+  linkWrap: {
     marginTop: 24,
   },
-  footerText: {
-    textAlign: "center",
-    fontSize: 14,
-    color: "#6B7280",
+  linkLabel: {
+    fontSize: 15,
+    color: "rgba(255, 255, 255, 0.6)",
   },
-  footerLink: {
-    color: "#EC4899",
-    textDecorationLine: "underline",
+  link: {
+    color: "#E91E8C",
+    fontWeight: "600",
+  },
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 34,
+  },
+  buttonWrapper: {
+    marginBottom: 16,
+  },
+  sendButton: {
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  homeIndicator: {
+    height: 5,
+    width: 134,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginTop: 12,
+  },
+
+  /* Curtain */
+  curtainPanel: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+    zIndex: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  curtainGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  curtainContentWrap: {
+    flex: 1,
+    width: "100%",
+  },
+  curtainScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 120,
   },
 });

@@ -7,20 +7,44 @@ type HandlerSimple = (req: Request) => Promise<Response>;
 export function withAuth(
   handler: HandlerWithParams | HandlerWithUser | HandlerSimple
 ) {
-  return async (req: Request, ctx?: { params?: Promise<any> }) => {
+  return async (req: Request, ctx?: { params?: Promise<any> | any }) => {
     const authHeader = req.headers.get("authorization");
 
     if (!authHeader) {
+      console.warn("⚠️ No Authorization header in request");
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const token = authHeader.replace("Bearer ", "");
 
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !data?.user) {
+    if (!token) {
+      console.warn("⚠️ Empty token in Authorization header");
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Log full access token for debugging
+    console.log("🔐 [AUTH] Access Token:", token);
+    console.log("🔐 [AUTH] Token length:", token.length);
+    console.log("🔐 [AUTH] Token preview (first 50 chars):", token.substring(0, 50) + "...");
+
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error) {
+      console.error("❌ Token validation error:", error.message);
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!data?.user) {
+      console.warn("⚠️ No user found from token");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Log authenticated user details
+    console.log("✅ [AUTH] User authenticated:", {
+      id: data.user.id,
+      email: data.user.email,
+      role: (data.user.user_metadata as any)?.role || "unknown"
+    });
 
     const paramCount = handler.length;
 
@@ -32,7 +56,11 @@ export function withAuth(
       return (handler as HandlerWithUser)(req, data.user);
     } else {
       // Handler: (req, params, user) => Promise<Response>
-      const params = ctx?.params ? await ctx.params : {};
+      let params = {};
+      if (ctx?.params) {
+        // Handle both Promise and direct object
+        params = ctx.params instanceof Promise ? await ctx.params : ctx.params;
+      }
       return (handler as HandlerWithParams)(req, params, data.user);
     }
   };

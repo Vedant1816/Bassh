@@ -1,290 +1,196 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { Platform } from "react-native";
 import supabasePublic from "@/_services/supabase-public";
 import { withAuthHeaders } from "@/_services/auth-fetch";
-import { API_BASE_URL, isApiUrlConfiguredForDevice } from "@/_services/api-config";
-import { redirectToRoleHome } from "@/_services/user-role";
+import { fetchWithFallback } from "@/_services/api-config";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 
 export default function StaffSignupScreen() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const validateForm = (): string | null => {
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail) {
-      return "Email is required";
-    }
-
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      return "Please enter a valid email address";
-    }
-
-    if (!trimmedPassword) {
-      return "Password is required";
-    }
-
-    if (trimmedPassword.length < 6) {
-      return "Password must be at least 6 characters";
-    }
-
-    return null;
-  };
-
   const handleSignup = async () => {
-    // Validate form before submission
-    const validationError = validateForm();
-    if (validationError) {
-      setMessage(validationError);
+    console.log("👤 [STAFF-SIGNUP] Signup initiated");
+    console.log("👤 [STAFF-SIGNUP] Email:", email.trim());
+    console.log("👤 [STAFF-SIGNUP] Password length:", password.length);
+
+    if (!email.trim() || !password.trim()) {
+      console.warn("⚠️ [STAFF-SIGNUP] Validation failed: Email or password missing");
+      setMessage("Email and password are required");
       return;
     }
 
     setLoading(true);
     setMessage("");
 
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+    /* ---------------- SUPABASE SIGNUP ---------------- */
+    console.log("🔐 [STAFF-SIGNUP] Creating Supabase auth account...");
 
-    const { data, error } = await supabasePublic.auth.signUp({
-      email: trimmedEmail,
-      password: trimmedPassword,
+    const { data: signupData, error } = await supabasePublic.auth.signUp({
+      email: email.trim(),
+      password: password.trim(),
     });
 
     if (error) {
+      console.error("❌ [STAFF-SIGNUP] Supabase signup error:", {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
       setMessage(error.message);
       setLoading(false);
       return;
     }
 
-    // Get session and log the access token
-    const { data: sessionData } = await supabasePublic.auth.getSession();
-    if (sessionData?.session?.access_token) {
-      console.log("🔑 Staff Signup Access Token:", sessionData.session.access_token);
-    }
+    console.log("✅ [STAFF-SIGNUP] Supabase account created:", {
+      userId: signupData?.user?.id,
+      email: signupData?.user?.email,
+      session: !!signupData?.session
+    });
 
-    // Using helper to attach Authorization automatically
-    // Only call API if URL is configured (required for physical devices)
-    if (!API_BASE_URL || (!isApiUrlConfiguredForDevice() && Platform.OS !== "web")) {
-      console.warn("API URL not configured. Skipping profile creation.");
-      setMessage(
-        "Account created! Note: Profile setup requires API server. " +
-        "Set EXPO_PUBLIC_API_URL in .env for full functionality."
-      );
-      setLoading(false);
-      return;
-    }
+    /* ---------------- CREATE PROFILE (BACKEND) ---------------- */
+    console.log("📝 [STAFF-SIGNUP] Creating staff profile in backend...");
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/users`,
-        await withAuthHeaders({
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: trimmedEmail.split("@")[0],
-            role: "staff",
-          }),
-        })
+      const authHeaders = await withAuthHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          role: "staff",
+        }),
+      });
+
+      console.log("📤 [STAFF-SIGNUP] Sending request to /api/users");
+      console.log("📤 [STAFF-SIGNUP] Request body:", {
+        email: email.trim(),
+        role: "staff"
+      });
+      console.log("📤 [STAFF-SIGNUP] Auth headers present:", !!authHeaders.headers?.Authorization);
+
+      const res = await fetchWithFallback(
+        `/api/users`,
+        authHeaders
       );
+
+      console.log("📥 [STAFF-SIGNUP] Response status:", res.status);
+      console.log("📥 [STAFF-SIGNUP] Response ok:", res.ok);
 
       if (!res.ok) {
         const err = await res.json();
-        setMessage(`Account created but profile setup failed: ${err.error || "Unknown error"}. Redirecting...`);
-        // Still redirect even if profile setup failed - account exists
-        setTimeout(async () => {
-          await redirectToRoleHome(router, "staff");
-        }, 1500);
+        console.error("❌ [STAFF-SIGNUP] Profile creation failed:", {
+          status: res.status,
+          error: err
+        });
+        setMessage("Account created, but profile setup failed.");
       } else {
-        setMessage("Staff account created successfully! Redirecting...");
-        // Wait a moment then redirect with known role
-        setTimeout(async () => {
-          await redirectToRoleHome(router, "staff");
-        }, 1000);
+        const responseData = await res.json();
+        console.log("✅ [STAFF-SIGNUP] Profile created successfully:", responseData);
       }
-    } catch (fetchError: any) {
-      // Handle network errors gracefully - account is still created in Supabase
-      console.error("API Error:", fetchError);
-      const errorMsg = fetchError.message?.includes("Network request failed")
-        ? "Account created! API server unreachable. Redirecting anyway..."
-        : "Account created! Profile setup failed. Redirecting anyway...";
-      setMessage(errorMsg);
-      // Still redirect even if API failed - Supabase account exists
-      setTimeout(async () => {
-        await redirectToRoleHome(router, "staff");
-      }, 1500);
+    } catch (err: any) {
+      console.error("❌ [STAFF-SIGNUP] API request error:", {
+        message: err.message,
+        stack: err.stack
+      });
+      console.warn("⚠️ [STAFF-SIGNUP] API unreachable, continuing anyway");
     }
 
+    /* ---------------- REDIRECT ---------------- */
+    console.log("🔄 [STAFF-SIGNUP] Redirecting to /staff");
+    router.replace("/staff");
     setLoading(false);
   };
 
   return (
-    <View style={styles.container}>
+    <DismissKeyboardView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Staff Registration</Text>
-        <Text style={styles.subtitle}>Create your staff account</Text>
+        <Text style={styles.title}>Staff Signup</Text>
 
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Staff Email"
-            placeholderTextColor="#6B7280"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+        <TextInput
+          placeholder="Email"
+          placeholderTextColor="#777"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          autoCapitalize="none"
+        />
 
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            style={styles.input}
-            autoCapitalize="none"
-          />
+        <TextInput
+          placeholder="Password"
+          placeholderTextColor="#777"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={styles.input}
+        />
 
-          <Pressable
-            onPress={handleSignup}
-            disabled={loading || !email.trim() || !password.trim()}
-            style={[styles.button, (loading || !email.trim() || !password.trim()) && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Creating..." : "Create Staff Account"}
-            </Text>
-          </Pressable>
-
-          {message && (
-            <Text style={[styles.message, message.includes("successfully") ? styles.messageSuccess : styles.messageError]}>
-              {message}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Already have an account?{" "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.push("/staff-login")}
-            >
-              Staff Login
-            </Text>
+        <Pressable
+          onPress={handleSignup}
+          disabled={loading}
+          style={[styles.button, loading && styles.disabled]}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Creating..." : "Create Account"}
           </Text>
-          <Text style={styles.footerText}>
-            <Text
-              style={styles.footerLink}
-              onPress={() => router.back()}
-            >
-              ← Back
-            </Text>
-          </Text>
-        </View>
+        </Pressable>
+
+        {message ? <Text style={styles.error}>{message}</Text> : null}
       </View>
-    </View>
+    </DismissKeyboardView>
   );
 }
+
+/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
-    alignItems: "center",
+    backgroundColor: "#000",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    padding: 20,
   },
   card: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    backgroundColor: "#000000",
-    padding: 32,
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 40,
-    elevation: 10,
+    backgroundColor: "#111",
+    padding: 24,
+    borderRadius: 12,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
     color: "#EC4899",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 16,
     textAlign: "center",
-    color: "#9CA3AF",
-    marginBottom: 32,
-  },
-  form: {
-    gap: 16,
   },
   input: {
-    width: "100%",
+    backgroundColor: "#1F1F1F",
+    color: "#fff",
+    padding: 14,
     borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(236, 72, 153, 0.3)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: "#FFFFFF",
-    fontSize: 16,
+    marginBottom: 12,
   },
   button: {
-    width: "100%",
+    backgroundColor: "#EC4899",
+    padding: 14,
     borderRadius: 8,
-    backgroundColor: "#DB2777",
-    paddingVertical: 12,
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#EC4899",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 5,
+    marginTop: 8,
   },
-  buttonDisabled: {
+  disabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+    color: "#fff",
     fontWeight: "600",
+    fontSize: 16,
   },
-  message: {
-    textAlign: "center",
-    fontSize: 14,
-    marginTop: 8,
-  },
-  messageSuccess: {
-    color: "#EC4899",
-  },
-  messageError: {
+  error: {
     color: "#F87171",
-  },
-  footer: {
-    marginTop: 24,
-    gap: 8,
-  },
-  footerText: {
+    marginTop: 10,
     textAlign: "center",
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  footerLink: {
-    color: "#EC4899",
-    textDecorationLine: "underline",
   },
 });

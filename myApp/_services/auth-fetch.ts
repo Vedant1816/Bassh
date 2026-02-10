@@ -1,4 +1,5 @@
 import supabasePublic from "./supabase-public";
+import { fetchWithFallback } from "./api-config";
 
 export async function withAuthHeaders(
   init: RequestInit = {}
@@ -24,6 +25,8 @@ export async function withAuthHeaders(
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;
       console.log("✅ Auth token attached to request");
+      console.log("🔐 [FRONTEND] Access Token:", session.access_token);
+      console.log("🔐 [FRONTEND] Token length:", session.access_token.length);
     } else {
       console.warn("⚠️ No session or access token available");
     }
@@ -37,4 +40,15 @@ export async function withAuthHeaders(
     // Return original init even if auth fails
     return init;
   }
+}
+
+/**
+ * Fetch with authentication and automatic fallback to ngrok URL
+ */
+export async function authFetch(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const authInit = await withAuthHeaders(init);
+  return fetchWithFallback(path, authInit);
 }
