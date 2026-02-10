@@ -25,6 +25,7 @@ const tabs = [
     href: "/dashboard/settings/legals",
     icon: "file",
   },
+  
 ];
 
 const TabIcon = ({ icon, isActive }: { icon: string; isActive: boolean }) => {

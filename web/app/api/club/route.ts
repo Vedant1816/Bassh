@@ -15,7 +15,8 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
       phone_number,
       tier,
       terms_and_conditions,
-      privacy_policy
+      privacy_policy,
+      pan_no
     } = body;
 
     const club_id = user.id;
@@ -32,6 +33,7 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
     if (tier) updateData.tier = tier;
     if (terms_and_conditions) updateData.terms_and_conditions = terms_and_conditions;
     if (privacy_policy) updateData.privacy_policy = privacy_policy;
+    if (pan_no) updateData.pan_no = pan_no;
 
     const { data: club, error: clubError } = await supabaseAdmin
       .from("clubs")
@@ -77,6 +79,7 @@ export const GET = withAuth(async (req: Request, user: { id: string }) => {
         latitude,
         longitude,
         tier,
+        pan_no,
         terms_and_conditions,
         privacy_policy
       `)

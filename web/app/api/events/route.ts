@@ -54,26 +54,28 @@ export const POST = withAuth(async (req:Request, user:any) => {
       );
     }
 
-    /* Insert ticket pricing*/
-    if (Array.isArray(pricing) && pricing.length > 0) {
-      const pricingRows = pricing.map((tier: any) => ({
-        event_id: event.id,
-        label: tier.label,
-        price: tier.price,
-      }));
+    
+   /* Insert ticket pricing */
+if (Array.isArray(pricing) && pricing.length > 0) {
+  const pricingRows = pricing.map((tier: any) => ({
+    event_id: event.id,
+    label: tier.label,
+    stag_price: tier.stag_price ?? null,
+    couple_price: tier.couple_price ?? null,
+  }));
 
-      const { error: pricingError } =
-        await supabaseAdmin
-          .from("event_ticket_pricing")
-          .insert(pricingRows);
+  const { error: pricingError } = await supabaseAdmin
+    .from("event_ticket_pricing")
+    .insert(pricingRows);
 
-      if (pricingError) {
-        return Response.json(
-          { error: pricingError.message },
-          { status: 400 }
-        );
-      }
-    }
+  if (pricingError) {
+    return Response.json(
+      { error: pricingError.message },
+      { status: 400 }
+    );
+  }
+}
+
 
     return Response.json(
       { event },

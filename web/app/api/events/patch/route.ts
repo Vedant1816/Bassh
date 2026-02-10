@@ -86,9 +86,11 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
             pricing.map((p: any) => ({
               event_id: eventId,
               label: p.label,
-              price: p.price,
+              stag_price: p.stag_price ?? null,
+              couple_price: p.couple_price ?? null,
             }))
           );
+
 
         if (insertError) {
           return Response.json(
@@ -128,7 +130,8 @@ export const GET = withAuth(async (req: Request, user: { id: string }) => {
         event_ticket_pricing (
           id,
           label,
-          price
+          stag_price,
+          couple_price
         )
       `)
       .eq("id", eventId)         
