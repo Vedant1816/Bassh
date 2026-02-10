@@ -29,8 +29,8 @@ export default function Sidebar() {
         <NavItem label="Menu Management" href="/dashboard/menu"/>
         <NavItem label="Discounts & Offers" href="/dashboard/discount"/>
         <NavItem label="Event Management" href="/dashboard/events" />
-        <NavItem label="Guest List" />
-        <NavItem label="Billing & Receipts" />
+        <NavItem label="Guest List" href="/dashboard/guest"/>
+        <NavItem label="Billing & Receipts" href="/dashboard/billing"/>
         <NavItem label="Settings" href="/dashboard/settings"/>
       </nav>
 

@@ -328,7 +328,6 @@ export default function OperationalDetailsPage() {
                 rows={5}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="The hottest nightclub in the city with amazing DJs and events every weekend."
                 className="w-full bg-[#1a1a1a] border-0 rounded-md px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-600 resize-none"
               />
             </div>

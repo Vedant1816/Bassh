@@ -15,8 +15,10 @@ import {
 
 type PricingTier = {
   label: string;
-  price: string;
+  stag_price: string;
+  couple_price: string;
 };
+
 
 type EventForm = {
   name: string;
@@ -53,6 +55,7 @@ const uploadImage = async (file: File, path: string): Promise<string> => {
 /* ---------------- PAGE ---------------- */
 
 export default function ManageEventPage() {
+  
    const DEFAULT_BANNER_IMAGE =
   "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
 
@@ -73,8 +76,9 @@ const DEFAULT_DJ_IMAGE =
   });
 
   const [pricing, setPricing] = useState<PricingTier[]>([
-    { label: "", price: "" },
-  ]);
+  { label: "", stag_price: "", couple_price: "" },
+]);
+
 
   const [djImage, setDjImage] = useState<File | null>(null);
   const [bannerImage, setBannerImage] = useState<File | null>(null);
@@ -82,7 +86,11 @@ const DEFAULT_DJ_IMAGE =
   /* ---------------- PRICING ---------------- */
 
   const addPricingTier = () => {
-    setPricing((p) => [...p, { label: "", price: "" }]);
+   setPricing((p) => [
+  ...p,
+  { label: "", stag_price: "", couple_price: "" },
+]);
+
   };
 
   const updatePricing = (
@@ -151,11 +159,21 @@ const DEFAULT_DJ_IMAGE =
       }
 
       const cleanedPricing = pricing
-        .filter((p) => p.label && p.price)
-        .map((p) => ({
-          label: p.label,
-          price: Number(p.price),
-        }));
+  .filter(
+    (p) =>
+      p.label &&
+      (p.stag_price || p.couple_price)
+  )
+  .map((p) => ({
+    label: p.label,
+    stag_price: p.stag_price
+      ? Number(p.stag_price)
+      : null,
+    couple_price: p.couple_price
+      ? Number(p.couple_price)
+      : null,
+  }));
+
 
       const res = await fetch("/api/events", await withAuthHeaders({
         method: "POST",
@@ -213,7 +231,7 @@ const DEFAULT_DJ_IMAGE =
               dj_name: "",
               dj_instagram: "",
               max_attendees: "",});
-        setPricing([{ label: "", price: "" }]);
+        setPricing([{ label: "", stag_price: "", couple_price: ""}]);
         setDjImage(null);
         setBannerImage(null);
       }
@@ -409,23 +427,34 @@ const openDeleteConfirmation = (eventId: string) => {
               />
 
               <div className="flex gap-3">
-                <Input
-                  label="Price"
-                  placeholder="₹ 0.00"
-                  value={tier.price}
-                  onChange={(v) =>
-                    updatePricing(index, "price", v)
-                  }
-                />
-                {pricing.length > 1 && (
-                  <button
-                    onClick={() => removePricing(index)}
-                    className="text-sm text-red-400 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
+  <Input
+    label="Stag Price"
+    placeholder="₹ 0.00"
+    value={tier.stag_price}
+    onChange={(v) =>
+      updatePricing(index, "stag_price", v)
+    }
+  />
+
+  <Input
+    label="Couple Price"
+    placeholder="₹ 0.00"
+    value={tier.couple_price}
+    onChange={(v) =>
+      updatePricing(index, "couple_price", v)
+    }
+  />
+
+  {pricing.length > 1 && (
+    <button
+      onClick={() => removePricing(index)}
+      className="text-sm text-red-400 hover:text-red-500"
+    >
+      Remove
+    </button>
+  )}
+</div>
+
             </div>
           ))}
         </div>
@@ -634,6 +663,30 @@ function BannerUpload({
 function EventCard({ event, openDeleteConfirmation }: { event: any, openDeleteConfirmation: (eventId : string) => void; }) {
   const [open, setOpen] = useState(false);
 
+const [attendees, setAttendees] = useState<any[]>([]);
+const [attendeeCount, setAttendeeCount] = useState(0);
+const [loadingAttendees, setLoadingAttendees] = useState(false);
+
+const toggleDropdown = async () => {
+  setOpen((prev) => !prev);
+
+  if (!open && attendees.length === 0) {
+    setLoadingAttendees(true);
+
+    const res = await fetch(
+      `/api/events/attendees?eventId=${event.id}`,
+      await withAuthHeaders({ method: "GET" })
+    );
+
+    const data = await res.json();
+
+    setAttendees(data.attendees || []);
+    setAttendeeCount(data.count || 0);
+    setLoadingAttendees(false);
+  }
+};
+
+
   const banner = event.banner_image_url
   ? `${event.banner_image_url}?v=${event.updated_at}`
   : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30";
@@ -666,18 +719,25 @@ const isUpcoming = eventDateTime >= new Date();
 
           {/* PRICING */}
           {Array.isArray(event.event_ticket_pricing) &&
-            event.event_ticket_pricing.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {event.event_ticket_pricing.map((tier: any) => (
-                  <span
-                    key={tier.id}
-                    className="px-3 py-1 rounded-full bg-[#1a1a1a] border border-white/10 text-xs text-gray-300"
-                  >
-                    {tier.label}: ₹{tier.price}
-                  </span>
-                ))}
-              </div>
-            )}
+  event.event_ticket_pricing.length > 0 && (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {event.event_ticket_pricing.map((tier: any) => (
+        <span
+          key={tier.id}
+          className="px-3 py-1 rounded-full bg-[#1a1a1a] border border-white/10 text-xs text-gray-300"
+        >
+          {tier.label}
+          {tier.stag_price != null && (
+            <> • Stag ₹{tier.stag_price}</>
+          )}
+          {tier.couple_price != null && (
+            <> • Couple ₹{tier.couple_price}</>
+          )}
+        </span>
+      ))}
+    </div>
+  )}
+
         </div>
 
         <div className="flex items-center gap-3">
@@ -709,34 +769,79 @@ const isUpcoming = eventDateTime >= new Date();
           </button>
 
           <button
-            onClick={() => setOpen(!open)}
-            className={`text-gray-400 hover:text-white transition ${
-              open ? "rotate-180" : ""
-            }`}
-          >
-            <ChevronDown size={18} />
-          </button>
+  onClick={toggleDropdown}
+  className={`text-gray-400 hover:text-white transition ${
+    open ? "rotate-180" : ""
+  }`}
+>
+  <ChevronDown size={18} />
+</button>
+
         </div>
         </div>
       </div>
 
       {/* DROPDOWN */}
-      {open && (
-        <div className="border-t border-white/10 p-4 space-y-4">
-          <div className="flex gap-3">
-            <button className="flex-1 py-2 rounded-md bg-[#1a1a1a] text-sm text-gray-300">
-              Guest List
-            </button>
-            <button className="flex-1 py-2 rounded-md bg-pink-600 text-sm font-medium">
-              Attendees List
-            </button>
-          </div>
+ {open && (
+  <div className="border-t border-white/10 px-6 py-5 space-y-4">
+    <div className="flex items-center justify-between">
+      <p className="text-sm font-medium text-white">Attendees List</p>
+      <span className="px-3 py-1 text-xs bg-white/10 rounded-full text-gray-300">
+        Total {attendeeCount}
+      </span>
+    </div>
 
-          <div className="rounded-lg bg-[#1a1a1a] border border-white/10 p-6 text-center text-sm text-gray-400">
-            No data yet 
-          </div>
-        </div>
+    <div
+      className="
+        max-h-64
+        overflow-y-auto
+        space-y-3
+        pr-2
+        scrollbar-thin
+        scrollbar-thumb-white/10
+        scrollbar-track-transparent
+      "
+    >
+      {loadingAttendees && (
+        <p className="text-sm text-gray-400 text-center py-6">
+          Loading attendees…
+        </p>
       )}
+
+      {!loadingAttendees && attendees.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-6">
+          No confirmed attendees yet
+        </p>
+      )}
+
+      {!loadingAttendees &&
+        attendees.map((user) => (
+          <div
+            key={user.id}
+            className="
+              flex items-center gap-3
+              px-5 py-3
+              rounded-lg
+              bg-[#4a2849]
+              border border-purple-500/20
+              hover:border-purple-500/40
+              transition-colors
+            "
+          >
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+              <span className="text-white font-medium text-sm">
+                {user.name?.charAt(0).toUpperCase() || "?"}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">{user.name}</p>
+            </div>
+          </div>
+        ))}
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

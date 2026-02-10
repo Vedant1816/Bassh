@@ -22,10 +22,10 @@ export function withAuth(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Log full access token for debugging
-    console.log("🔐 [AUTH] Access Token:", token);
-    console.log("🔐 [AUTH] Token length:", token.length);
-    console.log("🔐 [AUTH] Token preview (first 50 chars):", token.substring(0, 50) + "...");
+    // // Log full access token for debugging
+    // console.log("🔐 [AUTH] Access Token:", token);
+    // console.log("🔐 [AUTH] Token length:", token.length);
+    // console.log("🔐 [AUTH] Token preview (first 50 chars):", token.substring(0, 50) + "...");
 
     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
@@ -39,12 +39,12 @@ export function withAuth(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Log authenticated user details
-    console.log("✅ [AUTH] User authenticated:", {
-      id: data.user.id,
-      email: data.user.email,
-      role: (data.user.user_metadata as any)?.role || "unknown"
-    });
+    // // Log authenticated user details
+    // console.log("✅ [AUTH] User authenticated:", {
+    //   id: data.user.id,
+    //   email: data.user.email,
+    //   role: (data.user.user_metadata as any)?.role || "unknown"
+    // });
 
     const paramCount = handler.length;
 
