@@ -284,7 +284,6 @@ export default function EditClubPage() {
               <input
                 value={club.club_name}
                 onChange={(e) => setClub({ ...club, club_name: e.target.value })}
-                placeholder="Neon Club"
                 className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
               />
             </div>
@@ -320,7 +319,6 @@ export default function EditClubPage() {
                 onChange={(e) =>
                   setClub({ ...club, club_desc: e.target.value })
                 }
-                placeholder="The hottest nightclub in the city with amazing DJs and events every weekend."
                 rows={4}
                 className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 resize-none"
               />
@@ -360,7 +358,6 @@ export default function EditClubPage() {
                     onChange={(e) =>
                       setClub({ ...club, phone_number: e.target.value })
                     }
-                    placeholder="+1 (555) 123-4567"
                     className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
                   />
                 </div>
@@ -373,7 +370,6 @@ export default function EditClubPage() {
                     onChange={(e) =>
                       setClub({ ...club, contact_email: e.target.value })
                     }
-                    placeholder="info@bassh.com"
                     className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
                   />
                 </div>
@@ -407,7 +403,6 @@ export default function EditClubPage() {
                       onChange={(e) =>
                         setClub({ ...club, insta_link: e.target.value })
                       }
-                      placeholder="https://instagram.com/bassh"
                       className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg pl-11 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
                     />
                   </div>
@@ -433,7 +428,6 @@ export default function EditClubPage() {
                       onChange={(e) =>
                         setClub({ ...club, facebook_link: e.target.value })
                       }
-                      placeholder="https://facebook.com/bassh"
                       className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg pl-11 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
                     />
                   </div>
@@ -459,7 +453,6 @@ export default function EditClubPage() {
                       onChange={(e) =>
                         setClub({ ...club, twitter_link: e.target.value })
                       }
-                      placeholder="https://twitter.com/bassh"
                       className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg pl-11 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
                     />
                   </div>

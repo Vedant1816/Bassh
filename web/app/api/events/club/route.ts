@@ -1,5 +1,5 @@
-import { withAuth } from "@/app/services/protected";
 import supabaseAdmin from "@/app/services/supabase-admin";
+import { withAuth } from "@/app/services/protected";
 
 export const GET = withAuth(async (req: Request, user: any) => {
   try {
@@ -15,12 +15,13 @@ export const GET = withAuth(async (req: Request, user: any) => {
         event_ticket_pricing (
           id,
           label,
-          price
+          stag_price,
+          couple_price
         )
       `)
       .eq("club_id", clubId)
       .order("event_date", { ascending: false })
-      .order("start_time", {ascending: false});
+      .order("start_time", { ascending: false });
 
     if (search && search.trim() !== "") {
       query = query.ilike("name", `%${search.trim()}%`);
@@ -36,7 +37,29 @@ export const GET = withAuth(async (req: Request, user: any) => {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json(data, { status: 200 });
+    const now = new Date();
+
+    const sorted = [...data].sort((a, b) => {
+      const aDate = new Date(`${a.event_date}T${a.start_time}`);
+      const bDate = new Date(`${b.event_date}T${b.start_time}`);
+
+      const aIsFuture = aDate >= now;
+      const bIsFuture = bDate >= now;
+
+      // Future events first
+      if (aIsFuture && !bIsFuture) return -1;
+      if (!aIsFuture && bIsFuture) return 1;
+
+      // Both future → closest first
+      if (aIsFuture && bIsFuture) {
+        return aDate.getTime() - bDate.getTime();
+      }
+
+      // Both past → most recent first
+      return bDate.getTime() - aDate.getTime();
+    });
+
+    return Response.json(sorted, { status: 200 });
 
   } catch (err) {
     console.error(err);
@@ -46,4 +69,3 @@ export const GET = withAuth(async (req: Request, user: any) => {
     );
   }
 });
-

@@ -9,8 +9,10 @@ import { withAuthHeaders } from "@/app/services/auth-fetch";
 
 type PricingTier = {
   label: string;
-  price: number;
+  stag_price: number | null;
+  couple_price: number | null;
 };
+
 
 type EventForm = {
   name: string;
@@ -86,8 +88,9 @@ export default function UpdateEventPage() {
   });
 
   const [pricing, setPricing] = useState<PricingTier[]>([
-    { label: "", price: 0 },
-  ]);
+  { label: "", stag_price: null, couple_price: null },
+]);
+
 
   /* ---------------- FETCH EVENT ---------------- */
 
@@ -120,11 +123,13 @@ export default function UpdateEventPage() {
 
         if (Array.isArray(data.event_ticket_pricing)) {
           setPricing(
-            data.event_ticket_pricing.map((p: any) => ({
-              label: p.label,
-              price: Number(p.price),
-            }))
-          );
+  data.event_ticket_pricing.map((p: any) => ({
+    label: p.label,
+    stag_price: p.stag_price ?? null,
+    couple_price: p.couple_price ?? null,
+  }))
+);
+
         }
       } catch (err: any) {
         setError(err.message);
@@ -138,8 +143,12 @@ export default function UpdateEventPage() {
 
   /* ---------------- SAVE (PATCH) ---------------- */
   const addPricingTier = () => {
-  setPricing((p) => [...p, { label: "", price: 0 }]);
+  setPricing((p) => [
+    ...p,
+    { label: "", stag_price: null, couple_price: null },
+  ]);
 };
+
 
 const updatePricing = (
   index: number,
@@ -149,11 +158,18 @@ const updatePricing = (
   setPricing((p) =>
     p.map((tier, i) =>
       i === index
-        ? { ...tier, [key]: key === "price" ? Number(value) : value }
+        ? {
+            ...tier,
+            [key]:
+              key === "stag_price" || key === "couple_price"
+                ? value === "" ? null : Number(value)
+                : value,
+          }
         : tier
     )
   );
 };
+
 
 const removePricing = (index: number) => {
   setPricing((p) => p.filter((_, i) => i !== index));
@@ -167,7 +183,12 @@ const removePricing = (index: number) => {
 
       const body: any = {
         ...form,
-        pricing: pricing.filter((p) => p.label && p.price > 0),
+        pricing: pricing.filter(
+  (p) =>
+    p.label &&
+    (p.stag_price != null || p.couple_price != null)
+),
+
       };
 
       if (!useDefaultBanner && bannerImage) {
@@ -305,24 +326,34 @@ const removePricing = (index: number) => {
       />
 
       <div className="flex gap-3">
-        <Input
-          label="Price"
-          placeholder="₹ 0.00"
-          value={String(tier.price)}
-          onChange={(v: string) =>
-            updatePricing(index, "price", v)
-          }
-        />
+  <Input
+    label="Stag Price"
+    placeholder="₹ 0.00"
+    value={tier.stag_price ?? ""}
+    onChange={(v: string) =>
+      updatePricing(index, "stag_price", v)
+    }
+  />
 
-        {pricing.length > 1 && (
-          <button
-            onClick={() => removePricing(index)}
-            className="text-sm text-red-400 hover:text-red-500"
-          >
-            Remove
-          </button>
-        )}
-      </div>
+  <Input
+    label="Couple Price"
+    placeholder="₹ 0.00"
+    value={tier.couple_price ?? ""}
+    onChange={(v: string) =>
+      updatePricing(index, "couple_price", v)
+    }
+  />
+
+  {pricing.length > 1 && (
+    <button
+      onClick={() => removePricing(index)}
+      className="text-sm text-red-400 hover:text-red-500"
+    >
+      Remove
+    </button>
+  )}
+</div>
+
     </div>
   ))}
 </div>
