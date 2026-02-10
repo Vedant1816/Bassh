@@ -8,11 +8,11 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  StatusBar,
   Dimensions,
   Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { withAuthHeaders } from "@/_services/auth-fetch";
 import { fetchWithFallback } from "@/_services/api-config";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,12 +20,17 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const OTP_GRADIENT = ["#8B0045", "#2D0A1F", "#000000"] as const;
-const OTP_GRADIENT_LOCATIONS = [0, 0.4, 1] as const;
+
+/* Theme aligned with payment/success.tsx: black bg, green gradient, #00FF6F accent, #515151 borders */
 const GREEN_GRADIENT = ["#00FF6D", "#000000"] as const;
 const GREEN_GRADIENT_LOCATIONS = [0.36, 1] as const;
 const RED_GRADIENT = ["#DC2626", "#000000"] as const;
 const RED_GRADIENT_LOCATIONS = [0.36, 1] as const;
+
+const SUCCESS_CARD_BG = "rgba(31, 31, 31, 0.73)";
+const SUCCESS_CARD_BORDER = "#515151";
+const SUCCESS_PRIMARY_BG = "#00FF6F";
+const SUCCESS_DIVIDER = "#515151";
 
 const THEMES = {
   success: {
@@ -33,12 +38,12 @@ const THEMES = {
     gradientLocations: GREEN_GRADIENT_LOCATIONS,
     accent: "#00FF6F",
     accentDark: "#2D5016",
-    cardBg: "rgba(31, 31, 31, 0.73)",
-    cardBorder: "#515151",
+    cardBg: SUCCESS_CARD_BG,
+    cardBorder: SUCCESS_CARD_BORDER,
     muted: "rgba(255, 255, 255, 0.7)",
-    primaryButtonColors: ["#00FF6F", "#00E065"] as const,
+    primaryButtonBg: SUCCESS_PRIMARY_BG,
     primaryButtonTextColor: "#000000",
-    secondaryBorder: "#515151",
+    secondaryBorder: SUCCESS_CARD_BORDER,
     enteredBadgeBg: "rgba(0, 255, 111, 0.25)",
     enteredBadgeIcon: "#2D5016",
     reviewedBadgeBg: "rgba(0, 255, 111, 0.2)",
@@ -46,19 +51,19 @@ const THEMES = {
     cancelledBadgeBg: "rgba(239, 68, 68, 0.2)",
     cancelledBadgeIcon: "#7F1D1D",
     amountColor: "#00FF6F",
-    divider: "#515151",
+    divider: SUCCESS_DIVIDER,
   },
   failure: {
     gradient: RED_GRADIENT,
     gradientLocations: RED_GRADIENT_LOCATIONS,
     accent: "#EF4444",
     accentDark: "#7F1D1D",
-    cardBg: "rgba(31, 31, 31, 0.73)",
-    cardBorder: "#515151",
+    cardBg: SUCCESS_CARD_BG,
+    cardBorder: SUCCESS_CARD_BORDER,
     muted: "rgba(255, 255, 255, 0.7)",
-    primaryButtonColors: ["#EF4444", "#DC2626"] as const,
+    primaryButtonBg: "#EF4444",
     primaryButtonTextColor: "#FFFFFF",
-    secondaryBorder: "#515151",
+    secondaryBorder: SUCCESS_CARD_BORDER,
     enteredBadgeBg: "rgba(0, 255, 111, 0.2)",
     enteredBadgeIcon: "#2D5016",
     reviewedBadgeBg: "rgba(0, 255, 111, 0.2)",
@@ -66,27 +71,27 @@ const THEMES = {
     cancelledBadgeBg: "rgba(239, 68, 68, 0.25)",
     cancelledBadgeIcon: "#7F1D1D",
     amountColor: "#FFFFFF",
-    divider: "#515151",
+    divider: SUCCESS_DIVIDER,
   },
   default: {
-    gradient: OTP_GRADIENT,
-    gradientLocations: OTP_GRADIENT_LOCATIONS,
-    accent: "#E91E8C",
-    accentDark: "#B81A6B",
-    cardBg: "rgba(255, 255, 255, 0.08)",
-    cardBorder: "rgba(255, 255, 255, 0.15)",
-    muted: "rgba(255, 255, 255, 0.6)",
-    primaryButtonColors: ["#E91E8C", "#DB1A85"] as const,
-    primaryButtonTextColor: "#FFFFFF",
-    secondaryBorder: "rgba(255, 255, 255, 0.3)",
-    enteredBadgeBg: "rgba(34, 197, 94, 0.2)",
-    enteredBadgeIcon: "#22C55E",
-    reviewedBadgeBg: "rgba(34, 197, 94, 0.2)",
-    reviewedBadgeBorder: "rgba(34, 197, 94, 0.5)",
+    gradient: GREEN_GRADIENT,
+    gradientLocations: GREEN_GRADIENT_LOCATIONS,
+    accent: "#00FF6F",
+    accentDark: "#2D5016",
+    cardBg: SUCCESS_CARD_BG,
+    cardBorder: SUCCESS_CARD_BORDER,
+    muted: "rgba(255, 255, 255, 0.7)",
+    primaryButtonBg: SUCCESS_PRIMARY_BG,
+    primaryButtonTextColor: "#000000",
+    secondaryBorder: SUCCESS_CARD_BORDER,
+    enteredBadgeBg: "rgba(0, 255, 111, 0.25)",
+    enteredBadgeIcon: "#2D5016",
+    reviewedBadgeBg: "rgba(0, 255, 111, 0.2)",
+    reviewedBadgeBorder: "rgba(0, 255, 111, 0.5)",
     cancelledBadgeBg: "rgba(239, 68, 68, 0.2)",
-    cancelledBadgeIcon: "#EF4444",
-    amountColor: "#E91E8C",
-    divider: "rgba(255, 255, 255, 0.15)",
+    cancelledBadgeIcon: "#7F1D1D",
+    amountColor: "#00FF6F",
+    divider: SUCCESS_DIVIDER,
   },
 } as const;
 
@@ -410,17 +415,10 @@ export default function BookingDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient
-          colors={defaultTheme.gradient}
-          locations={defaultTheme.gradientLocations}
-          style={styles.gradientBackground}
-        />
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={[styles.loadingText, { color: defaultTheme.muted }]}>Loading booking…</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color="#00FF6F" />
+        <Text style={styles.loadingText}>Loading your booking...</Text>
       </View>
     );
   }
@@ -428,27 +426,24 @@ export default function BookingDetailScreen() {
   if (error || !booking) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar style="light" />
         <LinearGradient
           colors={defaultTheme.gradient}
           locations={defaultTheme.gradientLocations}
-          style={styles.gradientBackground}
+          style={styles.gradientBlur}
         />
         <View style={styles.center}>
           <Text style={styles.error}>{error || "Booking not found"}</Text>
-          <Pressable onPress={() => router.back()} style={styles.primaryButton}>
-            <LinearGradient
-              colors={defaultTheme.primaryButtonColors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.primaryButtonGradient}
-            >
-              <Text style={[styles.primaryButtonText, { color: defaultTheme.primaryButtonTextColor }]}>
-                Go Back
-              </Text>
-            </LinearGradient>
+          <Pressable
+            onPress={() => router.back()}
+            style={[styles.primaryButtonSolid, { backgroundColor: defaultTheme.primaryButtonBg }]}
+          >
+            <Text style={[styles.primaryButtonTextSolid, { color: defaultTheme.primaryButtonTextColor }]}>
+              Go Back
+            </Text>
           </Pressable>
         </View>
+        <View style={styles.homeIndicator} />
       </View>
     );
   }
@@ -457,16 +452,11 @@ export default function BookingDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <LinearGradient
         colors={theme.gradient}
         locations={theme.gradientLocations}
-        style={[
-          styles.gradientBackground,
-          (isSuccessState(booking) || isFailureState(booking)) && {
-            height: SCREEN_HEIGHT * 0.6,
-          },
-        ]}
+        style={styles.gradientBlur}
       />
 
       <View style={styles.header}>
@@ -492,24 +482,20 @@ export default function BookingDetailScreen() {
             </View>
             <Text style={[styles.qrHint, { color: theme.muted }]}>Show at entry</Text>
 
-            <Pressable style={styles.primaryButton} onPress={handleShareQR}>
-              <LinearGradient
-                colors={theme.primaryButtonColors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButtonGradient}
-              >
-                <Text style={[styles.primaryButtonText, { color: theme.primaryButtonTextColor }]}>
-                  Share Ticket
-                </Text>
-              </LinearGradient>
+            <Pressable
+              style={[styles.primaryButtonSolid, { backgroundColor: theme.primaryButtonBg }]}
+              onPress={handleShareQR}
+            >
+              <Text style={[styles.primaryButtonTextSolid, { color: theme.primaryButtonTextColor }]}>
+                Share Ticket
+              </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.secondaryButton, { borderColor: theme.secondaryBorder }]}
+              style={[styles.secondaryButtonSolid, { borderColor: theme.secondaryBorder }]}
               onPress={handleDownloadQR}
             >
-              <Text style={styles.secondaryButtonText}>Download QR</Text>
+              <Text style={styles.secondaryButtonTextSolid}>Download QR</Text>
             </Pressable>
           </View>
         ) : (
@@ -525,17 +511,13 @@ export default function BookingDetailScreen() {
                 </Text>
 
                 {shouldShowReviewButton() && (
-                  <Pressable style={styles.primaryButton} onPress={handleWriteReview}>
-                    <LinearGradient
-                      colors={theme.primaryButtonColors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.primaryButtonGradient}
-                    >
-                      <Text style={[styles.primaryButtonText, { color: theme.primaryButtonTextColor }]}>
-                        Write a Review
-                      </Text>
-                    </LinearGradient>
+                  <Pressable
+                    style={[styles.primaryButtonSolid, { backgroundColor: theme.primaryButtonBg }]}
+                    onPress={handleWriteReview}
+                  >
+                    <Text style={[styles.primaryButtonTextSolid, { color: theme.primaryButtonTextColor }]}>
+                      Write a Review
+                    </Text>
                   </Pressable>
                 )}
 
@@ -672,6 +654,8 @@ export default function BookingDetailScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <View style={styles.homeIndicator} />
     </View>
   );
 }
@@ -679,17 +663,29 @@ export default function BookingDetailScreen() {
 /* ================= STYLES ================= */
 
 const HEADER_TOP = Platform.OS === "ios" ? 56 : 48;
-const CARD_RADIUS = 16;
+const CARD_RADIUS = 18;
 const CARD_PADDING = 20;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000000" },
-  gradientBackground: {
+  gradientBlur: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
+    width: 418,
+    height: 475,
+    left: -21,
+    top: -246,
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginTop: 16,
   },
   center: {
     flex: 1,
@@ -728,7 +724,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { width: 40 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 32 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 50 },
   qrCard: {
     alignItems: "center",
     paddingVertical: 28,
@@ -740,54 +736,52 @@ const styles = StyleSheet.create({
   qrWrapper: {
     padding: 16,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 12,
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 },
       android: { elevation: 8 },
     }),
   },
   qr: {
-    width: 220,
-    height: 220,
-    borderRadius: 8,
+    width: 200,
+    height: 200,
+    borderRadius: 12,
     backgroundColor: "#fff",
   },
   qrHint: {
     fontSize: 14,
     marginTop: 16,
     letterSpacing: 0.3,
+    color: "#FFFFFF",
   },
   muted: {
-    color: "rgba(255, 255, 255, 0.6)",
+    color: "rgba(255, 255, 255, 0.7)",
     fontSize: 15,
     marginTop: 8,
   },
-  primaryButton: {
+  primaryButtonSolid: {
     marginTop: 20,
     width: "100%",
     maxWidth: 280,
-  },
-  primaryButtonGradient: {
-    height: 52,
-    borderRadius: 14,
-    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
-  primaryButtonText: {
+  primaryButtonTextSolid: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FFFFFF",
   },
-  secondaryButton: {
+  secondaryButtonSolid: {
     marginTop: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 28,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    borderRadius: 12,
+    borderWidth: 1,
     alignSelf: "center",
   },
-  secondaryButtonText: {
-    fontSize: 15,
+  secondaryButtonTextSolid: {
+    fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
   },
@@ -939,10 +933,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.5,
   },
-  loadingText: {
-    fontSize: 15,
-    marginTop: 16,
-  },
   error: {
     color: "#EF4444",
     textAlign: "center",
@@ -978,5 +968,16 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: Platform.OS === "ios" ? 40 : 24,
+  },
+  homeIndicator: {
+    position: "absolute",
+    width: 134,
+    height: 5,
+    left: "50%",
+    bottom: 8,
+    marginLeft: -67,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 100,
+    opacity: 0.3,
   },
 });

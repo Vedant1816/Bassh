@@ -63,6 +63,41 @@ export default function EventDetailScreen() {
   const [guestGender, setGuestGender] = useState("");
   const [userGuestStatus, setUserGuestStatus] = useState<{ applied: boolean, status: string | null } | null>(null);
 
+  // Pre-fill guest list apply form from customer profile when modal opens (only empty fields)
+  useEffect(() => {
+    if (!applyGuestModalVisible || userGuestStatus?.applied) return;
+
+    (async () => {
+      try {
+        const res = await fetchWithFallback(
+          "/api/users/me",
+          await withAuthHeaders({ method: "GET" })
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const c = data.customer;
+        if (!c) return;
+
+        setGuestUsername((prev) => {
+          if (prev.trim()) return prev;
+          const name = [c.username, [c.first_name, c.last_name].filter(Boolean).join(" ")].find(Boolean) || "";
+          return name;
+        });
+        setGuestPhone((prev) => (prev.trim() ? prev : (c.phone_number ? String(c.phone_number) : "")));
+        setGuestGender((prev) => {
+          if (prev) return prev;
+          if (!c.gender) return "";
+          const g = String(c.gender).toLowerCase();
+          if (g === "male") return "Male";
+          if (g === "female") return "Female";
+          return "";
+        });
+      } catch {
+        // ignore
+      }
+    })();
+  }, [applyGuestModalVisible, userGuestStatus?.applied]);
+
   useEffect(() => {
     if (!id) {
       setError("Event ID is missing");
@@ -721,15 +756,6 @@ export default function EventDetailScreen() {
                   )}
                 </Pressable>
 
-                <Pressable
-                  style={styles.viewGuestListLink}
-                  onPress={() => {
-                    setApplyGuestModalVisible(false);
-                    setGuestListModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.viewGuestListLinkText}>View current guest list</Text>
-                </Pressable>
               </ScrollView>
             )}
           </View>
@@ -1301,15 +1327,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
-  },
-  viewGuestListLink: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-  viewGuestListLinkText: {
-    color: Colors.dark.primary,
-    fontSize: 14,
-    fontWeight: "600",
   },
   applyInputLabel: {
     color: "rgba(255, 255, 255, 0.6)",

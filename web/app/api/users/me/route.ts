@@ -3,6 +3,27 @@ import supabaseAdmin from "@/app/services/supabase-admin";
 
 export const runtime = "nodejs";
 
+export const GET = withAuth(async (_req: Request, _ctx: any, user: any) => {
+  try {
+    const { data: customer, error } = await supabaseAdmin
+      .from("customers")
+      .select("first_name, last_name, username, phone_number, gender")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+
+    return Response.json({ customer: customer ?? null });
+  } catch (err: any) {
+    return Response.json(
+      { error: err.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+});
+
 export const PATCH = withAuth(async (req: Request, user: any) => {
   try {
     const body = await req.json().catch(() => ({}));
