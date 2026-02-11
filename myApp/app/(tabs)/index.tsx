@@ -373,32 +373,38 @@ export default function HomeScreen() {
           })
         );
 
-        if (!cancelled && res.ok) {
-          const data = await res.json();
-          const allFeatures = data.features || [];
-          // Only keep features with intensity > 0
-          const liveFeatures = allFeatures.filter(
-            (f: any) => typeof f.properties?.intensity === "number" && f.properties.intensity > 0
-          );
+        if (!cancelled) {
+          if (res.ok) {
+            const data = await res.json();
+            // Handle both array response and FeatureCollection
+            const allFeatures = Array.isArray(data) ? data : (data.features || []);
 
-          console.log(`[Heatmap] Total: ${allFeatures.length}, Live (intensity>0): ${liveFeatures.length}`);
+            // Pass all features to heatmap (user requested no filtering for > 0)
+            const liveFeatures = allFeatures;
 
-          if (liveFeatures.length === 0) {
-            setGeojson(EMPTY_GEOJSON);
+            console.log(`[Heatmap] Total features passed: ${liveFeatures.length}`);
+
+            if (liveFeatures.length === 0) {
+              setGeojson(EMPTY_GEOJSON);
+            } else {
+              setGeojson({
+                type: "FeatureCollection",
+                features: liveFeatures.map((f: any) => ({
+                  ...f,
+                  properties: {
+                    ...f.properties,
+                    intensity: Math.min(1, Math.max(0, f.properties.intensity)),
+                  },
+                })),
+              });
+            }
           } else {
-            setGeojson({
-              type: "FeatureCollection",
-              features: liveFeatures.map((f: any) => ({
-                ...f,
-                properties: {
-                  ...f.properties,
-                  intensity: Math.min(1, Math.max(0, f.properties.intensity)),
-                },
-              })),
-            });
+            console.log("[Heatmap] Fetch failed, clearing data.");
+            setGeojson(EMPTY_GEOJSON);
           }
         }
-      } catch {
+      } catch (err) {
+        console.log("[Heatmap] Error:", err);
         if (!cancelled) setGeojson(EMPTY_GEOJSON);
       }
     };
@@ -482,44 +488,48 @@ export default function HomeScreen() {
           </Mapbox.PointAnnotation>
         )}
 
-        {/* HEATMAP — only render when there are live features */}
-        {geojson.features.length > 0 && (
-          <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
-            <Mapbox.HeatmapLayer
-              id="heatmap-layer"
-              layerIndex={0}
-              style={{
-                heatmapRadius: 100,
-                heatmapWeight: ["get", "intensity"] as any,
-                heatmapIntensity: 1.2,
-                heatmapOpacity: 0.75,
-                heatmapColor: [
-                  "interpolate",
-                  ["linear"],
-                  ["heatmap-density"],
-                  0,
-                  "rgba(0, 0, 0, 0)",
-                  0.125,
-                  "rgba(50, 190, 100, 0.55)",
-                  0.25,
-                  "rgba(85, 210, 140, 0.65)",
-                  0.375,
-                  "rgba(180, 235, 35, 0.7)",
-                  0.5,
-                  "rgba(200, 245, 40, 0.74)",
-                  0.625,
-                  "rgba(220, 255, 50, 0.78)",
-                  0.75,
-                  "rgba(255, 140, 140, 0.75)",
-                  0.875,
-                  "rgba(255, 100, 100, 0.8)",
-                  1,
-                  "rgba(240, 75, 75, 0.83)",
-                ] as any,
-              }}
-            />
-          </Mapbox.ShapeSource>
-        )}
+        {/* HEATMAP — red (hot) → orange → yellow → green (cool); layerIndex 0 so it draws below roads and club markers */}
+        <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
+          <Mapbox.HeatmapLayer
+            id="heatmap-layer"
+            layerIndex={0}
+            style={{
+              heatmapRadius: 100,
+              heatmapWeight: ["get", "intensity"] as any,
+              heatmapIntensity: 1.2,
+              heatmapOpacity: 0.8,
+              heatmapColor: [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+
+                0,
+                "rgba(0,0,0,0)",
+
+                0.08,
+                "rgba(50, 190, 100, 0.55)",   // green
+
+                0.16,
+                "rgba(120, 220, 80, 0.65)",   // light green
+
+                0.28,
+                "rgba(200, 245, 40, 0.75)",   // yellow
+
+                0.35,
+                "rgba(255, 200, 0, 0.80)",    // orange
+
+                0.46,
+                "rgba(255, 140, 100, 0.85)",  // orange-red
+
+                0.56,
+                "rgba(255, 90, 90, 0.9)",     // red (earlier now 🔥)
+
+                0.66,
+                "rgba(240, 50, 50, 1)",       // strong red
+              ] as any,
+            }}
+          />
+        </Mapbox.ShapeSource>
 
         {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
         {(appliedFilters ? filteredClubs : clubs).map((club, index) => (
