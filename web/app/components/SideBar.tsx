@@ -34,8 +34,14 @@ export default function Sidebar() {
         <NavItem label="Settings" href="/dashboard/settings"/>
       </nav>
 
-      {/* PUSH LOGOUT TO BOTTOM */}
-      <div className="mt-auto border-t border-white/10 p-4">
+      {/* PUSH CONTACT & LOGOUT TO BOTTOM */}
+      <div className="mt-auto border-t border-white/10 p-4 space-y-3">
+        <Link
+          href="/dashboard/contact"
+          className="block text-sm text-gray-400 hover:text-pink-400"
+        >
+          Contact Us
+        </Link>
         <button
           onClick={handleLogout}
           className="text-sm text-gray-400 hover:text-red-400"

@@ -184,16 +184,15 @@ const DiscountManagement = () => {
 
 
   const buildDateTime = (date: string, time?: string | null) => {
-    // If time is missing, default to start or end of day
+    // Strip to just YYYY-MM-DD in case the API returns a full ISO string
+    const dateOnly = date.split("T")[0];
     const safeTime = time ?? "00:00";
-    return new Date(`${date}T${safeTime}`);
+    return new Date(`${dateOnly}T${safeTime}`);
   };
 
 
   const isExpired = (d: Discount) => {
     const now = new Date();
-
-    const startDateTime = buildDateTime(d.start_date, d.start_time);
     const endDateTime = buildDateTime(d.end_date, d.end_time ?? "23:59");
 
     return now > endDateTime;
@@ -206,9 +205,9 @@ const DiscountManagement = () => {
     const startDateTime = buildDateTime(d.start_date, d.start_time);
     const endDateTime = buildDateTime(d.end_date, d.end_time ?? "23:59");
 
-    if (now < startDateTime) return "Inactive"; // or "Upcoming"
     if (now > endDateTime) return "Expired";
     if (!d.is_active) return "Inactive";
+    if (now < startDateTime) return "Inactive";
 
     return "Active";
   };
@@ -642,8 +641,12 @@ const DiscountManagement = () => {
                 {showEventDropdown && (
                   <div className="absolute z-10 w-full mt-2 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                     {loadingEvents ? (
-                      <div className="p-4 text-center text-gray-400 text-sm">
-                        Loading events...
+                      <div className="p-4 flex items-center justify-center gap-2">
+                        <div className="relative w-4 h-4">
+                          <div className="absolute inset-0 rounded-full border-2 border-gray-800" />
+                          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 animate-spin" />
+                        </div>
+                        <span className="text-gray-400 text-sm animate-pulse">Loading events...</span>
                       </div>
                     ) : events.length === 0 ? (
                       <div className="p-4 text-center text-gray-400 text-sm">
@@ -1097,8 +1100,12 @@ const DiscountManagement = () => {
           </div>
 
           {loadingDiscounts ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400">Loading discounts...</p>
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="relative w-10 h-10">
+                <div className="absolute inset-0 rounded-full border-4 border-gray-800" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-pink-500 animate-spin" />
+              </div>
+              <p className="text-sm text-gray-500 animate-pulse">Loading discounts...</p>
             </div>
           ) : filteredDiscounts.length === 0 ? (
             <div className="text-center py-12 bg-[#111111] border border-gray-800 rounded-lg">

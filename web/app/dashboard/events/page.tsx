@@ -520,7 +520,13 @@ const openDeleteConfirmation = (eventId: string) => {
         </div>
 
         {eventLoading && (
-          <p className="text-sm text-gray-400">Loading events…</p>
+          <div className="flex items-center gap-3 py-4">
+            <div className="relative w-5 h-5">
+              <div className="absolute inset-0 rounded-full border-2 border-gray-800" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 animate-spin" />
+            </div>
+            <p className="text-sm text-gray-400 animate-pulse">Loading events...</p>
+          </div>
         )}
 
         {!eventLoading && postedEvents.length === 0 && (
@@ -759,9 +765,9 @@ const isUpcoming = eventDateTime >= new Date();
           <Pencil size={16} />
          </Link>
 
-          <button className="text-gray-400 hover:text-white transition">
+          {/* <button className="text-gray-400 hover:text-white transition">
             <Share2 size={16} />
-          </button>
+          </button> */}
 
           <button className="text-gray-400 hover:text-red-400 transition" onClick={() => openDeleteConfirmation(event.id)}
           >
@@ -803,9 +809,13 @@ const isUpcoming = eventDateTime >= new Date();
       "
     >
       {loadingAttendees && (
-        <p className="text-sm text-gray-400 text-center py-6">
-          Loading attendees…
-        </p>
+        <div className="flex flex-col items-center gap-3 py-6">
+          <div className="relative w-5 h-5">
+            <div className="absolute inset-0 rounded-full border-2 border-gray-800" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 animate-spin" />
+          </div>
+          <p className="text-sm text-gray-400 animate-pulse">Loading attendees...</p>
+        </div>
       )}
 
       {!loadingAttendees && attendees.length === 0 && (

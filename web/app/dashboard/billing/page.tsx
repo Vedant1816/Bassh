@@ -259,8 +259,12 @@ export default function BillingPage() {
 
   if (checkingAuth || loading || !summary) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
-        Loading billing data…
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-gray-800" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-pink-500 animate-spin" />
+        </div>
+        <p className="text-sm text-gray-500 animate-pulse">Loading billing data...</p>
       </div>
     );
   }
@@ -503,45 +507,38 @@ export default function BillingPage() {
               <tr>
                 <th className="px-4 py-2 text-left font-normal">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-yellow-500">👤</span>
                     Name
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-purple-500">🆔</span>
                     User ID
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-blue-500">📅</span>
                     Date
                   </div>
                 </th>
                 {activeTab === "event" && (
                   <th className="px-4 py-2 text-center font-normal">
                     <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-orange-500">🎉</span>
                       Event
                     </div>
                   </th>
                 )}
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-green-500">💵</span>
                     Amount (₹)
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-gray-500">🧾</span>
                     Transaction ID
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-pink-500">🔘</span>
                     Status
                   </div>
                 </th>
@@ -635,7 +632,13 @@ export default function BillingPage() {
         {showClaimHistory && (
           <>
             {historyLoading && (
-              <p className="text-sm text-gray-400">Loading claim history…</p>
+              <div className="flex items-center gap-3 py-2">
+                <div className="relative w-4 h-4">
+                  <div className="absolute inset-0 rounded-full border-2 border-gray-800" />
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 animate-spin" />
+                </div>
+                <p className="text-sm text-gray-400 animate-pulse">Loading claim history...</p>
+              </div>
             )}
 
             {!historyLoading && payoutHistory.length === 0 && (
