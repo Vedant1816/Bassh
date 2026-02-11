@@ -53,7 +53,7 @@ export default function LoginPage() {
     }
   };
 
-  //  AUTH CHECK LOADING SCREEN
+  // AUTH CHECK LOADING SCREEN
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
@@ -68,59 +68,70 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#0b0b0b] p-8">
-
-        <h1 className="text-xl font-semibold text-white mb-6">
-          Log In
+      
+      {/* Wrapper Column */}
+      <div className="flex flex-col items-center w-full max-w-md">
+        
+        {/* 🔥 BASSH Heading (outside card) */}
+        <h1 className="text-3xl font-bold text-pink-600 mb-6">
+          BASSH
         </h1>
 
-        <div className="mb-4">
-          <label className="block text-sm text-gray-400 mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
-          />
-        </div>
+        {/* Login Card */}
+        <div className="w-full rounded-lg border border-white/10 bg-[#0b0b0b] p-8">
 
-        <div className="mb-6">
-          <label className="block text-sm text-gray-400 mb-1">
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
-          />
-        </div>
+          <h1 className="text-xl font-semibold text-white mb-6">
+            Log In
+          </h1>
 
-        <p className="mt-4 text-center text-sm text-gray-400">
-          New to Bassh?{" "}
-          <a
-            href="/auth/signUp"
-            className="text-pink-500 hover:underline"
-          >
-            Create Account
-          </a>
-        </p>
+          <div className="mb-4">
+            <label className="block text-sm text-gray-400 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
+            />
+          </div>
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full rounded-md bg-pink-600 hover:bg-pink-700 transition py-2.5 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {loading ? "Logging in..." : "Log in"}
-        </button>
+          <div className="mb-6">
+            <label className="block text-sm text-gray-400 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-md bg-black border border-white/15 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
+            />
+          </div>
 
-        {message && (
-          <p className="mt-4 text-center text-sm text-red-400">
-            {message}
+          <p className="mt-4 text-center text-sm text-gray-400">
+            New to Bassh?{" "}
+            <a
+              href="/auth/signUp"
+              className="text-pink-500 hover:underline"
+            >
+              Create Account
+            </a>
           </p>
-        )}
+
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full rounded-md bg-pink-600 hover:bg-pink-700 transition py-2.5 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {loading ? "Logging in..." : "Log in"}
+          </button>
+
+          {message && (
+            <p className="mt-4 text-center text-sm text-red-400">
+              {message}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
