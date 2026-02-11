@@ -11,6 +11,11 @@ function prefixes(text: string) {
 }
 
 export async function indexSearchData() {
+  // 🔥 Added null safety guard (fixes TypeScript error)
+  if (!redis) {
+    throw new Error("Redis client is not initialized");
+  }
+
   /* -------- Clubs -------- */
   const { data: clubs } = await supabaseAdmin
     .from("clubs")
