@@ -29,7 +29,6 @@ export default function PaymentSuccess() {
             setQrUri(`data:image/png;base64,${decoded}`);
           }
         } catch (error) {
-          console.error("❌ [FRONTEND] Error processing QR code:", error);
           const qrStr = Array.isArray(qr) ? qr[0] : qr;
           setQrUri(qrStr.startsWith("data:") ? qrStr : `data:image/png;base64,${qrStr}`);
         }

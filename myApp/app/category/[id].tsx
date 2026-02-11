@@ -66,7 +66,6 @@ export default function CategoryScreen() {
 
       setEvents(filtered);
     } catch (err) {
-      console.error("❌ Fetch category events error:", err);
     } finally {
       setLoading(false);
     }

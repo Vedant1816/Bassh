@@ -112,7 +112,6 @@ export default function StaffLoginScreen() {
       await redirectStaff(router);
       return true;
     } catch (err) {
-      console.error("Staff verification failed:", err);
       if (err instanceof Error && err.message !== "No user session") {
         await supabasePublic.auth.signOut();
       }
@@ -139,17 +138,7 @@ export default function StaffLoginScreen() {
       return;
     }
 
-    // Log authentication tokens for staff login
-    if (data?.session) {
-      console.log("========================================");
-      console.log("🔐 STAFF LOGIN SUCCESSFUL");
-      console.log("========================================");
-      console.log("Access Token:", data.session.access_token);
-      console.log("Refresh Token:", data.session.refresh_token);
-      console.log("User ID:", data.user?.id);
-      console.log("Email:", data.user?.email);
-      console.log("========================================");
-    }
+
 
     const success = await verifyStaffUser();
     if (!success) setLoginLoading(false);
@@ -202,15 +191,7 @@ export default function StaffLoginScreen() {
               return;
             }
 
-            // Log authentication tokens for Google staff sign-in
-            console.log("========================================");
-            console.log("🔐 STAFF GOOGLE SIGN-IN SUCCESSFUL");
-            console.log("========================================");
-            console.log("Access Token:", accessToken);
-            console.log("Refresh Token:", refreshToken);
-            console.log("User ID:", sessionData?.user?.id);
-            console.log("Email:", sessionData?.user?.email);
-            console.log("========================================");
+
 
             await verifyStaffUser();
           } else {

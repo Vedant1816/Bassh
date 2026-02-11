@@ -35,7 +35,6 @@ export default function SocialScreen() {
       );
       router.replace("/(tabs)");
     } catch (error) {
-      console.error("Error completing onboarding:", error);
       setLoading(false);
     }
   };

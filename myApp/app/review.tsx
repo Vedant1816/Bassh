@@ -85,7 +85,6 @@ export default function ReviewScreen() {
         ]
       );
     } catch (err: any) {
-      console.error("❌ Review submission error:", err);
       Alert.alert(
         "Submission Failed",
         err.message || "Failed to submit review. Please try again."

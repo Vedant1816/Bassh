@@ -23,7 +23,6 @@ export async function getUserRole(): Promise<"user" | "staff" | null> {
       if (error.code === "PGRST116") {
         return null;
       }
-      console.error("Error fetching user role:", error);
       return null;
     }
 
@@ -33,7 +32,6 @@ export async function getUserRole(): Promise<"user" | "staff" | null> {
 
     return data.role as "user" | "staff";
   } catch (error) {
-    console.error("Error in getUserRole:", error);
     return null;
   }
 }

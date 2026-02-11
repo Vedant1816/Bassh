@@ -12,6 +12,7 @@ import {
   StatusBar,
   TextInput,
   Platform,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -217,7 +218,7 @@ export default function EventsScreen() {
     // Apply filters
     if (appliedFilters) {
       const filters = appliedFilters;
-      
+
       // Filter by categories
       if (filters.categories && filters.categories.length > 0) {
         filtered = filtered.filter((e) => {
@@ -366,7 +367,6 @@ export default function EventsScreen() {
         setLocationAddress(addressText);
         setLocationTitle("Home");
       } catch (e) {
-        console.error("Location error:", e);
         setLocationAddress("Unable to get location");
       }
       return;
@@ -429,7 +429,10 @@ export default function EventsScreen() {
         `/api/clubs/${clubId}`,
         await withAuthHeaders({ method: "GET" })
       );
-      if (!res.ok) return;
+      if (!res.ok) {
+        Alert.alert("Error", "Failed to fetch club information");
+        return;
+      }
       const data = await res.json();
       setPayBillClubId(clubId);
       setPayBillClub({
@@ -439,7 +442,8 @@ export default function EventsScreen() {
       });
       setPayBillDiscounts(data.discounts ?? []);
       setPayBillVisible(true);
-    } catch {
+    } catch (error: any) {
+      Alert.alert("Error", "Network error while fetching club details: " + (error.message || "Unknown error"));
       setPayBillVisible(false);
     }
   };
@@ -727,7 +731,7 @@ export default function EventsScreen() {
 
   const renderEventCard = ({ item }: { item: Event }) => {
     const isPast = isEventPast(item.event_date, item.start_time);
-    
+
     return (
       <View style={styles.cardWrapper}>
         <Pressable style={styles.card} onPress={() => router.push(`/event/${item.id}`)}>
@@ -1145,10 +1149,10 @@ export default function EventsScreen() {
             const today = new Date(now);
             today.setHours(0, 0, 0, 0);
             const currentMins = now.getHours() * 60 + now.getMinutes();
-            
+
             // Use filteredEvents if search or filters are active, otherwise use events
             const baseEvents = (searchQuery.trim().length >= 2 || appliedFilters) ? filteredEvents : events;
-            
+
             const displayEvents =
               selectedFilter === "past"
                 ? baseEvents.filter((e) => {

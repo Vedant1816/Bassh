@@ -51,7 +51,6 @@ export default function SearchBar({
         const data = await res.json();
         onResults(data.results || []);
       } catch (err) {
-        console.error("🔍 Search error:", err);
         onResults([]);
       }
     }, 300);

@@ -84,7 +84,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 setUnreadCount(json.unreadCount || 0);
             }
         } catch (err) {
-            console.error("❌ Notification fetch failed", err);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -118,7 +117,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
             );
             setUnreadCount(0);
         } catch (err) {
-            console.error("❌ Failed to mark all as read", err);
         }
     };
 

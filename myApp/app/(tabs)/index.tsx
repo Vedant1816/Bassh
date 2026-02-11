@@ -191,7 +191,6 @@ export default function HomeScreen() {
 
         setLocationAddress(addressText);
       } catch (error) {
-        console.error("❌ Failed to get location:", error);
       }
       return;
     }
@@ -233,7 +232,6 @@ export default function HomeScreen() {
       });
       setLocationAddress(addressText);
     } catch (error) {
-      console.error("❌ Recenter: failed to get location:", error);
     }
   };
 

@@ -35,7 +35,7 @@ export default function RootLayout() {
 
       // Check current route using segments array (cast for expo-router segment types)
       const segs = segments as string[];
-      const isOnAuthPage = segs.includes('(auth)') || segs.length === 0;
+      const isOnAuthPage = segs.includes('(auth)') || segs.includes('auth') || segs.length === 0;
       const isOnOnboardingPage = segs.includes('onboarding');
       const isOnTabsPage = segs.includes('(tabs)');
 

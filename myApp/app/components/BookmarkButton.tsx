@@ -69,7 +69,6 @@ export default function BookmarkButton({
         setIsBookmarked(false);
       }
     } catch (err) {
-      console.error("Error checking bookmark status:", err);
       setIsBookmarked(false);
     } finally {
       setInitializing(false);
@@ -111,7 +110,6 @@ export default function BookmarkButton({
       if (!res.ok) {
         // Revert optimistic update
         setIsBookmarked(prev);
-        console.error("Bookmark failed:", await res.text());
         return;
       }
 
@@ -120,7 +118,6 @@ export default function BookmarkButton({
     } catch (err) {
       // Revert optimistic update
       setIsBookmarked(prev);
-      console.error("Bookmark error:", err);
     } finally {
       setLoading(false);
     }

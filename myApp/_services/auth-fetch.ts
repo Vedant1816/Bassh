@@ -11,7 +11,6 @@ export async function withAuthHeaders(
     } = await supabasePublic.auth.getSession();
 
     if (sessionError) {
-      console.error("Error getting session:", sessionError);
     }
 
     const existingHeaders = init.headers || {};
@@ -31,7 +30,6 @@ export async function withAuthHeaders(
       headers,
     };
   } catch (error) {
-    console.error("Error in withAuthHeaders:", error);
     // Return original init even if auth fails
     return init;
   }

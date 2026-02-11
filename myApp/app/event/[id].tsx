@@ -154,7 +154,6 @@ export default function EventDetailScreen() {
           setUserGuestStatus(statusData);
         }
       } catch (e) {
-        console.error("📱 [FRONTEND] Error:", e);
         setError(e instanceof Error ? e.message : "Failed to load event");
       } finally {
         setLoading(false);
@@ -237,7 +236,6 @@ export default function EventDetailScreen() {
       // Refresh status
       setUserGuestStatus({ applied: true, status: "pending" });
     } catch (e) {
-      console.error("Guest apply error:", e);
       alert("Something went wrong");
     } finally {
       setApplying(false);

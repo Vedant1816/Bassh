@@ -81,17 +81,7 @@ export default function AuthScreen() {
       return;
     }
 
-    // Log authentication tokens
-    if (data?.session) {
-      console.log("========================================");
-      console.log("🔐 LOGIN SUCCESSFUL");
-      console.log("========================================");
-      console.log("Access Token:", data.session.access_token);
-      console.log("Refresh Token:", data.session.refresh_token);
-      console.log("User ID:", data.user?.id);
-      console.log("Email:", data.user?.email);
-      console.log("========================================");
-    }
+
 
     await redirectToRoleHome(router);
   };
@@ -146,15 +136,7 @@ export default function AuthScreen() {
               return;
             }
 
-            // Log authentication tokens from Google sign-in
-            console.log("========================================");
-            console.log("🔐 GOOGLE SIGN-IN SUCCESSFUL");
-            console.log("========================================");
-            console.log("Access Token:", accessToken);
-            console.log("Refresh Token:", refreshToken);
-            console.log("User ID:", sessionData?.user?.id);
-            console.log("Email:", sessionData?.user?.email);
-            console.log("========================================");
+
 
             // Check if user exists, if not create profile
             const {
@@ -186,7 +168,6 @@ export default function AuthScreen() {
                   return;
                 }
               } catch (err) {
-                console.error("Google sign in profile check failed:", err);
               }
             }
 
@@ -248,7 +229,6 @@ export default function AuthScreen() {
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error("[Signup] Profile creation failed:", err);
       }
     } catch {
       // If profile creation fails, user can still continue onboarding

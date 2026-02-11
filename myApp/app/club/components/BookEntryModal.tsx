@@ -448,7 +448,6 @@ export function BookEntryModal({
         })
       );
     } catch (err) {
-      console.error("❌ [NOTIFICATIONS] Failed to send booking confirmation notification:", err);
       // Don't block the booking flow if notification fails
     }
   };
@@ -473,7 +472,6 @@ export function BookEntryModal({
         })
       );
     } catch (err) {
-      console.error("❌ [NOTIFICATIONS] Failed to send notifications:", err);
       // Don't block the booking flow if notifications fail
     }
   };
@@ -519,7 +517,6 @@ export function BookEntryModal({
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("❌ [PAYMENT] Wallet payment failed:", data);
         setProcessing(false);
         Alert.alert("Payment Failed", data.error || "Failed to process wallet payment");
         return;
@@ -542,7 +539,6 @@ export function BookEntryModal({
         router.replace(`/payment/success?booking_id=${data.booking_id}&amount=${finalPrice}`);
       }
     } catch (err: any) {
-      console.error("❌ [PAYMENT] Error during wallet payment:", err);
       setProcessing(false);
       Alert.alert("Error", err.message || "Something went wrong");
     }

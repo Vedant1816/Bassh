@@ -97,7 +97,6 @@ export default function ClubProfile() {
         const data = await res.json();
         setReviews(data.reviews || []);
       } catch (err) {
-        console.error("Failed to fetch reviews:", err);
       }
     })();
   }, [clubId]);
@@ -267,7 +266,6 @@ export default function ClubProfile() {
                     galleryImages = parsed.filter((url: unknown): url is string => typeof url === 'string' && url.length > 0);
                   }
                 } catch (e) {
-                  console.error('Failed to parse gallery:', e);
                 }
               }
             }

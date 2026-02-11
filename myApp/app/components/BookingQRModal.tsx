@@ -190,7 +190,6 @@ export function BookingQRModal({ visible, onClose, booking }: BookingQRModalProp
                 });
             }
         } catch (error: any) {
-            console.error("Share error:", error);
             Alert.alert("Share failed", error?.message ?? "Something went wrong");
         }
     };
@@ -251,7 +250,6 @@ export function BookingQRModal({ visible, onClose, booking }: BookingQRModalProp
                 setSaving(false);
             }
         } catch (error) {
-            console.error("Download error:", error);
             setSaving(false);
         }
     };

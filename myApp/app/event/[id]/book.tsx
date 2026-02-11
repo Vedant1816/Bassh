@@ -391,7 +391,6 @@ export default function EventBookingScreen() {
         })
       );
     } catch (err) {
-      console.error("❌ Failed to send booking confirmation notification:", err);
       // Don't block the booking flow if notification fails
     }
   };
@@ -416,7 +415,6 @@ export default function EventBookingScreen() {
         })
       );
     } catch (err) {
-      console.error("❌ Failed to send notifications:", err);
       // Don't block the booking flow if notifications fail
     }
   };

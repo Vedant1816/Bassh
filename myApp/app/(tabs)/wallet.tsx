@@ -171,7 +171,6 @@ export default function WalletScreen() {
         setBalance(0);
       }
     } catch (err) {
-      console.error("Error fetching wallet balance:", err);
       setBalance(0);
     } finally {
       setLoadingBalance(false);
@@ -209,7 +208,10 @@ export default function WalletScreen() {
         `/api/clubs/${clubId}`,
         await withAuthHeaders({ method: "GET" })
       );
-      if (!res.ok) return;
+      if (!res.ok) {
+        Alert.alert("Error", "Failed to fetch club information");
+        return;
+      }
       const data = await res.json();
       setPayBillClubId(clubId);
       setPayBillClub({
@@ -219,7 +221,8 @@ export default function WalletScreen() {
       });
       setPayBillDiscounts(data.discounts ?? []);
       setPayBillVisible(true);
-    } catch {
+    } catch (error: any) {
+      Alert.alert("Error", "Network error while fetching club details: " + (error.message || "Unknown error"));
       setPayBillVisible(false);
     }
   };
@@ -309,13 +312,11 @@ export default function WalletScreen() {
           try {
             RazorpayCheckout = require("react-native-razorpay").default;
           } catch (importErr: any) {
-            console.error("❌ [WALLET] Razorpay import failed:", importErr);
             Alert.alert("Error", "Payment gateway not available");
             return;
           }
 
           if (!RazorpayCheckout || typeof RazorpayCheckout.open !== "function") {
-            console.error("❌ [WALLET] Razorpay.open not available");
             Alert.alert("Error", "Payment gateway not available");
             return;
           }
@@ -345,7 +346,6 @@ export default function WalletScreen() {
                 const verified = await verifyRes.json();
 
                 if (!verifyRes.ok) {
-                  console.error("❌ [WALLET] Verification failed:", verified.error);
                   Alert.alert("Error", verified.error || "Payment verification failed");
                   return;
                 }
@@ -361,7 +361,6 @@ export default function WalletScreen() {
               }
             })
             .catch((error: any) => {
-              console.error("❌ [WALLET] Razorpay error:", error);
               const isCancelled =
                 error?.description === "User closed the checkout form by pressing back button" ||
                 error?.code === "BAD_REQUEST_ERROR" ||

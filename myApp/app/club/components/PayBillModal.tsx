@@ -81,12 +81,12 @@ export function PayBillModal({
     errorMessage: string;
     amount: number;
   } | null>(null);
-  
+
   // Payment method selection
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"wallet" | "upi">("upi");
   const [selectedUpi, setSelectedUpi] = useState<string>("google");
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
-  
+
   const [pendingRazorpayOptions, setPendingRazorpayOptions] = useState<any>(null);
   const [showCouponModal, setShowCouponModal] = useState(false);
 
@@ -232,12 +232,17 @@ export function PayBillModal({
           })
         })
       );
-      const data = await res.json();
-      setProcessingPayment(false);
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        throw new Error("Invalid response from server");
+      }
 
       if (!res.ok) {
         setFailureData({
-          errorMessage: data.error || "Failed to pay with wallet",
+          errorMessage: data.error || data.message || `Server error (${res.status})`,
           amount: amountToPay
         });
         setStep("failure");
@@ -257,12 +262,13 @@ export function PayBillModal({
 
       setWalletBalance(data.wallet_balance ?? walletBalance - amountToPay);
     } catch (err: any) {
-      setProcessingPayment(false);
       setFailureData({
         errorMessage: err.message || "Something went wrong",
         amount: amountToPay
       });
       setStep("failure");
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -275,20 +281,42 @@ export function PayBillModal({
       setProcessingPayment(true);
 
       // Create bill transaction
-      const billRes = await fetchWithFallback("/api/payments/bill/create",
-        await withAuthHeaders({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            club_id: clubId,
-            amount: amountToPay,
-            discount_id: appliedBillDiscount?.id ?? null,
-            discount_amount: billDiscountAmount || 0,
+      let billRes;
+      try {
+        billRes = await fetchWithFallback("/api/payments/bill/create",
+          await withAuthHeaders({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              club_id: clubId,
+              amount: amountToPay,
+              discount_id: appliedBillDiscount?.id ?? null,
+              discount_amount: billDiscountAmount || 0,
+            })
           })
-        })
-      );
+        );
+      } catch (networkError: any) {
+        setProcessingPayment(false);
+        setFailureData({
+          errorMessage: `Network error: ${networkError.message || 'Unable to connect to server'}`,
+          amount: amountToPay
+        });
+        setStep("failure");
+        return;
+      }
 
-      const billData = await billRes.json();
+      let billData;
+      try {
+        billData = await billRes.json();
+      } catch (parseError) {
+        setProcessingPayment(false);
+        setFailureData({
+          errorMessage: "Invalid response from server",
+          amount: amountToPay
+        });
+        setStep("failure");
+        return;
+      }
 
       if (!billRes.ok) {
         setProcessingPayment(false);
@@ -337,7 +365,7 @@ export function PayBillModal({
 
       setPendingRazorpayOptions({ ...options, billData });
       setProcessingPayment(false);
-      
+
       openRazorpay({ ...options, billData });
     } catch (err: any) {
       setProcessingPayment(false);
@@ -464,6 +492,8 @@ export function PayBillModal({
 
   // Handle Pay Now button
   const handlePayNow = () => {
+    if (processingPayment) return;
+
     if (selectedPaymentMethod === "wallet") {
       handlePayWithWallet();
     } else {
@@ -519,7 +549,7 @@ export function PayBillModal({
     const isApplied = String(appliedBillDiscount?.id) === String(d.id);
     const amount = parseFloat(billAmount) || 0;
     const isApplicable = amount >= d.min_purchase;
-    
+
     return (
       <Pressable
         key={d.id}
@@ -592,13 +622,13 @@ export function PayBillModal({
       onRequestClose={() => setShowPaymentMethodModal(false)}
     >
       <View style={styles.paymentModalOverlay}>
-        <Pressable 
-          style={styles.paymentModalBackdrop} 
+        <Pressable
+          style={styles.paymentModalBackdrop}
           onPress={() => setShowPaymentMethodModal(false)}
         />
         <View style={styles.paymentModalContainer}>
           <View style={styles.paymentModalHandle} />
-          
+
           <Text style={styles.paymentModalTitle}>Select Payment Method</Text>
 
           {/* Wallet Option */}
@@ -636,7 +666,7 @@ export function PayBillModal({
 
           {/* UPI Section */}
           <Text style={styles.paymentModalSectionTitle}>UPI</Text>
-          
+
           {[
             { id: "google", label: "Google Pay", icon: "logo-google" },
             { id: "paytm", label: "Paytm", icon: "wallet-outline" },
@@ -660,7 +690,7 @@ export function PayBillModal({
                 <Text style={styles.paymentMethodLabel}>{item.label}</Text>
               </View>
               <View style={[
-                styles.radioOuter, 
+                styles.radioOuter,
                 selectedPaymentMethod === "upi" && selectedUpi === item.id && styles.radioOuterSelected
               ]}>
                 {selectedPaymentMethod === "upi" && selectedUpi === item.id && <View style={styles.radioInner} />}
@@ -685,9 +715,9 @@ export function PayBillModal({
   // ═══════════════════════════════════════════════════════════
   const renderStep1 = () => (
     <>
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         <Text style={styles.sectionTitle}>Enter your bill amount</Text>
@@ -740,10 +770,10 @@ export function PayBillModal({
       >
         <View style={styles.couponModalContainer}>
           <StatusBar barStyle="light-content" />
-          <LinearGradient 
-            colors={OTP_GRADIENT} 
-            locations={OTP_GRADIENT_LOCATIONS} 
-            style={styles.couponModalGradient} 
+          <LinearGradient
+            colors={OTP_GRADIENT}
+            locations={OTP_GRADIENT_LOCATIONS}
+            style={styles.couponModalGradient}
           />
 
           <View style={styles.couponModalHeader}>
@@ -771,9 +801,9 @@ export function PayBillModal({
   // ═══════════════════════════════════════════════════════════
   const renderStep2 = () => (
     <>
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.step2ScrollContent}
       >
         {/* Section: Your bill amount */}
@@ -877,15 +907,15 @@ export function PayBillModal({
 
       {/* Footer - Matching Design */}
       <View style={styles.payFooter}>
-        <Pressable 
+        <Pressable
           style={styles.payUsingSection}
           onPress={() => setShowPaymentMethodModal(true)}
         >
           <View style={styles.paymentMethodIcon}>
-            <Ionicons 
-              name={selectedPaymentMethod === "wallet" ? "wallet-outline" : "logo-google"} 
-              size={16} 
-              color="#FFFFFF" 
+            <Ionicons
+              name={selectedPaymentMethod === "wallet" ? "wallet-outline" : "logo-google"}
+              size={16}
+              color="#FFFFFF"
             />
           </View>
           <View>
@@ -922,10 +952,10 @@ export function PayBillModal({
       >
         <View style={styles.couponModalContainer}>
           <StatusBar barStyle="light-content" />
-          <LinearGradient 
-            colors={OTP_GRADIENT} 
-            locations={OTP_GRADIENT_LOCATIONS} 
-            style={styles.couponModalGradient} 
+          <LinearGradient
+            colors={OTP_GRADIENT}
+            locations={OTP_GRADIENT_LOCATIONS}
+            style={styles.couponModalGradient}
           />
 
           <View style={styles.couponModalHeader}>
@@ -962,9 +992,9 @@ export function PayBillModal({
         style={styles.successGradient}
       />
 
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.successScrollContent}
       >
         <View style={styles.successCheckCircle}>
@@ -1033,9 +1063,9 @@ export function PayBillModal({
         locations={[0, 0.4, 1]}
         style={styles.failureGradient}
       />
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.failureScrollContent}
       >
         <View style={styles.failureCircle}>
@@ -1068,7 +1098,7 @@ export function PayBillModal({
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════
   const isSuccessOrFailure = step === 4 || step === "failure";
-  
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
       <View style={styles.container}>

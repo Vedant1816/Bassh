@@ -176,7 +176,6 @@ export default function BookingDetailScreen() {
         setHasReviewed(data.reviews && data.reviews.length > 0);
       }
     } catch (err) {
-      console.error("❌ Check review error:", err);
     } finally {
       setCheckingReview(false);
     }
@@ -254,7 +253,6 @@ export default function BookingDetailScreen() {
         ]
       );
     } catch (err: any) {
-      console.error("❌ Cancel booking error:", err);
       Alert.alert(
         "Cancellation Failed",
         err.message || "Failed to cancel booking. Please try again."
@@ -343,7 +341,6 @@ export default function BookingDetailScreen() {
         UTI: "public.png",
       });
     } catch (err: any) {
-      console.error("❌ QR Share Error:", err);
       Alert.alert("Share failed", err.message || "Something went wrong");
     }
   };

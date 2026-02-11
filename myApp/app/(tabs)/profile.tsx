@@ -47,12 +47,10 @@ export default function ProfileScreen() {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
       } else {
         setProfile(customerData);
       }
     } catch (error) {
-      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -63,7 +61,6 @@ export default function ProfileScreen() {
       await supabase.auth.signOut();
       router.replace('/(auth)');
     } catch (error) {
-      console.error('Error signing out:', error);
     }
   };
 
