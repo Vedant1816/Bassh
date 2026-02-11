@@ -1,11 +1,10 @@
-import { NextRequest } from "next/server";
 import supabaseAdmin from "@/app/services/supabase-admin";
 import { withAuth } from "@/app/services/protected";
 
 export const runtime = "nodejs";
 
 // POST - Send notification to a user by username/email OR to the authenticated user
-export const POST = withAuth(async (req: NextRequest, _params: any, authUser: any) => {
+export const POST = withAuth(async (req: Request, _params: any, authUser: any) => {
     console.log("🔔 [NOTIFICATIONS] POST /api/notifications/send - Request received");
 
     try {
@@ -24,13 +23,11 @@ export const POST = withAuth(async (req: NextRequest, _params: any, authUser: an
         let targetUserId: string;
         let targetUserName: string = "User";
 
-        // If no username provided, send to the authenticated user
         if (!username) {
             console.log("🔔 [NOTIFICATIONS] No username provided, sending to authenticated user:", authUser.id);
             targetUserId = authUser.id;
             targetUserName = authUser.email || "User";
         } else {
-            // Find user by username or email in customers table
             const { data: user, error: userError } = await supabaseAdmin
                 .from("customers")
                 .select("id, email, username")
@@ -51,7 +48,6 @@ export const POST = withAuth(async (req: NextRequest, _params: any, authUser: an
             targetUserName = user.username || user.email || "User";
         }
 
-        // Insert notification with metadata
         const { data: notification, error: notifError } = await supabaseAdmin
             .from("notifications")
             .insert({
