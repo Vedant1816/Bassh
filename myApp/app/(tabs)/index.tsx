@@ -356,37 +356,60 @@ export default function HomeScreen() {
     setFilteredClubs(filtered);
   }, [clubs, appliedFilters]);
 
-  /* ---------------- HEATMAP ---------------- */
+  /* ---------------- HEATMAP (auto-refresh every 5 min) ---------------- */
   useEffect(() => {
     if (!location) return;
 
     let cancelled = false;
 
-    (async () => {
+    const fetchHeatmap = async () => {
       try {
         const res = await fetchWithFallback(
           `/api/map/heatmap`,
           await withAuthHeaders({
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lat: location.lat,
-              lng: location.lng,
-              radius: 10000,
-            }),
+            body: JSON.stringify({}),
           })
         );
 
         if (!cancelled && res.ok) {
-          setGeojson(await res.json());
+          const data = await res.json();
+          const allFeatures = data.features || [];
+          // Only keep features with intensity > 0
+          const liveFeatures = allFeatures.filter(
+            (f: any) => typeof f.properties?.intensity === "number" && f.properties.intensity > 0
+          );
+
+          console.log(`[Heatmap] Total: ${allFeatures.length}, Live (intensity>0): ${liveFeatures.length}`);
+
+          if (liveFeatures.length === 0) {
+            setGeojson(EMPTY_GEOJSON);
+          } else {
+            setGeojson({
+              type: "FeatureCollection",
+              features: liveFeatures.map((f: any) => ({
+                ...f,
+                properties: {
+                  ...f.properties,
+                  intensity: Math.min(1, Math.max(0, f.properties.intensity)),
+                },
+              })),
+            });
+          }
         }
       } catch {
         if (!cancelled) setGeojson(EMPTY_GEOJSON);
       }
-    })();
+    };
+
+    // Fetch immediately, then every 5 minutes
+    fetchHeatmap();
+    const interval = setInterval(fetchHeatmap, 5 * 60 * 1000);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [location]);
 
@@ -411,6 +434,10 @@ export default function HomeScreen() {
       <Mapbox.MapView
         style={{ flex: 1 }}
         styleURL={Mapbox.StyleURL.Dark}
+        scaleBarEnabled={false}
+        attributionEnabled={false}
+        compassEnabled={false}
+        logoEnabled={false}
         onPress={() => Keyboard.dismiss()}
       >
         <Mapbox.Camera
@@ -455,42 +482,44 @@ export default function HomeScreen() {
           </Mapbox.PointAnnotation>
         )}
 
-        {/* HEATMAP — red (hot) → orange → yellow → green (cool); layerIndex 0 so it draws below roads and club markers */}
-        <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
-          <Mapbox.HeatmapLayer
-            id="heatmap-layer"
-            layerIndex={0}
-            style={{
-              heatmapRadius: 100,
-              heatmapWeight: 1,
-              heatmapIntensity: 1.2,
-              heatmapOpacity: 0.75,
-              heatmapColor: [
-                "interpolate",
-                ["linear"],
-                ["heatmap-density"],
-                0,
-                "rgba(0, 0, 0, 0)",
-                0.12,
-                "rgba(50, 190, 100, 0.55)",
-                0.24,
-                "rgba(85, 210, 140, 0.65)",
-                0.36,
-                "rgba(180, 235, 35, 0.7)",
-                0.48,
-                "rgba(200, 245, 40, 0.74)",
-                0.6,
-                "rgba(220, 255, 50, 0.78)",
-                0.78,
-                "rgba(255, 140, 140, 0.75)",
-                0.92,
-                "rgba(255, 100, 100, 0.8)",
-                1,
-                "rgba(240, 75, 75, 0.83)",
-              ] as any,
-            }}
-          />
-        </Mapbox.ShapeSource>
+        {/* HEATMAP — only render when there are live features */}
+        {geojson.features.length > 0 && (
+          <Mapbox.ShapeSource id="heatmap" shape={geojson as any}>
+            <Mapbox.HeatmapLayer
+              id="heatmap-layer"
+              layerIndex={0}
+              style={{
+                heatmapRadius: 100,
+                heatmapWeight: ["get", "intensity"] as any,
+                heatmapIntensity: 1.2,
+                heatmapOpacity: 0.75,
+                heatmapColor: [
+                  "interpolate",
+                  ["linear"],
+                  ["heatmap-density"],
+                  0,
+                  "rgba(0, 0, 0, 0)",
+                  0.125,
+                  "rgba(50, 190, 100, 0.55)",
+                  0.25,
+                  "rgba(85, 210, 140, 0.65)",
+                  0.375,
+                  "rgba(180, 235, 35, 0.7)",
+                  0.5,
+                  "rgba(200, 245, 40, 0.74)",
+                  0.625,
+                  "rgba(220, 255, 50, 0.78)",
+                  0.75,
+                  "rgba(255, 140, 140, 0.75)",
+                  0.875,
+                  "rgba(255, 100, 100, 0.8)",
+                  1,
+                  "rgba(240, 75, 75, 0.83)",
+                ] as any,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        )}
 
         {/* CLUB MARKERS - Using MarkerView for native React component rendering */}
         {(appliedFilters ? filteredClubs : clubs).map((club, index) => (

@@ -78,7 +78,7 @@ export default function EventBookingScreen() {
   const [finalPrice, setFinalPrice] = useState(0);
   const [bookingFee, setBookingFee] = useState(0);
   const [orderTotal, setOrderTotal] = useState(0);
-  const [pendingRazorpayOptions, setPendingRazorpayOptions] = useState<any>(null);
+
 
   // Discount state
   const [discounts, setDiscounts] = useState<Discount[]>([]);
@@ -568,9 +568,97 @@ export default function EventBookingScreen() {
         theme: { color: ACCENT_PINK },
       };
 
-      setPendingRazorpayOptions({ ...options, bookingData });
       setShowPaymentDetails(false);
       setProcessing(false);
+
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(async () => {
+          let RazorpayCheckout: any;
+          try {
+            RazorpayCheckout = require("react-native-razorpay").default;
+          } catch (importError: any) {
+            console.log("Razorpay import error:", importError);
+            const errorMsg = "Payment gateway not available";
+            router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+            return;
+          }
+
+          if (!RazorpayCheckout || typeof RazorpayCheckout.open !== "function") {
+            const errorMsg = "Payment gateway not available";
+            router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+            return;
+          }
+
+          setProcessing(true);
+
+          RazorpayCheckout.open(options)
+            .then(async (response: any) => {
+              if (!response || !response.razorpay_payment_id) {
+                setProcessing(false);
+                const errorMsg = "Invalid payment response";
+                router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+                return;
+              }
+
+              try {
+                const verifyRes = await fetchWithFallback(
+                  `/api/payments/verify`,
+                  await withAuthHeaders({
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      booking_id: bookingData.booking_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_signature: response.razorpay_signature,
+                    }),
+                  })
+                );
+
+                const verified = await verifyRes.json();
+
+                if (!verifyRes.ok) {
+                  setProcessing(false);
+                  const errorMsg = verified.error || "Unable to verify payment";
+                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+                  return;
+                }
+
+                await sendNotificationToMatchingUsers(participants.map(p => p.name), bookingData.booking_id);
+
+                const qrCode = verified.qr || verified.qr_code;
+                setProcessing(false);
+
+                const qrParam = qrCode ? encodeURIComponent(qrCode) : "";
+
+                if (qrCode) {
+                  router.replace(`/payment/success?qr=${qrParam}&booking_id=${bookingData.booking_id}&amount=${finalPrice}`);
+                } else {
+                  router.replace(`/payment/success?booking_id=${bookingData.booking_id}&amount=${finalPrice}`);
+                }
+              } catch (verifyError: any) {
+                setProcessing(false);
+                const errorMsg = verifyError?.message || "Payment verification failed";
+                router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+              }
+            })
+            .catch((error: any) => {
+              setProcessing(false);
+              const isCancelled =
+                error?.description === "User closed the checkout form by pressing back button" ||
+                error?.code === "BAD_REQUEST_ERROR" ||
+                (error?.description && error.description.toLowerCase().includes("cancelled"));
+
+              if (isCancelled) {
+                const errorMsg = "Payment was cancelled. Your booking is pending.";
+                router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+              } else {
+                const errorMsg = error?.description || error?.message || "Payment could not be completed";
+                router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${bookingData.booking_id}&event_id=${id}`);
+              }
+            });
+        }, 600);
+      });
     } catch (err: any) {
       setProcessing(false);
       const errorMsg = err.message || "Something went wrong. Please try again.";
@@ -961,109 +1049,7 @@ export default function EventBookingScreen() {
         visible={showPaymentDetails}
         animationType="slide"
         presentationStyle="pageSheet"
-        onDismiss={() => {
-          if (pendingRazorpayOptions) {
-            const { bookingData: storedBookingData, ...options } = pendingRazorpayOptions;
-            setPendingRazorpayOptions(null);
 
-            InteractionManager.runAfterInteractions(() => {
-              setTimeout(async () => {
-                setProcessing(true);
-
-                const currentBookingId = storedBookingData.booking_id;
-
-                let RazorpayCheckout: any;
-                try {
-                  RazorpayCheckout = require("react-native-razorpay").default;
-                } catch (importError: any) {
-                  const errorMsg = "Payment gateway not available";
-                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                  setProcessing(false);
-                  return;
-                }
-
-                if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
-                  const errorMsg = "Payment gateway not available";
-                  router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                  setProcessing(false);
-                  return;
-                }
-
-                RazorpayCheckout.open(options)
-                  .then(async (response: any) => {
-                    if (!response || !response.razorpay_payment_id) {
-                      setProcessing(false);
-                      const errorMsg = "Invalid payment response";
-                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                      return;
-                    }
-
-                    setProcessing(true);
-
-                    try {
-                      const verifyRes = await fetchWithFallback(
-                        `/api/payments/verify`,
-                        await withAuthHeaders({
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            booking_id: currentBookingId,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_signature: response.razorpay_signature,
-                          }),
-                        })
-                      );
-
-                      const verified = await verifyRes.json();
-
-                      if (!verifyRes.ok) {
-                        setProcessing(false);
-                        const errorMsg = verified.error || "Unable to verify payment";
-                        router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                        return;
-                      }
-
-
-                      // Send notifications to matching participants with booking_id
-                      await sendNotificationToMatchingUsers(participants.map(p => p.name), currentBookingId);
-
-                      const qrCode = verified.qr || verified.qr_code;
-                      setProcessing(false);
-
-                      const qrParam = qrCode ? encodeURIComponent(qrCode) : "";
-
-                      if (qrCode) {
-                        router.replace(`/payment/success?qr=${qrParam}&booking_id=${currentBookingId}&amount=${finalPrice}`);
-                      } else {
-                        router.replace(`/payment/success?booking_id=${currentBookingId}&amount=${finalPrice}`);
-                      }
-                    } catch (verifyError: any) {
-                      setProcessing(false);
-                      const errorMsg = verifyError?.message || "Payment verification failed";
-                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                    }
-                  })
-                  .catch((error: any) => {
-                    setProcessing(false);
-
-                    const isCancelled =
-                      error?.description === "User closed the checkout form by pressing back button" ||
-                      error?.code === "BAD_REQUEST_ERROR" ||
-                      (error?.description && error.description.toLowerCase().includes("cancelled"));
-
-                    if (isCancelled) {
-                      const errorMsg = "Payment was cancelled. Your booking is still pending.";
-                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                    } else {
-                      const errorMsg = error?.description || error?.message || "Payment could not be completed";
-                      router.replace(`/payment/failure?error_message=${encodeURIComponent(errorMsg)}&amount=${finalPrice}&booking_id=${currentBookingId}&event_id=${id}`);
-                    }
-                  });
-              }, 500);
-            });
-          }
-        }}
       >
         <View style={styles.paymentModalContainer}>
           <StatusBar barStyle="light-content" />
