@@ -182,6 +182,9 @@ export const GET = withAuth(async (req: Request, _ctx: any, user: any) => {
       .single();
 
     if (userError) {
+      if (userError.code === "PGRST116") {
+        return Response.json({ error: "User not found" }, { status: 404 });
+      }
       console.error("❌ GET USER ERROR:", userError);
       return Response.json({ error: userError.message }, { status: 500 });
     }

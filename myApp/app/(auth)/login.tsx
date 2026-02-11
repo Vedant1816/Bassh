@@ -66,6 +66,31 @@ export default function AuthScreen() {
     setSignupError("");
   };
 
+  const ensureUserProfile = async (email: string): Promise<"new" | "existing" | "error"> => {
+    try {
+      const checkRes = await fetchWithFallback(
+        "/api/users",
+        await withAuthHeaders({ method: "GET" })
+      );
+
+      if (checkRes.status === 404) {
+        const createRes = await fetchWithFallback(
+          "/api/users",
+          await withAuthHeaders({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, role: "user" }),
+          })
+        );
+        return createRes.ok ? "new" : "error";
+      }
+
+      return checkRes.ok ? "existing" : "error";
+    } catch {
+      return "error";
+    }
+  };
+
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       setLoginError("Email and password required");
@@ -81,7 +106,11 @@ export default function AuthScreen() {
       return;
     }
 
-
+    const profileStatus = await ensureUserProfile(loginEmail.trim());
+    if (profileStatus === "new") {
+      router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
+      return;
+    }
 
     await redirectToRoleHome(router);
   };
@@ -138,36 +167,15 @@ export default function AuthScreen() {
 
 
 
-            // Check if user exists, if not create profile
             const {
               data: { user },
             } = await supabasePublic.auth.getUser();
 
             if (user) {
-              try {
-                // Check if profile exists
-                const checkRes = await fetchWithFallback(
-                  "/api/users",
-                  await withAuthHeaders({ method: "GET" })
-                );
-
-                if (checkRes.status === 404) {
-                  // NEW USER SIGNUP -> Go to onboarding
-                  await fetchWithFallback(
-                    "/api/users",
-                    await withAuthHeaders({
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        email: user.email,
-                        role: "user",
-                      }),
-                    })
-                  );
-                  router.replace("/onboarding/about-you");
-                  return;
-                }
-              } catch (err) {
+              const profileStatus = await ensureUserProfile(user.email!);
+              if (profileStatus === "new") {
+                router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
+                return;
               }
             }
 
