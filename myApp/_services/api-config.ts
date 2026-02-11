@@ -47,6 +47,22 @@ export async function fetchWithFallback(
     });
 
     clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.log(`[API Response Error] Status: ${response.status} for ${cleanPath}`);
+      try {
+        console.log(`[API Error Body]`, JSON.parse(errorBody));
+      } catch {
+        console.log(`[API Error Body]`, errorBody);
+      }
+      return new Response(errorBody, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
+    }
+
     console.log(`[API Response Success] Status: ${response.status} for ${cleanPath}`);
     return response;
   } catch (error: any) {
@@ -54,7 +70,23 @@ export async function fetchWithFallback(
     // If it was aborted by our timer or network failed, retry once without signal
     // This handles cases where the signal might be causing issues on some devices
     const retryResponse = await fetch(fullUrl, init);
-    console.log(`[API Retry Response] Status: ${retryResponse.status} for ${cleanPath}`);
+
+    if (!retryResponse.ok) {
+      const errorBody = await retryResponse.text();
+      console.log(`[API Retry Response Error] Status: ${retryResponse.status} for ${cleanPath}`);
+      try {
+        console.log(`[API Retry Error Body]`, JSON.parse(errorBody));
+      } catch {
+        console.log(`[API Retry Error Body]`, errorBody);
+      }
+      return new Response(errorBody, {
+        status: retryResponse.status,
+        statusText: retryResponse.statusText,
+        headers: retryResponse.headers
+      });
+    }
+
+    console.log(`[API Retry Response Success] Status: ${retryResponse.status} for ${cleanPath}`);
     return retryResponse;
   }
 }

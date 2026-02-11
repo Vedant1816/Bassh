@@ -6,11 +6,11 @@ export const runtime = "nodejs";
 
 export const POST = withAuth(async (req: Request, _ctx: any, user: any) => {
   console.log("🔄 [BACKEND] POST /api/payments/checkout/create-order - Request received");
-  
+
   try {
     const body = await req.json();
     const { booking_id, transaction_id, amount } = body;
-    
+
     console.log("🔄 [BACKEND] Request body:", { booking_id, transaction_id, amount });
 
     if ((!booking_id && !transaction_id) || !amount) {
@@ -22,13 +22,12 @@ export const POST = withAuth(async (req: Request, _ctx: any, user: any) => {
     }
 
     // 🔥 Initialize Razorpay INSIDE handler (fixes build crash)
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      throw new Error("Razorpay environment variables not configured");
-    }
+    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "rzp_test_S87ed3mUSlzztX";
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "H7Q9tiHomxudW0mxfDR36Htp";
 
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
     });
 
     const receiptId = booking_id || transaction_id;
@@ -71,7 +70,7 @@ export const POST = withAuth(async (req: Request, _ctx: any, user: any) => {
     const response = {
       order_id: order.id,
       amount: order.amount,
-      key: process.env.RAZORPAY_KEY_ID,
+      key: RAZORPAY_KEY_ID,
     };
 
     console.log("✅ [BACKEND] Returning order details");
