@@ -113,55 +113,56 @@ export const POST = withAuth(async (req: Request, user: any) => {
     /* ---------------- CLUBS TABLE ---------------- */
 
     if (role === "club") {
-      const { clubName, location, isNewClub } = body;
+  const { clubName, location, isNewClub } = body;
 
-      if (!clubName || !location?.latitude || !location?.longitude) {
-        return Response.json(
-          { error: "Missing club details" },
-          { status: 400 }
-        );
+  if (!clubName || !location?.latitude || !location?.longitude) {
+    return Response.json(
+      { error: "Missing club details" },
+      { status: 400 }
+    );
+  }
+
+  const { error: clubError } = await supabaseAdmin
+    .from("clubs")
+    .upsert(
+      {
+        id: user.id,
+        club_name: clubName,
+        club_email: email, 
+        address_text: location.address || "",
+        latitude: location.latitude,
+        longitude: location.longitude,
+      },
+      { onConflict: "id" }
+    );
+
+  if (clubError) {
+    return Response.json(
+      { error: clubError.message },
+      { status: 500 }
+    );
+  }
+
+  if (isNewClub === true) {
+    const { error: locationError } = await supabaseAdmin.rpc(
+      "insert_location",
+      {
+        p_name: clubName,
+        p_category: "club",
+        p_lat: location.latitude,
+        p_lng: location.longitude,
       }
+    );
 
-      const { error: clubError } = await supabaseAdmin
-        .from("clubs")
-        .upsert(
-          {
-            id: user.id,
-            club_name: clubName,
-            address_text: location.address || "",
-            latitude: location.latitude,
-            longitude: location.longitude,
-          },
-          { onConflict: "id" }
-        );
-
-      if (clubError) {
-        return Response.json(
-          { error: clubError.message },
-          { status: 500 }
-        );
-      }
-
-      // Insert heatmap point only once
-      if (isNewClub === true) {
-        const { error: locationError } = await supabaseAdmin.rpc(
-          "insert_location",
-          {
-            p_name: clubName,
-            p_category: "club",
-            p_lat: location.latitude,
-            p_lng: location.longitude,
-          }
-        );
-
-        if (locationError) {
-          return Response.json(
-            { error: locationError.message },
-            { status: 500 }
-          );
-        }
-      }
+    if (locationError) {
+      return Response.json(
+        { error: locationError.message },
+        { status: 500 }
+      );
     }
+  }
+}
+
 
     return Response.json({ ok: true });
   } catch (err: any) {
