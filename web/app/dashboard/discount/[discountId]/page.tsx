@@ -254,8 +254,12 @@ export default function EditDiscountPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white">
-        <p className="text-gray-400">Loading discount...</p>
+      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-gray-800" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-pink-500 animate-spin" />
+        </div>
+        <p className="text-sm text-gray-500 animate-pulse">Loading discount...</p>
       </div>
     );
   }

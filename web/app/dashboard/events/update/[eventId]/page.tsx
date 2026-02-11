@@ -246,7 +246,15 @@ const removePricing = (index: number) => {
 
   /* ---------------- UI STATES ---------------- */
 
-  if (loading) return <div className="p-8 text-gray-400">Loading event…</div>;
+  if (loading) return (
+    <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="relative w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-4 border-gray-800" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-pink-500 animate-spin" />
+      </div>
+      <p className="text-sm text-gray-500 animate-pulse">Loading event...</p>
+    </div>
+  );
   if (error) return <div className="p-8 text-red-400">{error}</div>;
 
   /* ---------------- UI ---------------- */

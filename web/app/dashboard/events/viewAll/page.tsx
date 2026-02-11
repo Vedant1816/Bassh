@@ -141,7 +141,13 @@ export default function ViewAllEventsPage() {
 
       {/* EVENTS */}
       {loading && (
-        <p className="text-sm text-gray-400">Loading events…</p>
+        <div className="flex items-center gap-3 py-4">
+          <div className="relative w-5 h-5">
+            <div className="absolute inset-0 rounded-full border-2 border-gray-800" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 animate-spin" />
+          </div>
+          <p className="text-sm text-gray-400 animate-pulse">Loading events...</p>
+        </div>
       )}
 
       {!loading && events.length === 0 && (
