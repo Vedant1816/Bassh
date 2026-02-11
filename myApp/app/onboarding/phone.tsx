@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { flex: 1 },
   skipButton: { padding: 8 },
-  skipButtonText: { fontSize: 15, fontWeight: "600", color: Colors.dark.textSecondary },
+  skipButtonText: { fontSize: 15, fontWeight: "600", color: Colors.dark.primary },
   titleSection: {
     marginBottom: 40,
   },
