@@ -16,7 +16,8 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
       tier,
       terms_and_conditions,
       privacy_policy,
-      pan_no
+      pan_no,
+      max_capacity
     } = body;
 
     const club_id = user.id;
@@ -34,6 +35,7 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
     if (terms_and_conditions) updateData.terms_and_conditions = terms_and_conditions;
     if (privacy_policy) updateData.privacy_policy = privacy_policy;
     if (pan_no) updateData.pan_no = pan_no;
+    if (max_capacity) updateData.max_capacity = max_capacity;
 
     const { data: club, error: clubError } = await supabaseAdmin
       .from("clubs")
@@ -81,7 +83,8 @@ export const GET = withAuth(async (req: Request, user: { id: string }) => {
         tier,
         pan_no,
         terms_and_conditions,
-        privacy_policy
+        privacy_policy,
+        max_capacity
       `)
       .eq("id", user.id)
       .single();

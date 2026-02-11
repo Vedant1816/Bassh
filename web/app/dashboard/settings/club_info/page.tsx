@@ -18,6 +18,7 @@ type ClubData = {
   address_text: string | null;
   latitude: number | null;
   longitude: number | null;
+  max_capacity: number | null;
   tier: 1 | 2 | 3 | null;
 };
 
@@ -113,6 +114,7 @@ export default function EditClubPage() {
             twitter_link: club.twitter_link,
             contact_email: club.contact_email,
             tier: club.tier,
+            max_capacity: club.max_capacity,
           }),
         })
       );
@@ -292,26 +294,28 @@ export default function EditClubPage() {
               />
             </div>
 
-            {/* Club Tier */}
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">
-                Club Tier
-              </label>
-              <select
-                value={club.tier ?? ""}
-                onChange={(e) =>
-                  setClub({
-                    ...club,
-                    tier: Number(e.target.value) as 1 | 2 | 3,
-                  })
-                }
-                className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-gray-600"
-              >
-                <option value={1}>Tier 1</option>
-                <option value={2}>Tier 2</option>
-                <option value={3}>Tier 3</option>
-              </select>
-            </div>
+            {/* Max Capacity */}
+             <div>
+  <label className="block text-sm text-gray-300 mb-2">
+    Max Capacity
+  </label>
+
+  <input
+    type="number"
+    min="0"
+    value={club.max_capacity ?? ""}
+    onChange={(e) =>
+      setClub({
+        ...club,
+        max_capacity: e.target.value === ""
+          ? null
+          : Number(e.target.value),
+      })
+    }
+    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
+  />
+</div>
+
 
             {/* Club Description */}
             <div>
