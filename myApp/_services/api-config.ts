@@ -27,6 +27,15 @@ export async function fetchWithFallback(
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const fullUrl = `${API_BASE_URL}${cleanPath}`;
 
+  console.log(`[API Request] ${init?.method || 'GET'} ${fullUrl}`);
+  if (init?.body) {
+    try {
+      console.log(`[API Body]`, JSON.parse(init.body as string));
+    } catch {
+      console.log(`[API Body]`, init.body);
+    }
+  }
+
   try {
     // Create timeout controller for React Native compatibility
     const controller = new AbortController();
@@ -38,11 +47,15 @@ export async function fetchWithFallback(
     });
 
     clearTimeout(timeoutId);
+    console.log(`[API Response Success] Status: ${response.status} for ${cleanPath}`);
     return response;
   } catch (error: any) {
+    console.log(`[API Request Error/Retry] ${error.message} for ${cleanPath}`);
     // If it was aborted by our timer or network failed, retry once without signal
     // This handles cases where the signal might be causing issues on some devices
-    return fetch(fullUrl, init);
+    const retryResponse = await fetch(fullUrl, init);
+    console.log(`[API Retry Response] Status: ${retryResponse.status} for ${cleanPath}`);
+    return retryResponse;
   }
 }
 

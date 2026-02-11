@@ -251,6 +251,7 @@ export default function WalletScreen() {
 
     try {
       setProcessingPayment(true);
+      console.log("[Wallet] Starting Add Money Flow", { amount });
 
       const addRes = await fetchWithFallback(
         "/api/payments/wallet/add",
@@ -262,6 +263,7 @@ export default function WalletScreen() {
       );
 
       const addData = await addRes.json();
+      console.log("[Wallet] Add Money Response:", addData);
 
       if (!addRes.ok) {
         setProcessingPayment(false);
@@ -282,9 +284,11 @@ export default function WalletScreen() {
       );
 
       const order = await orderRes.json();
+      console.log("[Wallet] Razorpay Order Response:", order);
 
       if (!orderRes.ok) {
         setProcessingPayment(false);
+        console.log("[Wallet] Failed to create Razorpay order:", order.error);
         Alert.alert("Error", order.error || "Failed to create order");
         return;
       }
@@ -312,17 +316,21 @@ export default function WalletScreen() {
           try {
             RazorpayCheckout = require("react-native-razorpay").default;
           } catch (importErr: any) {
+            console.log("[Wallet] Razorpay import error:", importErr);
             Alert.alert("Error", "Payment gateway not available");
             return;
           }
 
           if (!RazorpayCheckout || typeof RazorpayCheckout.open !== "function") {
+            console.log("[Wallet] RazorpayCheckout.open is not a function");
             Alert.alert("Error", "Payment gateway not available");
             return;
           }
 
+          console.log("[Wallet] Opening Razorpay Modal with options:", options);
           RazorpayCheckout.open(options)
             .then(async (response: any) => {
+              console.log("[Wallet] Razorpay Payment Success:", response);
               if (!response?.razorpay_payment_id) {
                 Alert.alert("Error", "Invalid payment response");
                 return;

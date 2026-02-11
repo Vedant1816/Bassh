@@ -279,10 +279,12 @@ export function PayBillModal({
 
     try {
       setProcessingPayment(true);
+      console.log("[PayBill] Starting UPI Payment Flow", { amountToPay, clubId });
 
       // Create bill transaction
       let billRes;
       try {
+        console.log("[PayBill] Creating Bill Transaction...");
         billRes = await fetchWithFallback("/api/payments/bill/create",
           await withAuthHeaders({
             method: "POST",
@@ -296,6 +298,7 @@ export function PayBillModal({
           })
         );
       } catch (networkError: any) {
+        console.log("[PayBill] Network Error creating bill:", networkError.message);
         setProcessingPayment(false);
         setFailureData({
           errorMessage: `Network error: ${networkError.message || 'Unable to connect to server'}`,
@@ -308,7 +311,9 @@ export function PayBillModal({
       let billData;
       try {
         billData = await billRes.json();
+        console.log("[PayBill] Bill Data Response:", billData);
       } catch (parseError) {
+        console.log("[PayBill] Failed to parse bill response JSON");
         setProcessingPayment(false);
         setFailureData({
           errorMessage: "Invalid response from server",
@@ -319,6 +324,7 @@ export function PayBillModal({
       }
 
       if (!billRes.ok) {
+        console.log("[PayBill] Bill Creation Failed:", billData.error);
         setProcessingPayment(false);
         setFailureData({
           errorMessage: billData.error || "Failed to create bill",
@@ -329,6 +335,7 @@ export function PayBillModal({
       }
 
       // Create Razorpay order
+      console.log("[PayBill] Creating Razorpay Order for Transaction:", billData.transaction_id);
       const orderRes = await fetchWithFallback("/api/payments/checkout/create-order",
         await withAuthHeaders({
           method: "POST",
@@ -341,8 +348,10 @@ export function PayBillModal({
       );
 
       const order = await orderRes.json();
+      console.log("[PayBill] Razorpay Order Response:", order);
 
       if (!orderRes.ok) {
+        console.log("[PayBill] Razorpay Order Creation Failed:", order.error);
         setProcessingPayment(false);
         setFailureData({
           errorMessage: order.error || "Failed to create order",
@@ -397,6 +406,7 @@ export function PayBillModal({
         }
 
         if (!RazorpayCheckout || typeof RazorpayCheckout.open !== "function") {
+          console.log("[PayBill] RazorpayCheckout.open is not a function");
           setFailureData({
             errorMessage: "Payment gateway not available",
             amount: toBePaidAmount,
@@ -406,8 +416,10 @@ export function PayBillModal({
           return;
         }
 
+        console.log("[PayBill] Opening Razorpay Modal with options:", options);
         RazorpayCheckout.open(options)
           .then(async (response: any) => {
+            console.log("[PayBill] Razorpay Payment Success:", response);
             if (!response?.razorpay_payment_id) {
               setFailureData({
                 errorMessage: "Invalid payment response",
@@ -420,6 +432,7 @@ export function PayBillModal({
 
             try {
               setProcessingPayment(true);
+              console.log("[PayBill] Verifying payment on backend...");
               const vRes = await fetchWithFallback("/api/payments/bill/verify",
                 await withAuthHeaders({
                   method: "POST",
@@ -434,9 +447,11 @@ export function PayBillModal({
               );
 
               const verified = await vRes.json();
+              console.log("[PayBill] Verification Response:", verified);
               setProcessingPayment(false);
 
               if (!vRes.ok) {
+                console.log("[PayBill] Payment Verification Failed:", verified.error);
                 setFailureData({
                   errorMessage: verified.error || "Verification failed",
                   amount: toBePaidAmount,
@@ -445,6 +460,8 @@ export function PayBillModal({
                 setPendingRazorpayOptions(null);
                 return;
               }
+
+              console.log("[PayBill] Payment Fully Verified!");
 
               setSuccessData({
                 transactionId: billData.transaction_id,
