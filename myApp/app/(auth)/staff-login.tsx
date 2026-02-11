@@ -81,7 +81,7 @@ export default function StaffLoginScreen() {
 
       if (res.status === 404) {
         // New user signup through staff portal -> Create as staff
-        await fetchWithFallback(
+        const createRes = await fetchWithFallback(
           "/api/users",
           await withAuthHeaders({
             method: "POST",
@@ -92,6 +92,9 @@ export default function StaffLoginScreen() {
             }),
           })
         );
+        if (!createRes.ok) {
+          throw new Error("Failed to create staff account");
+        }
         await redirectStaff(router);
         return true;
       }

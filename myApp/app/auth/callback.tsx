@@ -3,6 +3,8 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import supabasePublic from '@/_services/supabase-public';
+import { withAuthHeaders } from '@/_services/auth-fetch';
+import { fetchWithFallback } from '@/_services/api-config';
 import { redirectToRoleHome } from '@/_services/user-role';
 
 export default function AuthCallback() {
@@ -23,6 +25,32 @@ export default function AuthCallback() {
                     });
 
                     if (!error) {
+                        // Check if user exists in users table, create if new
+                        try {
+                            const checkRes = await fetchWithFallback(
+                                "/api/users",
+                                await withAuthHeaders({ method: "GET" })
+                            );
+
+                            if (checkRes.status === 404) {
+                                const { data: { user } } = await supabasePublic.auth.getUser();
+                                if (user) {
+                                    await fetchWithFallback(
+                                        "/api/users",
+                                        await withAuthHeaders({
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ email: user.email, role: "user" }),
+                                        })
+                                    );
+                                    router.replace("/onboarding/about-you" as any);
+                                    return;
+                                }
+                            }
+                        } catch {
+                            // If check fails, continue to role-based redirect
+                        }
+
                         await redirectToRoleHome(router);
                         return;
                     }

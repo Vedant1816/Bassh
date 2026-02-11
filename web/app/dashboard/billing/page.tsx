@@ -285,9 +285,9 @@ export default function BillingPage() {
         <div className="text-right">
           <button
             onClick={openPanModal}
-            disabled={summary.payoutInProcess}
+            disabled={summary.payoutInProcess || summary.totalPending === 0}
             className={`px-5 py-2 rounded-md font-medium ${
-              summary.payoutInProcess
+              summary.payoutInProcess || summary.totalPending === 0
                 ? "bg-gray-600 cursor-not-allowed"
                 : "bg-pink-500 hover:bg-pink-400"
             }`}
@@ -598,7 +598,7 @@ export default function BillingPage() {
           value={summary.totalPending}
           color="pink"
           description="Available for claim"
-          showButton={!summary.payoutInProcess}
+          showButton={!summary.payoutInProcess && summary.totalPending > 0}
           onButtonClick={openPanModal}
         />
         <SummaryCard
