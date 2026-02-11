@@ -77,10 +77,12 @@ export const POST = withAuth(async (req: Request, _ctx: any, user: any) => {
       });
     }
 
+    console.log("🔐 [BACKEND] Verifying signature...");
     // Verify Razorpay signature
     const signatureBody = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "H7Q9tiHomxudW0mxfDR36Htp";
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
       .update(signatureBody)
       .digest("hex");
 

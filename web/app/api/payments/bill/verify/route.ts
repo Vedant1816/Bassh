@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
   console.log("🔄 [BACKEND] POST /api/payments/bill/verify - Request received");
-  
+
   try {
     const body = await req.json();
     const {
@@ -41,11 +41,11 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
         .select("id")
         .eq("razorpay_order_id", razorpay_order_id)
         .single();
-      
+
       if (lookupError) {
         console.error("❌ [BACKEND] Error looking up transaction:", lookupError.message);
       }
-      
+
       if (transactionLookup) {
         finalTransactionId = transactionLookup.id;
         console.log("✅ [BACKEND] Found transaction:", finalTransactionId);
@@ -59,7 +59,7 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
         { status: 400 }
       );
     }
-    
+
     // ================= VERIFY TRANSACTION EXISTS =================
     console.log("🔍 [BACKEND] Verifying transaction exists:", finalTransactionId);
     const { data: existingTransaction, error: checkError } = await supabaseAdmin
@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
       .select("id, user_id, club_id, amount, status, razorpay_order_id")
       .eq("id", finalTransactionId)
       .single();
-    
+
     if (checkError || !existingTransaction) {
       console.error("❌ [BACKEND] Transaction not found in database:", checkError?.message);
       return Response.json(
@@ -75,7 +75,7 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
         { status: 404 }
       );
     }
-    
+
     console.log("✅ [BACKEND] Transaction exists:", {
       id: existingTransaction.id,
       current_status: existingTransaction.status,
@@ -84,15 +84,16 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
 
     // ================= VERIFY PAYMENT SIGNATURE =================
     console.log("🔐 [BACKEND] Verifying signature...");
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "H7Q9tiHomxudW0mxfDR36Htp";
     const signatureBody = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
       .update(signatureBody)
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
       console.error("❌ [BACKEND] Invalid payment signature");
-      
+
       // ================= UPDATE TRANSACTION TO FAILED =================
       try {
         await supabaseAdmin
@@ -102,12 +103,12 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
             status: "failed",
           })
           .eq("id", finalTransactionId);
-        
+
         console.log("✅ [BACKEND] Transaction marked as failed");
       } catch (updateError: any) {
         console.error("⚠️ [BACKEND] Failed to update transaction:", updateError.message);
       }
-      
+
       return Response.json(
         { error: "Invalid payment signature" },
         { status: 400 }
@@ -118,7 +119,7 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
 
     // ================= UPDATE TRANSACTION TO SUCCESS =================
     console.log("💾 [BACKEND] Updating transaction status to success...");
-    
+
     const { data: updateData, error: updateError } = await supabaseAdmin
       .from("transactions")
       .update({
@@ -130,19 +131,19 @@ export const POST = withAuth(async (req: Request, _ctx: any, _user: any) => {
 
     if (updateError) {
       console.error("❌ [BACKEND] Failed to update transaction:", updateError.message);
-      
+
       return Response.json(
         { error: "Failed to update transaction", details: updateError.message },
         { status: 500 }
       );
     }
-    
+
     console.log("✅ [BACKEND] Transaction updated successfully:", updateData);
 
     console.log("✅ [BACKEND] Bill payment verified successfully");
-    
-    return Response.json({ 
-      success: true, 
+
+    return Response.json({
+      success: true,
       transaction_id: finalTransactionId,
       amount: existingTransaction.amount,
     });
