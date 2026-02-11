@@ -42,15 +42,13 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
       );
     }
 
-    const { error: locationError } = await supabaseAdmin.rpc(
-      "insert_location",
-      {
-        p_name: club.club_name,
-        p_category: "club",
-        p_lat: location.latitude,
-        p_lng: location.longitude,
-      }
-    );
+    const { error: locationError } = await supabaseAdmin.rpc("insert_location", {
+  p_name: club.club_name,
+  p_category: "club",
+  p_lat: Number(location.latitude),
+  p_lng: Number(location.longitude),
+  p_club_id: user.id,
+});
 
     if (locationError) {
       return Response.json(
@@ -58,6 +56,7 @@ export const PATCH = withAuth(async (req: Request, user: { id: string }) => {
         { status: 500 }
       );
     }
+    
 
     return Response.json(
       { message: "Location updated successfully" },

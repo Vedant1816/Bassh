@@ -143,16 +143,14 @@ export const POST = withAuth(async (req: Request, user: any) => {
     );
   }
 
-  if (isNewClub === true) {
-    const { error: locationError } = await supabaseAdmin.rpc(
-      "insert_location",
-      {
-        p_name: clubName,
-        p_category: "club",
-        p_lat: location.latitude,
-        p_lng: location.longitude,
-      }
-    );
+    const { error: locationError } = await supabaseAdmin.rpc("insert_location", {
+  p_name: clubName,
+  p_category: "club",
+  p_lat: Number(location.latitude),
+  p_lng: Number(location.longitude),
+  p_club_id: user.id,
+});
+
 
     if (locationError) {
       return Response.json(
@@ -160,7 +158,7 @@ export const POST = withAuth(async (req: Request, user: any) => {
         { status: 500 }
       );
     }
-  }
+
 }
 
 
