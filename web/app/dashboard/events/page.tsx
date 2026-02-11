@@ -765,9 +765,9 @@ const isUpcoming = eventDateTime >= new Date();
           <Pencil size={16} />
          </Link>
 
-          <button className="text-gray-400 hover:text-white transition">
+          {/* <button className="text-gray-400 hover:text-white transition">
             <Share2 size={16} />
-          </button>
+          </button> */}
 
           <button className="text-gray-400 hover:text-red-400 transition" onClick={() => openDeleteConfirmation(event.id)}
           >

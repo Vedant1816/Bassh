@@ -184,16 +184,15 @@ const DiscountManagement = () => {
 
 
   const buildDateTime = (date: string, time?: string | null) => {
-    // If time is missing, default to start or end of day
+    // Strip to just YYYY-MM-DD in case the API returns a full ISO string
+    const dateOnly = date.split("T")[0];
     const safeTime = time ?? "00:00";
-    return new Date(`${date}T${safeTime}`);
+    return new Date(`${dateOnly}T${safeTime}`);
   };
 
 
   const isExpired = (d: Discount) => {
     const now = new Date();
-
-    const startDateTime = buildDateTime(d.start_date, d.start_time);
     const endDateTime = buildDateTime(d.end_date, d.end_time ?? "23:59");
 
     return now > endDateTime;
@@ -206,9 +205,9 @@ const DiscountManagement = () => {
     const startDateTime = buildDateTime(d.start_date, d.start_time);
     const endDateTime = buildDateTime(d.end_date, d.end_time ?? "23:59");
 
-    if (now < startDateTime) return "Inactive"; // or "Upcoming"
     if (now > endDateTime) return "Expired";
     if (!d.is_active) return "Inactive";
+    if (now < startDateTime) return "Inactive";
 
     return "Active";
   };

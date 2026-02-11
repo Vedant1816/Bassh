@@ -12,7 +12,6 @@ export default function ContactUsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // UI only — no backend functionality yet
     setSubmitted(true);
   };
 
@@ -125,7 +124,7 @@ export default function ContactUsPage() {
           Prefer to talk? Reach us directly at
         </p>
         <p className="text-lg font-semibold text-white">
-          +91 98765 43210
+          +91 XXXXX XXXXX
         </p>
       </div>
     </div>

@@ -507,45 +507,38 @@ export default function BillingPage() {
               <tr>
                 <th className="px-4 py-2 text-left font-normal">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-yellow-500">👤</span>
                     Name
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-purple-500">🆔</span>
                     User ID
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-blue-500">📅</span>
                     Date
                   </div>
                 </th>
                 {activeTab === "event" && (
                   <th className="px-4 py-2 text-center font-normal">
                     <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-orange-500">🎉</span>
                       Event
                     </div>
                   </th>
                 )}
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-green-500">💵</span>
                     Amount (₹)
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-gray-500">🧾</span>
                     Transaction ID
                   </div>
                 </th>
                 <th className="px-4 py-2 text-center font-normal">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-pink-500">🔘</span>
                     Status
                   </div>
                 </th>
