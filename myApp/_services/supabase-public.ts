@@ -1,42 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 const supabaseURL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anon_key = process.env.EXPO_PUBLIC_ANON_KEY;
+const anonKey = process.env.EXPO_PUBLIC_ANON_KEY;
 
-if (!supabaseURL || !anon_key) {
+if (!supabaseURL || !anonKey) {
   throw new Error("Missing Supabase Credentials");
 }
 
-// Import AsyncStorage only for native platforms
-let AsyncStorage: any = null;
-if (Platform.OS !== "web") {
-  try {
-    AsyncStorage = require("@react-native-async-storage/async-storage").default;
-  } catch (e) {
-    // AsyncStorage will fall back to default storage
-  }
-}
-
-const supabasePublic = createClient(
-  supabaseURL,
-  anon_key,
-  AsyncStorage
-    ? {
-        auth: {
-          storage: AsyncStorage,
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: false,
-        },
-      }
-    : {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: false,
-        },
-      }
-);
+const supabasePublic = createClient(supabaseURL, anonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: Platform.OS === "web",
+  },
+});
 
 export default supabasePublic;
