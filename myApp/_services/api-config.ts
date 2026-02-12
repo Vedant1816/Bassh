@@ -2,7 +2,8 @@
  * API Configuration
  * Derived from Environment Variables or falling back to the production URL.
  */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || "https://bassh-green.vercel.app";
+export const API_BASE_URL = rawBaseUrl.endsWith("/") ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
 /**
  * Fallback API URL
