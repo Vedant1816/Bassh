@@ -8,10 +8,11 @@ Bassh connects users with nightlife events, clubs, and entertainment venues. The
 
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
+- [Repository Structure](#repository-structure)
 - [Features](#features)
 - [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
+- [Docker Setup](#docker-setup)
 - [Database Schema](#database-schema)
 - [API Documentation](#api-documentation)
 - [Payment Integration](#payment-integration)
@@ -27,21 +28,32 @@ Bassh connects users with nightlife events, clubs, and entertainment venues. The
 │   Mobile App    │────────>│   Web Backend   │────────>│    Supabase     │
 │  (React Native) │         │    (Next.js)    │         │   (PostgreSQL)  │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
-         │                           │
-         │                           │
-         v                           v
-┌─────────────────┐         ┌─────────────────┐
-│  Razorpay SDK   │         │  Razorpay API   │
-│  (Native iOS)   │         │   (Payments)    │
-└─────────────────┘         └─────────────────┘
+         │                           │                           │
+         │                           │                           │
+         v                           v                           v
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│  Razorpay SDK   │         │  Razorpay API   │         │  Supabase Auth  │
+│  (Native iOS/   │         │   (Payments)    │         │   (JWT Tokens)  │
+│   Android)      │         │                 │         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+                                     │
+                            ┌────────┴────────┐
+                            │                 │
+                            v                 v
+                    ┌──────────────┐  ┌──────────────┐
+                    │    Twilio    │  │    Redis     │
+                    │ (WhatsApp   │  │  (Upstash    │
+                    │   OTP)      │  │   Cache)     │
+                    └──────────────┘  └──────────────┘
 ```
 
 ### Component Flow
 
-1. **Authentication** — Supabase Auth issues JWT tokens for protected API routes
-2. **Event Discovery** — Map-based search queries nearby events API with real-time updates
-3. **Booking Flow** — Event selection, participant details, price calculation, payment
-4. **Payment Processing** — Razorpay order creation, native SDK payment, verification, QR generation
+1. **Authentication** — Supabase Auth issues JWT tokens; OTP verification via Twilio (WhatsApp)
+2. **Event Discovery** — Map-based search queries nearby events API with Mapbox heatmap visualization
+3. **Booking Flow** — Event selection, participant details, gender-based price calculation, payment
+4. **Payment Processing** — Razorpay order creation on backend, native SDK payment on mobile, signature verification, QR code generation
+5. **Admin Dashboard** — Club owners manage events, bookings, discounts, guest lists, billing, and settings via the web dashboard
 
 ---
 
@@ -49,86 +61,126 @@ Bassh connects users with nightlife events, clubs, and entertainment venues. The
 
 ### Mobile App (`myApp/`)
 
-| Layer          | Technology                          |
-|----------------|-------------------------------------|
-| Framework      | Expo ~54.0 (React Native 0.81)      |
-| Navigation     | Expo Router v6 (file-based routing) |
-| Maps           | Mapbox (@rnmapbox/maps)             |
-| Auth           | Supabase JS SDK                     |
-| Payments       | react-native-razorpay (native SDK)  |
-| Language       | TypeScript                          |
+| Layer          | Technology                            |
+|----------------|---------------------------------------|
+| Framework      | Expo ~54.0 (React Native 0.81)        |
+| Navigation     | Expo Router v6 (file-based routing)   |
+| Maps           | Mapbox (@rnmapbox/maps 10.2.10)       |
+| Auth           | Supabase JS SDK 2.91                  |
+| Payments       | react-native-razorpay (native SDK)    |
+| UI             | Bottom Sheet, Reanimated, Gesture Handler |
+| QR Codes       | react-native-qrcode-svg               |
+| Language       | TypeScript 5.9                        |
 
 ### Web Backend & Dashboard (`web/`)
 
-| Layer          | Technology                          |
-|----------------|-------------------------------------|
-| Framework      | Next.js 16 (App Router)             |
-| Database       | Supabase (PostgreSQL)               |
-| Auth           | Supabase Auth with JWT              |
-| Payments       | Razorpay Node.js SDK                |
-| Charts         | Recharts                            |
-| QR Generation  | qrcode                              |
-| SMS/OTP        | Twilio (WhatsApp OTP)               |
-| Styling        | Tailwind CSS 4                      |
-| Cache          | Redis (ioredis / Upstash)           |
-| Language       | TypeScript                          |
+| Layer          | Technology                            |
+|----------------|---------------------------------------|
+| Framework      | Next.js 16.1 (App Router)             |
+| Database       | Supabase (PostgreSQL)                 |
+| Auth           | Supabase Auth with JWT                |
+| Payments       | Razorpay Node.js SDK 2.9              |
+| Charts         | Recharts 3.7                          |
+| QR Generation  | qrcode 1.5                            |
+| PDF Generation | pdfkit 0.17                           |
+| SMS/OTP        | Twilio 5.12 (WhatsApp OTP)            |
+| Styling        | Tailwind CSS 4                        |
+| Cache          | Redis (ioredis / Upstash)             |
+| Icons          | lucide-react                          |
+| Language       | TypeScript 5                          |
 
 ### Infrastructure
 
 - **Database** — Supabase PostgreSQL
-- **Authentication** — Supabase Auth
+- **Authentication** — Supabase Auth (JWT-based)
 - **Storage** — Supabase Storage (images)
 - **Payment Gateway** — Razorpay
+- **SMS/OTP** — Twilio (WhatsApp)
+- **Caching** — Upstash Redis
 - **Containerization** — Docker & Docker Compose
 
 ---
 
-## Project Structure
+## Repository Structure
+
+This is a monorepo with two main applications and shared Docker orchestration at the root.
 
 ```
 Bassh/
-├── myApp/                          # React Native mobile app
-│   ├── app/                        # Expo Router pages
-│   │   ├── (auth)/                 # Authentication screens
-│   │   ├── (tabs)/                 # Main tabs (Home, Events, Booking, Profile)
-│   │   ├── event/                  # Event detail & booking
+├── README.md                       # This file — project overview
+├── docker-compose.yml              # Docker orchestration for both services
+├── .gitignore                      # Root git ignore rules
+├── .dockerignore                   # Docker ignore rules
+│
+├── myApp/                          # React Native mobile app (Expo)
+│   ├── app/                        # Expo Router pages (file-based routing)
+│   │   ├── _layout.tsx             # Root layout with auth guard
+│   │   ├── (auth)/                 # Auth group — login & signup screens
+│   │   ├── (tabs)/                 # Tab navigation — Home, Events, Booking, Profile
+│   │   ├── event/[id]/             # Event detail & booking screens
+│   │   ├── booking/                # Booking flow screens
 │   │   ├── payment/                # Payment success screen
-│   │   ├── onboarding/             # User onboarding flow
-│   │   └── staff/                  # Staff-specific screens
-│   ├── _services/                  # API config & auth utilities
+│   │   ├── onboarding/             # New user onboarding flow
+│   │   ├── club/[clubId]/          # Club detail screens
+│   │   ├── staff/                  # Staff registration screens
+│   │   ├── category/               # Event category browsing
+│   │   ├── transaction/            # Transaction history
+│   │   └── components/             # Screen-level shared components
+│   ├── _services/                  # API config, auth fetch, Supabase client
 │   ├── components/                 # Reusable UI components
-│   └── assets/                     # Images, icons, fonts
+│   ├── hooks/                      # Custom React hooks
+│   ├── constants/                  # App constants (colors, theme)
+│   ├── services/                   # Additional service utilities
+│   ├── assets/                     # Images, icons, splash screen
+│   ├── app.json                    # Expo configuration
+│   ├── eas.json                    # Expo Application Services config
+│   ├── package.json                # Dependencies & scripts
+│   ├── Dockerfile                  # Container config
+│   └── README.md                   # Mobile app documentation
 │
-├── web/                            # Next.js backend & dashboard
+├── web/                            # Next.js backend API & admin dashboard
 │   ├── app/
-│   │   ├── api/                    # REST API endpoints
-│   │   │   ├── auth/               # Authentication (OTP, WhatsApp)
-│   │   │   ├── bookings/           # Booking management
-│   │   │   ├── events/             # Event CRUD
-│   │   │   ├── payments/           # Payment processing
-│   │   │   ├── clubs/              # Club queries
-│   │   │   ├── club/               # Club-specific operations
-│   │   │   ├── discount/           # Discount management
+│   │   ├── api/                    # REST API endpoints (~40+ routes)
+│   │   │   ├── auth/               # OTP send/verify (SMS & WhatsApp)
+│   │   │   ├── bookings/           # Create, cancel, fetch bookings
+│   │   │   ├── events/             # Event CRUD, attendees, guest lists
+│   │   │   ├── payments/           # Checkout, verify, billing, wallet
+│   │   │   ├── club/               # Club operations, revenue, payouts
+│   │   │   ├── clubs/              # Club queries (details, nearby)
+│   │   │   ├── discounts/          # Discount CRUD
+│   │   │   ├── map/                # Heatmap & nearby event data
+│   │   │   ├── notifications/      # Send single, bulk, all notifications
+│   │   │   ├── bookmarks/          # Save, fetch, check bookmarks
 │   │   │   ├── guests/             # Guest list management
-│   │   │   ├── map/                # Map data (heatmap, nearby)
-│   │   │   ├── menu/               # Menu management
-│   │   │   ├── notifications/      # Notification system
+│   │   │   ├── reviews/            # Review system
 │   │   │   ├── search/             # Search functionality
-│   │   │   └── users/              # User management
-│   │   ├── dashboard/              # Admin dashboard (web)
+│   │   │   ├── users/              # User management
+│   │   │   ├── upload-image/       # Image upload
+│   │   │   └── health/             # Health check endpoint
+│   │   ├── dashboard/              # Admin dashboard (club owners)
 │   │   │   ├── billing/            # Billing & payouts
-│   │   │   ├── discount/           # Discount management
-│   │   │   ├── events/             # Event management
-│   │   │   ├── guest/              # Guest list
-│   │   │   ├── menu/               # Menu management
-│   │   │   └── settings/           # Club settings
+│   │   │   ├── events/             # Event management (create, view, update)
+│   │   │   ├── discount/           # Discount code management
+│   │   │   ├── guest/              # Guest list management
+│   │   │   ├── menu/               # Menu configuration
+│   │   │   ├── contact/            # Contact management
+│   │   │   └── settings/           # Club settings (info, location, visuals, legal)
 │   │   ├── auth/                   # Login & signup pages
-│   │   ├── components/             # Shared UI components
-│   │   └── services/               # Backend utilities
-│   └── lib/                        # Shared libraries (Razorpay, Redis)
-│
-└── docker-compose.yml              # Docker orchestration
+│   │   ├── components/             # Shared UI components (Sidebar, TopBar)
+│   │   └── services/               # Backend utilities (auth-fetch, Supabase)
+│   ├── lib/                        # Shared libraries (Razorpay, Redis)
+│   ├── types/                      # TypeScript type definitions
+│   ├── public/                     # Static assets
+│   ├── supabase/                   # Supabase configuration
+│   ├── scripts/                    # Build & dev scripts
+│   ├── package.json                # Dependencies & scripts
+│   ├── Dockerfile                  # Container config
+│   └── README.md                   # Web app documentation
 ```
+
+> For detailed documentation of each sub-project, see:
+> - [Mobile App Documentation](./myApp/README.md)
+> - [Web Backend & Dashboard Documentation](./web/README.md)
 
 ---
 
@@ -136,16 +188,17 @@ Bassh/
 
 ### Users (Mobile App)
 
-- **Interactive Map** — Location-based event discovery with heatmap visualization
+- **Interactive Map** — Location-based event discovery with Mapbox heatmap visualization
 - **Event Discovery** — Browse and filter by category, age limit, DJ, date, time, and capacity
 - **Real-time Search** — Instant search across events and clubs
 - **Ticket Booking** — Multi-participant booking with age validation
 - **Smart Pricing** — Automatic stag/couple pricing based on participant gender distribution
-- **Payment Processing** — Secure Razorpay payment integration
+- **Payment Processing** — Secure Razorpay payment integration (native SDK)
 - **QR Code Entry** — Digital QR codes generated on successful booking
 - **Booking History** — View past and upcoming bookings
 - **Wallet** — Quick-add wallet with ongoing event cards
 - **Club Filtering** — Filter clubs by tier, rating, price range, and guest count
+- **Bookmarks** — Save favourite events and clubs
 - **Notifications** — In-app notifications for booking confirmations and updates
 - **Onboarding** — Guided setup for new users
 
@@ -157,15 +210,16 @@ Bassh/
 
 ### Club Owners (Web Dashboard)
 
-- **Revenue Dashboard** — Real-time revenue tracking with trend charts
+- **Revenue Dashboard** — Real-time revenue tracking with trend charts (Recharts)
 - **Booking Analytics** — Current bookings with daily change metrics
 - **Event Management** — Create, update, and delete events with image uploads
-- **Pricing Tiers** — Configure multiple ticket pricing (stag/couple)
+- **Pricing Tiers** — Configure multiple ticket pricing tiers (stag/couple by time slot)
 - **Discount Management** — Create and manage discount codes with scheduling
 - **Guest List** — Manage guest lists with approval, VIP, and suspend actions
-- **Billing & Payouts** — Transaction history, PDF export, and payout claims
+- **Billing & Payouts** — Transaction history, PDF invoice export, and payout claims
 - **Menu Management** — Club menu configuration
-- **Settings** — Club info, location picker, visuals, legal policies, and operational details
+- **Settings** — Club info, location picker (Google Maps), visuals, legal policies, and operational details
+- **Notifications** — Send notifications to individual users, bulk, or all users
 
 ---
 
@@ -173,13 +227,13 @@ Bassh/
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Expo CLI (`npm install -g expo-cli`)
-- Docker & Docker Compose (optional)
-- Supabase account and project
-- Razorpay account
-- Mapbox account
-- Twilio account (for WhatsApp OTP)
+- **Node.js** 18+ and npm
+- **Expo CLI** (`npm install -g expo-cli`) — for mobile development
+- **Docker & Docker Compose** — optional, for containerized development
+- **Supabase** account and project
+- **Razorpay** account (test or live keys)
+- **Mapbox** account (for map tokens)
+- **Twilio** account (for WhatsApp OTP)
 
 ### Installation
 
@@ -190,27 +244,26 @@ git clone <repository-url>
 cd Bassh
 ```
 
-**2. Mobile App**
+**2. Install dependencies for both sub-projects**
 
 ```bash
+# Mobile app
 cd myApp
 npm install
-cp .env.example .env
-# Configure environment variables (see below)
-```
 
-**3. Web Backend**
-
-```bash
+# Web backend (in a separate terminal)
 cd web
 npm install
-cp .env.example .env
-# Configure environment variables (see below)
 ```
+
+**3. Configure environment variables**
+
+Create `.env` files in both `myApp/` and `web/` directories. See the [Environment Variables](#environment-variables) section below for required values.
 
 **4. Run with Docker (recommended)**
 
 ```bash
+# From the repository root
 docker-compose up --build
 ```
 
@@ -221,20 +274,22 @@ This starts:
 **5. Run locally (alternative)**
 
 ```bash
-# Terminal 1 — Mobile
-cd myApp && npm start
+# Terminal 1 — Mobile app
+cd myApp
+npm start
 
-# Terminal 2 — Web
-cd web && npm run dev
+# Terminal 2 — Web backend
+cd web
+npm run dev
 ```
 
 ---
 
 ## Environment Variables
 
-For detailed setup instructions and descriptions of each variable, refer to the README files in each sub-directory:
-- [Mobile App Environment Setup](./myApp/README.md)
-- [Web & API Environment Setup](./web/README.md)
+Each sub-project requires its own `.env` file. For detailed descriptions of each variable, refer to the sub-project READMEs:
+- [Mobile App Environment Setup](./myApp/README.md#environment-variables)
+- [Web Backend Environment Setup](./web/README.md#environment-variables)
 
 ### Mobile App (`myApp/.env`)
 
@@ -270,7 +325,41 @@ REDIS_REST_TOKEN=your_redis_token
 
 ---
 
+## Docker Setup
+
+The project uses Docker Compose to orchestrate both services from the repository root.
+
+### Services
+
+| Service       | Container Name | Port | Description              |
+|---------------|----------------|------|--------------------------|
+| `expo`        | bassh-expo     | 8081 | Expo dev server (mobile) |
+| `web`         | bassh-web      | 3000 | Next.js server (API + dashboard) |
+
+Both services use Node 20 Alpine images, mount local source directories as volumes for hot-reloading, and read environment variables from their respective `.env` files.
+
+### Commands
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Start in detached mode
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# Rebuild a specific service
+docker-compose up --build web
+docker-compose up --build expo
+```
+
+---
+
 ## Database Schema
+
+The application uses Supabase (PostgreSQL) with the following core tables.
 
 ### Core Tables
 
@@ -301,6 +390,8 @@ REDIS_REST_TOKEN=your_redis_token
 | latitude, longitude | Decimal     | Geographic coordinates   |
 | address_text        | Text        | Display address          |
 | guest_count         | Integer     | Current guest count      |
+| tier                | Text        | Club tier level          |
+| rating              | Decimal     | Club rating              |
 
 **`events`** — Event listings
 
@@ -317,96 +408,135 @@ REDIS_REST_TOKEN=your_redis_token
 
 **`event_ticket_pricing`** — Ticket pricing tiers
 
-| Column       | Type        | Description              |
-|--------------|-------------|--------------------------|
-| id           | UUID (PK)   | Pricing tier identifier  |
-| event_id     | UUID (FK)   | References events.id     |
-| label        | Text        | Tier name (e.g. "Before 11 PM") |
-| stag_price   | Decimal     | Price for single entry   |
-| couple_price | Decimal     | Price for couple entry   |
+| Column       | Type        | Description                          |
+|--------------|-------------|--------------------------------------|
+| id           | UUID (PK)   | Pricing tier identifier              |
+| event_id     | UUID (FK)   | References events.id                 |
+| label        | Text        | Tier name (e.g. "Before 11 PM")     |
+| stag_price   | Decimal     | Price for single entry               |
+| couple_price | Decimal     | Price for couple entry               |
 
 **`bookings`** — Booking records
 
-| Column              | Type        | Description              |
-|---------------------|-------------|--------------------------|
-| id                  | UUID (PK)   | Booking identifier       |
-| user_id             | UUID (FK)   | References users.id      |
-| event_id            | UUID (FK)   | References events.id     |
-| participants        | JSONB       | Participant details      |
-| total_amount        | Decimal     | Total booking amount     |
-| money_saved         | Decimal     | Discount amount applied  |
-| booking_status      | Enum        | `pending`, `confirmed`, `cancelled` |
-| razorpay_order_id   | Text        | Razorpay order reference |
-| qr_code             | Text        | Base64 QR code data URL  |
-| entry_status        | Enum        | `not_entered`, `entered` |
+| Column              | Type        | Description                                  |
+|---------------------|-------------|----------------------------------------------|
+| id                  | UUID (PK)   | Booking identifier                           |
+| user_id             | UUID (FK)   | References users.id                          |
+| event_id            | UUID (FK)   | References events.id                         |
+| participants        | JSONB       | Participant details (name, gender, age)      |
+| total_amount        | Decimal     | Total booking amount                         |
+| money_saved         | Decimal     | Discount amount applied                      |
+| booking_status      | Enum        | `pending`, `confirmed`, `cancelled`          |
+| razorpay_order_id   | Text        | Razorpay order reference                     |
+| qr_code             | Text        | Base64 QR code data URL                      |
+| entry_status        | Enum        | `not_entered`, `entered`                     |
 
 **`staff`** — Staff members
 
-| Column    | Type        | Description              |
-|-----------|-------------|--------------------------|
-| id        | UUID (FK)   | References users.id      |
-| club_id   | UUID (FK)   | References clubs.id      |
-| club_name | Text        | Associated club name     |
-| status    | Enum        | `pending`, `approved`, `rejected` |
+| Column    | Type        | Description                              |
+|-----------|-------------|------------------------------------------|
+| id        | UUID (FK)   | References users.id                      |
+| club_id   | UUID (FK)   | References clubs.id                      |
+| club_name | Text        | Associated club name                     |
+| status    | Enum        | `pending`, `approved`, `rejected`        |
+
+**Additional tables:** `discounts`, `transactions`, `notifications`, `reviews`, `bookmarks`
 
 ---
 
 ## API Documentation
 
-### Authentication
-
-All protected endpoints require a Bearer token:
+All API endpoints are served from the Next.js backend under `/api/`. Protected endpoints require a Bearer token.
 
 ```
 Authorization: Bearer <supabase_access_token>
 ```
 
-### Endpoints
+### Authentication
 
-#### Events
+| Method | Endpoint                         | Description                    |
+|--------|----------------------------------|--------------------------------|
+| POST   | `/api/auth/send-otp`             | Send OTP via SMS               |
+| POST   | `/api/auth/verify-otp`           | Verify SMS OTP                 |
+| POST   | `/api/auth/send-whatsapp-otp`    | Send OTP via WhatsApp          |
+| POST   | `/api/auth/verify-whatsapp-otp`  | Verify WhatsApp OTP & create session |
+| POST   | `/api/auth/save-phone`           | Save phone number to profile   |
 
-| Method | Endpoint                | Description                              |
-|--------|------------------------|------------------------------------------|
-| GET    | `/api/events`          | List events with filters (lat, lng, radius, date) |
-| GET    | `/api/events/[id]`     | Event details with pricing and club info |
-| POST   | `/api/events`          | Create event (club owners only)          |
-| PATCH  | `/api/events/patch`    | Update event details                     |
-| DELETE | `/api/events/delete`   | Delete event                             |
+### Events
 
-#### Bookings
+| Method | Endpoint                         | Description                              |
+|--------|----------------------------------|------------------------------------------|
+| GET    | `/api/events/[id]`               | Event details with pricing and club info |
+| POST   | `/api/events`                    | Create event (club owners only)          |
+| PATCH  | `/api/events`                    | Update event details                     |
+| DELETE | `/api/events/delete`             | Delete event                             |
+| GET    | `/api/events/[id]/discounts`     | Get discounts for an event               |
+| GET    | `/api/events/[id]/guest-list`    | Get guest list for an event              |
+| GET    | `/api/events/club`               | Get events for a club                    |
+| GET    | `/api/events/attendees`          | Get event attendees                      |
 
-| Method | Endpoint                   | Description                              |
-|--------|---------------------------|------------------------------------------|
-| POST   | `/api/bookings/create`    | Create booking with participants         |
-| GET    | `/api/bookings/event/[id]`| Event pricing and availability           |
+### Bookings
 
-#### Payments
+| Method | Endpoint                         | Description                              |
+|--------|----------------------------------|------------------------------------------|
+| POST   | `/api/bookings/create`           | Create booking with participants         |
+| GET    | `/api/bookings/[id]`             | Get booking details                      |
+| POST   | `/api/bookings/[id]/cancel`      | Cancel a booking                         |
+| GET    | `/api/bookings/event/[id]`       | Event pricing and availability           |
+| GET    | `/api/bookings/my-bookings`      | Get current user's bookings              |
+| POST   | `/api/bookings/table/create`     | Create table booking                     |
+
+### Payments
 
 | Method | Endpoint                              | Description                    |
-|--------|--------------------------------------|--------------------------------|
-| POST   | `/api/payments/checkout/create-order`| Create Razorpay order          |
-| POST   | `/api/payments/verify`               | Verify payment and generate QR |
+|--------|---------------------------------------|--------------------------------|
+| POST   | `/api/payments/checkout`              | Create Razorpay order          |
+| POST   | `/api/payments/verify`                | Verify payment and generate QR |
+| POST   | `/api/payments/event`                 | Event payment processing       |
+| POST   | `/api/payments/table`                 | Table payment processing       |
+| GET    | `/api/payments/bill`                  | Get bill details               |
+| GET    | `/api/payments/wallet`                | Get wallet information         |
 
-#### Clubs
+### Clubs
 
-| Method | Endpoint             | Description                 |
-|--------|---------------------|-----------------------------|
-| GET    | `/api/clubs/[id]`   | Club details with events    |
-| GET    | `/api/clubs/nearby`  | Nearby clubs (lat, lng, radius) |
+| Method | Endpoint                         | Description                              |
+|--------|----------------------------------|------------------------------------------|
+| GET    | `/api/clubs/[id]`                | Club details                             |
+| GET    | `/api/clubs/[id]/nearby`         | Nearby clubs                             |
+| GET    | `/api/club/revenue`              | Revenue data (club owner)                |
+| GET    | `/api/club/location`             | Club location data                       |
+| GET    | `/api/club/events/upcoming`      | Upcoming events for club                 |
+| GET    | `/api/club/discounts`            | Club discounts                           |
+| GET    | `/api/club/bookings`             | Club bookings                            |
+| GET    | `/api/club/payouts/history`      | Payout history                           |
+| GET    | `/api/club/billing/pdf`          | Generate billing PDF                     |
+| GET    | `/api/club/billing/summary`      | Billing summary                          |
+| GET    | `/api/club/timing`               | Operational hours                        |
+| GET    | `/api/club/visuals`              | Club images                              |
 
-#### Map
+### Map & Discovery
 
-| Method | Endpoint            | Description                 |
-|--------|--------------------|-----------------------------|
-| GET    | `/api/map/heatmap` | Heatmap data for map        |
-| GET    | `/api/map/nearby`  | Nearby events for markers   |
+| Method | Endpoint                         | Description                    |
+|--------|----------------------------------|--------------------------------|
+| GET    | `/api/map/heatmap`               | Heatmap data for map           |
+| GET    | `/api/map/heatmap/live`          | Live heatmap data              |
+| GET    | `/api/map/heatmap/nearby`        | Nearby heatmap data            |
+| GET    | `/api/map/nearby`                | Nearby events for markers      |
+| GET    | `/api/search`                    | Search events and clubs        |
 
-#### Auth
+### Other Endpoints
 
-| Method | Endpoint                        | Description             |
-|--------|---------------------------------|-------------------------|
-| POST   | `/api/auth/send-whatsapp-otp`  | Send OTP via WhatsApp   |
-| POST   | `/api/auth/verify-whatsapp-otp`| Verify OTP and create session |
+| Method | Endpoint                         | Description                    |
+|--------|----------------------------------|--------------------------------|
+| POST   | `/api/notifications/send`        | Send notification              |
+| POST   | `/api/notifications/send-bulk`   | Send bulk notifications        |
+| POST   | `/api/notifications/send-all`    | Send to all users              |
+| POST   | `/api/bookmarks/save`            | Save bookmark                  |
+| GET    | `/api/bookmarks/fetch`           | Fetch bookmarks                |
+| GET    | `/api/bookmarks/check`           | Check bookmark status          |
+| GET    | `/api/users/[id]`                | Get user profile               |
+| GET    | `/api/transactions/[id]`         | Get transaction details        |
+| GET    | `/api/health`                    | Health check                   |
 
 ---
 
@@ -414,50 +544,48 @@ Authorization: Bearer <supabase_access_token>
 
 ### Razorpay Flow
 
-1. Backend creates Razorpay order with booking amount
-2. Mobile app opens Razorpay native payment screen
-3. User completes payment
-4. Backend verifies payment signature
-5. QR code generated and stored in booking
-6. User sees success page with QR code
+1. Backend creates Razorpay order with calculated booking amount
+2. Mobile app opens Razorpay native payment screen via `react-native-razorpay`
+3. User completes payment (UPI, card, net banking, etc.)
+4. Backend verifies payment signature using `razorpay_payment_id`, `razorpay_order_id`, and `razorpay_signature`
+5. QR code is generated (via `qrcode` library) and stored in the booking record
+6. User sees success page with downloadable QR code for venue entry
 
 ### Pricing Logic
 
-The system supports two pricing modes per tier:
+The system supports multiple pricing tiers per event (e.g., "Before 11 PM", "After 11 PM"):
 
 - **Stag Pricing** — Price for single entries
 - **Couple Pricing** — Price for couple entries
 
-Pricing is automatically calculated based on participant gender distribution and the selected time-based tier.
+Pricing is automatically calculated based on participant gender distribution and the selected time-based tier. Discounts can be applied via discount codes.
 
 ---
 
 ## Deployment
 
-### Mobile App
+### Mobile App (EAS Build)
 
 ```bash
-# iOS
 cd myApp
+
+# iOS
 eas build --platform ios
 eas submit --platform ios
 
 # Android
-cd myApp
 eas build --platform android
 eas submit --platform android
 ```
 
-### Web Backend
-
-**Vercel (recommended)**
+### Web Backend (Vercel — recommended)
 
 ```bash
 cd web
 vercel deploy
 ```
 
-**Docker**
+### Web Backend (Docker)
 
 ```bash
 cd web
@@ -479,9 +607,11 @@ Set all environment variables in your deployment platform (Vercel Project Settin
 
 ### Code Style
 
-- TypeScript for type safety
-- Follow ESLint configuration
-- Descriptive commit messages
+- TypeScript is used throughout both sub-projects for type safety
+- Follow the ESLint configuration in each sub-project
+- Use descriptive commit messages
+- Keep API route handlers in the Next.js `app/api/` directory following the App Router convention
+- Mobile screens follow Expo Router file-based routing conventions
 
 ---
 
