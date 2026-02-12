@@ -1,13 +1,17 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import supabasePublic from '@/_services/supabase-public';
+import { Colors } from '@/constants/Colors';
 
 import Mapbox from "@rnmapbox/maps";
+
+import type { Session } from '@supabase/supabase-js';
 
 // Set Mapbox access token from environment variable (same as Supabase setup)
 const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
@@ -16,92 +20,106 @@ if (mapboxToken) {
   Mapbox.setAccessToken(mapboxToken);
 }
 
-// Removed anchor to prevent default navigation to tabs
-// export const unstable_settings = {
-//   anchor: '(tabs)',
-// };
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
-  const hasBootstrapped = useRef(false);
+  const [isReady, setIsReady] = useState(false);
+  const isNavigating = useRef(false);
 
-  useEffect(() => {
-    const bootstrap = async () => {
-      // Only run bootstrap once on app start
-      if (hasBootstrapped.current) return;
-      hasBootstrapped.current = true;
+  // Route user based on session and onboarding status
+  const routeUser = useCallback(async (session: Session | null) => {
+    // Prevent concurrent navigation
+    if (isNavigating.current) return;
+    isNavigating.current = true;
 
-      // Check current route using segments array (cast for expo-router segment types)
+    try {
       const segs = segments as string[];
-      const isOnAuthPage = segs.includes('(auth)') || segs.includes('auth') || segs.length === 0;
       const isOnOnboardingPage = segs.includes('onboarding');
-      const isOnTabsPage = segs.includes('(tabs)');
 
       // CRITICAL: If user is on onboarding, NEVER redirect away - let them complete it
       if (isOnOnboardingPage) {
         return;
       }
 
-      const { data: sessionData } = await supabasePublic.auth.getSession();
-
-      // If no session, redirect to auth (unless already on auth page)
-      if (!sessionData.session) {
-        if (!isOnAuthPage && !isOnOnboardingPage) {
-          router.replace("/(auth)");
-        }
+      if (!session) {
+        // No session → go to auth
+        router.replace("/(auth)");
         return;
       }
 
-      // If we're already on auth page but have session, don't redirect (let user complete auth flow)
-      if (isOnAuthPage) {
-        return;
-      }
-
-      // Check onboarding status from customers table
+      // Session exists → check onboarding status
       try {
         const { data, error } = await supabasePublic
           .from("customers")
           .select("onboarding_completed")
-          .eq("id", sessionData.session.user.id)
+          .eq("id", session.user.id)
           .single();
 
         if (error) {
-          // PGRST116 means no rows found - customer doesn't exist yet, go to onboarding
           if (error.code === "PGRST116") {
-            if (!isOnOnboardingPage && !isOnAuthPage) {
-              router.replace("/onboarding/about-you");
-            }
+            // No customer row yet → needs onboarding
+            router.replace("/onboarding/about-you");
             return;
           }
-          // For other errors, don't redirect (especially if on onboarding)
+          // Other DB errors → default to tabs (user is authenticated)
+          router.replace("/(tabs)");
           return;
         }
 
-        // If onboarding not completed, redirect to onboarding (unless already there or on auth)
         if (!data?.onboarding_completed) {
-          if (!isOnOnboardingPage && !isOnAuthPage) {
-            router.replace("/onboarding/about-you");
-          }
+          router.replace("/onboarding/about-you");
         } else {
-          // Onboarding completed, redirect to tabs (unless already there or on onboarding/auth)
-          if (!isOnTabsPage && !isOnOnboardingPage && !isOnAuthPage) {
-            router.replace("/(tabs)");
-          }
+          router.replace("/(tabs)");
         }
       } catch {
-        // ignore bootstrap errors
+        // DB check failed but user is authenticated → go to tabs
+        router.replace("/(tabs)");
       }
-    };
-
-    // Small delay to ensure segments are populated
-    const timer = setTimeout(() => {
-      bootstrap();
-    }, 100);
-
-    return () => clearTimeout(timer);
+    } finally {
+      isNavigating.current = false;
+    }
   }, [router, segments]);
+
+  useEffect(() => {
+    // Listen for auth state changes including the initial session restore from storage.
+    // INITIAL_SESSION fires once Supabase has finished reading the persisted session
+    // from AsyncStorage, so we avoid the race condition of calling getSession() too early.
+    const { data: { subscription } } = supabasePublic.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'INITIAL_SESSION') {
+          // Session restored from storage (or null if none persisted)
+          await routeUser(session);
+          setIsReady(true);
+        } else if (event === 'SIGNED_IN') {
+          // User just logged in — login/signup pages handle their own redirect,
+          // so we only route here if the app isn't already navigating
+          // (e.g. token refresh that yields a new SIGNED_IN event)
+          if (isReady) {
+            await routeUser(session);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          router.replace("/(auth)");
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Token refreshed silently — no navigation needed
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [routeUser, isReady, router]);
+
+  // Show a loading screen until the initial session check completes.
+  // This prevents a flash of the auth screen for logged-in users.
+  if (!isReady) {
+    return (
+      <View style={splashStyles.container}>
+        <ActivityIndicator size="large" color={Colors.dark.primary} />
+      </View>
+    );
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -121,3 +139,12 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.dark.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
