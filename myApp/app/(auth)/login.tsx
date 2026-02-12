@@ -97,7 +97,7 @@ export default function AuthScreen() {
       return;
     }
     setLoginError("");
-    const { error } = await supabasePublic.auth.signInWithPassword({
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
       email: loginEmail.trim(),
       password: loginPassword,
     });
@@ -105,6 +105,14 @@ export default function AuthScreen() {
       setLoginError(error.message);
       return;
     }
+
+    const profileStatus = await ensureUserProfile(loginEmail.trim());
+    if (profileStatus === "new") {
+      router.replace("/onboarding/about-you" as Parameters<typeof router.replace>[0]);
+      return;
+    }
+
+    await redirectToRoleHome(router);
   };
 
   const handleGoogleSignIn = async () => {
