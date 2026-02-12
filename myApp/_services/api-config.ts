@@ -2,7 +2,7 @@
  * API Configuration
  * Derived from Environment Variables or falling back to the production URL.
  */
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || "https://bassh-green.vercel.app").replace(/\/$/, "");
+export const API_BASE_URL = "https://irrefutably-nondiscordant-ethan.ngrok-free.dev";
 
 /**
  * Fallback API URL

@@ -41,7 +41,7 @@ export default function PhoneScreen() {
     try {
       setLoading(true);
 
-      const res = await fetchWithFallback(`/api/auth/send-whatsapp-otp`, {
+      const res = await fetchWithFallback(`/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: fullPhone }),

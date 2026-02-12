@@ -9,35 +9,56 @@ export async function POST(req: Request) {
 
     if (!phone || !otp) {
       return Response.json(
-        { error: "Phone and OTP required" },
+        { error: "Phone and OTP are required" },
         { status: 400 }
       );
     }
 
+    // Hash the provided OTP
     const otpHash = crypto
       .createHash("sha256")
       .update(otp)
       .digest("hex");
 
-    const { data: row } = await supabaseAdmin
+    // Find matching OTP record
+    const { data: otpRecords, error: fetchError } = await supabaseAdmin
       .from("phone_otps")
-      .select("id")
+      .select("*")
       .eq("phone", phone)
       .eq("otp_hash", otpHash)
-      .eq("verified", false)
-      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
-    if (!row) {
-      return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
+    if (fetchError) {
+      console.error("Database fetch error:", fetchError);
+      return Response.json(
+        { error: "Failed to verify OTP" },
+        { status: 500 }
+      );
     }
 
+    if (!otpRecords || otpRecords.length === 0) {
+      return Response.json(
+        { error: "Invalid OTP" },
+        { status: 400 }
+      );
+    }
+
+    const otpRecord = otpRecords[0];
+
+    // Check if OTP has expired
+    if (new Date(otpRecord.expires_at) < new Date()) {
+      return Response.json(
+        { error: "OTP has expired. Please request a new one." },
+        { status: 400 }
+      );
+    }
+
+    // Delete used OTP
     await supabaseAdmin
       .from("phone_otps")
-      .update({ verified: true })
-      .eq("id", row.id);
+      .delete()
+      .eq("id", otpRecord.id);
 
     return Response.json({ ok: true });
   } catch (err: any) {

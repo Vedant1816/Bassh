@@ -31,6 +31,8 @@ export default function OtpScreen() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [countdown, setCountdown] = useState(30);
+  const [canResend, setCanResend] = useState(false);
 
   const inputRefs = [
     useRef<TextInput>(null),
@@ -40,6 +42,16 @@ export default function OtpScreen() {
     useRef<TextInput>(null),
     useRef<TextInput>(null),
   ];
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setCanResend(true);
+    }
+  }, [countdown]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -72,6 +84,32 @@ export default function OtpScreen() {
     }
   };
 
+  const resendOtp = async () => {
+    if (!canResend || !phone) return;
+
+    try {
+      setError("");
+      setCanResend(false);
+      setCountdown(30);
+
+      const res = await fetchWithFallback(`/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs[0].current?.focus();
+    } catch (e: any) {
+      setError(e.message || "Failed to resend OTP");
+      setCanResend(true);
+      setCountdown(0);
+    }
+  };
+
   const verifyOtp = async (otpCode?: string) => {
     const code = otpCode || otp.join("");
     if (code.length !== 6) return;
@@ -85,7 +123,7 @@ export default function OtpScreen() {
       setLoading(true);
       setError("");
 
-      // Step 1: Verify OTP via API (OTP is logged in server console when sent)
+      // Step 1: Verify OTP via API
       const verifyRes = await fetchWithFallback(`/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,7 +134,7 @@ export default function OtpScreen() {
 
       // Step 2: Save phone to customer table (use existing session)
       const res = await fetchWithFallback(
-        `/api/auth/verify-whatsapp-otp`,
+        `/api/auth/save-phone`,
         await withAuthHeaders({
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -188,6 +226,18 @@ export default function OtpScreen() {
           {error ? (
             <Text style={styles.error}>{error}</Text>
           ) : null}
+
+          <View style={styles.resendContainer}>
+            {canResend ? (
+              <Pressable onPress={resendOtp}>
+                <Text style={styles.resendButton}>Resend code</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.resendTimer}>
+                Resend code in {countdown}s
+              </Text>
+            )}
+          </View>
         </View>
 
         <View style={styles.bottomContainer}>
@@ -198,7 +248,7 @@ export default function OtpScreen() {
             style={styles.sendButton}
             textStyle={styles.buttonText}
           >
-            Send code
+            Verify code
           </ThemedButton>
 
           <View style={styles.homeIndicator} />
@@ -307,6 +357,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: 24,
     textAlign: "center",
+  },
+
+  resendContainer: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+    alignItems: "center",
+  },
+
+  resendButton: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.dark.primary,
+  },
+
+  resendTimer: {
+    fontSize: 15,
+    color: Colors.dark.textSecondary,
   },
 
   bottomContainer: {

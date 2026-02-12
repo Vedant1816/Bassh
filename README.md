@@ -232,31 +232,40 @@ cd web && npm run dev
 
 ## Environment Variables
 
+For detailed setup instructions and descriptions of each variable, refer to the README files in each sub-directory:
+- [Mobile App Environment Setup](./myApp/README.md)
+- [Web & API Environment Setup](./web/README.md)
+
 ### Mobile App (`myApp/.env`)
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-EXPO_PUBLIC_API_URL=http://localhost:3000
-EXPO_PUBLIC_MAPBOX_TOKEN=your_mapbox_token
-EXPO_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key_id
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_ANON_KEY=your_anon_key
+SERVICE_ROLE_KEY=your_service_role_key
+
+EXPO_PUBLIC_API_URL=https://your-api.vercel.app/
+EXPO_PUBLIC_MAPBOX_TOKEN=pk.your_public_token
+EXPO_PUBLIC_MAPBOX_SECRET_TOKEN=sk.your_secret_token
+EXPO_PUBLIC_RAZORPAY_KEY_ID=rzp_test_your_id
 ```
 
 ### Web Backend (`web/.env`)
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_ANON_KEY=your_anon_key
+SERVICE_ROLE_KEY=your_service_role_key
 
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=your_number
 
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+RAZORPAY_KEY_ID=rzp_test_your_id
+RAZORPAY_KEY_SECRET=your_secret
 
-APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=bassh://payment/redirect
+REDIS_REST_URL=https://your-redis.upstash.io
+REDIS_REST_TOKEN=your_redis_token
 ```
 
 ---
