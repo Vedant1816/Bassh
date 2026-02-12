@@ -36,7 +36,7 @@ export default function ContactUsPage() {
           <div className="text-pink-500 text-4xl mb-4">&#10003;</div>
           <h2 className="text-lg font-semibold mb-2">Query Submitted</h2>
           <p className="text-sm text-gray-400 mb-6">
-            Thank you for reaching out. We&apos;ll get back to you soon.
+            Thanks for reaching out. We&apos;ll get back to you soon.
           </p>
           <button
             onClick={() => {
