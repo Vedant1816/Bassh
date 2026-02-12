@@ -411,7 +411,7 @@ export default function HomeScreen() {
 
     // Fetch immediately, then every 5 minutes
     fetchHeatmap();
-    const interval = setInterval(fetchHeatmap, 5 * 60 * 1000);
+    const interval = setInterval(fetchHeatmap, 2 * 60 * 1000);
 
     return () => {
       cancelled = true;
@@ -494,22 +494,22 @@ export default function HomeScreen() {
             id="heatmap-layer"
             layerIndex={0}
             style={{
-              heatmapRadius: 100,
+              heatmapRadius: 80,
               heatmapWeight: ["get", "intensity"] as any,
-              heatmapIntensity: 1.2,
-              heatmapOpacity: 0.8,
+              heatmapIntensity: 1.5,
+              heatmapOpacity: 0.9,
               heatmapColor: [
                 "interpolate",
                 ["linear"],
                 ["heatmap-density"],
 
                 0,
-                "rgba(0,0,0,0)",
+                "rgba(0, 0, 0, 0)",
 
-                0.08,
+                0.05,
                 "rgba(50, 190, 100, 0.55)",   // green
 
-                0.16,
+                0.14,
                 "rgba(120, 220, 80, 0.65)",   // light green
 
                 0.28,

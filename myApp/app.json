@@ -14,7 +14,7 @@
       "RAZORPAY_KEY_ID": "${EXPO_PUBLIC_RAZORPAY_KEY_ID}",
       "router": {},
       "eas": {
-        "projectId": "03f531e1-6b44-4d13-ae82-8b5e67bb578b"
+        "projectId": "53f809e9-7072-48e1-bcbc-8be389eda29b"
       }
     },
     "ios": {
